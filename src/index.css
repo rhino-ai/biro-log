@@ -44,6 +44,8 @@
     --streak: 25 95% 53%;
     --raid: 0 84% 60%;
     --level: 263 70% 58%;
+    --coins: 48 96% 53%;
+    --streak: 25 95% 53%;
 
     /* Destructive */
     --destructive: 0 84% 60%;
@@ -126,6 +128,10 @@
 
   .text-glow-gold {
     text-shadow: 0 0 10px hsl(48, 96%, 53%, 0.8), 0 0 20px hsl(48, 96%, 53%, 0.5);
+  }
+
+  .text-glow-raid {
+    text-shadow: 0 0 10px hsl(0, 84%, 60%, 0.8), 0 0 20px hsl(0, 84%, 60%, 0.5);
   }
 
   /* Progress Bar Glow */

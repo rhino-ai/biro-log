@@ -5,7 +5,11 @@ import { StatCard } from '@/components/game/StatCard';
 import { XPBar } from '@/components/game/XPBar';
 import { JungleCard } from '@/components/game/JungleCard';
 import { ExamCountdown } from '@/components/game/ExamCountdown';
-import { useNavigate } from 'react-router-dom';
+import { ActivityLog } from '@/components/game/ActivityLog';
+import { QuestPanel } from '@/components/game/QuestPanel';
+import { useNavigate, Link } from 'react-router-dom';
+import { Swords } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 // Exam dates for 2026
 const examDates = {
@@ -55,6 +59,26 @@ const Index = () => {
           />
         </div>
 
+        {/* Raid Alert Banner */}
+        {backlogCount > 0 && (
+          <Link 
+            to="/raid"
+            className={cn(
+              "glass-panel rounded-2xl p-4 border border-destructive/30 flex items-center justify-between",
+              "animate-pulse cursor-pointer hover:border-destructive/50 transition-colors"
+            )}
+          >
+            <div className="flex items-center gap-3">
+              <div className="text-3xl animate-bounce-subtle">👹</div>
+              <div>
+                <h3 className="font-game text-destructive text-sm">RAID ACTIVE!</h3>
+                <p className="text-xs text-muted-foreground">Defeat the Lecture Backlog boss</p>
+              </div>
+            </div>
+            <Swords className="w-6 h-6 text-destructive" />
+          </Link>
+        )}
+
         {/* Overall Jungle Health */}
         <div className="glass-panel rounded-2xl p-4 animate-fade-in" style={{ animationDelay: '0.3s' }}>
           <div className="flex items-center justify-between mb-3">
@@ -90,6 +114,11 @@ const Index = () => {
           </div>
         </div>
 
+        {/* Quest Panel */}
+        <div className="animate-fade-in" style={{ animationDelay: '0.45s' }}>
+          <QuestPanel />
+        </div>
+
         {/* Jungles Section */}
         <div className="space-y-4 animate-fade-in" style={{ animationDelay: '0.5s' }}>
           <h2 className="font-game text-lg flex items-center gap-2">
@@ -104,6 +133,11 @@ const Index = () => {
               />
             ))}
           </div>
+        </div>
+
+        {/* Activity Log */}
+        <div className="animate-fade-in" style={{ animationDelay: '0.55s' }}>
+          <ActivityLog />
         </div>
 
         {/* Quick Tips */}

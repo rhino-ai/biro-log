@@ -4,8 +4,12 @@ import { useGameStore } from '@/store/gameStore';
 import { Header } from '@/components/layout/Header';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { ChapterList } from '@/components/game/ChapterList';
+import { JungleMap } from '@/components/game/JungleMap';
+import { ProgressRadar } from '@/components/game/ProgressRadar';
+import { ChaptersGrid } from '@/components/game/ChaptersGrid';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ArrowLeft, Map, List, BarChart3, Grid3X3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type Subject = 'all' | 'physics' | 'chemistry' | 'mathematics';
@@ -22,6 +26,7 @@ const JungleDetailPage = () => {
   const navigate = useNavigate();
   const { jungles, calculateJungleHealth } = useGameStore();
   const [activeSubject, setActiveSubject] = useState<Subject>('all');
+  const [viewMode, setViewMode] = useState<'list' | 'map' | 'grid'>('list');
 
   const jungle = jungles.find((j) => j.id === jungleId);
 
@@ -103,32 +108,63 @@ const JungleDetailPage = () => {
           </div>
         </div>
 
-        {/* Subject Filters */}
-        <div className="flex gap-2 overflow-x-auto pb-2 animate-fade-in" style={{ animationDelay: '0.1s' }}>
-          {subjectFilters.map((filter) => (
-            <button
-              key={filter.key}
-              onClick={() => setActiveSubject(filter.key)}
-              className={cn(
-                'flex items-center gap-2 px-4 py-2 rounded-full whitespace-nowrap transition-all duration-300',
-                activeSubject === filter.key
-                  ? 'glass-panel glow-purple text-foreground'
-                  : 'bg-secondary/50 text-muted-foreground hover:bg-secondary'
-              )}
-            >
-              <span>{filter.icon}</span>
-              <span className="text-sm">{filter.label}</span>
-              {filter.key !== 'all' && (
-                <span className="text-xs opacity-70">({subjectCounts[filter.key]})</span>
-              )}
-            </button>
-          ))}
+        {/* Progress Radar */}
+        <div className="animate-fade-in" style={{ animationDelay: '0.1s' }}>
+          <ProgressRadar jungleId={jungle.id} />
         </div>
 
-        {/* Chapters */}
-        <div className="animate-fade-in" style={{ animationDelay: '0.2s' }}>
-          <ChapterList jungle={jungle} filterSubject={activeSubject} />
-        </div>
+        {/* View Mode Tabs */}
+        <Tabs defaultValue="list" className="space-y-4">
+          <TabsList className="glass-panel w-full grid grid-cols-3">
+            <TabsTrigger value="list" className="gap-1">
+              <List className="w-4 h-4" />
+              <span className="hidden sm:inline">List</span>
+            </TabsTrigger>
+            <TabsTrigger value="map" className="gap-1">
+              <Map className="w-4 h-4" />
+              <span className="hidden sm:inline">Map</span>
+            </TabsTrigger>
+            <TabsTrigger value="grid" className="gap-1">
+              <Grid3X3 className="w-4 h-4" />
+              <span className="hidden sm:inline">Grid</span>
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="list" className="space-y-4">
+            {/* Subject Filters */}
+            <div className="flex gap-2 overflow-x-auto pb-2">
+              {subjectFilters.map((filter) => (
+                <button
+                  key={filter.key}
+                  onClick={() => setActiveSubject(filter.key)}
+                  className={cn(
+                    'flex items-center gap-2 px-4 py-2 rounded-full whitespace-nowrap transition-all duration-300',
+                    activeSubject === filter.key
+                      ? 'glass-panel glow-purple text-foreground'
+                      : 'bg-secondary/50 text-muted-foreground hover:bg-secondary'
+                  )}
+                >
+                  <span>{filter.icon}</span>
+                  <span className="text-sm">{filter.label}</span>
+                  {filter.key !== 'all' && (
+                    <span className="text-xs opacity-70">({subjectCounts[filter.key]})</span>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            {/* Chapters List */}
+            <ChapterList jungle={jungle} filterSubject={activeSubject} />
+          </TabsContent>
+
+          <TabsContent value="map">
+            <JungleMap jungle={jungle} />
+          </TabsContent>
+
+          <TabsContent value="grid">
+            <ChaptersGrid jungle={jungle} />
+          </TabsContent>
+        </Tabs>
       </main>
 
       <BottomNav />
