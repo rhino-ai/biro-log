@@ -8,6 +8,8 @@ import JunglesPage from "./pages/JunglesPage";
 import JungleDetailPage from "./pages/JungleDetailPage";
 import TasksPage from "./pages/TasksPage";
 import ProfilePage from "./pages/ProfilePage";
+import RaidPage from "./pages/RaidPage";
+import AdminPage from "./pages/AdminPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -24,6 +26,8 @@ const App = () => (
           <Route path="/jungle/:jungleId" element={<JungleDetailPage />} />
           <Route path="/tasks" element={<TasksPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/raid" element={<RaidPage />} />
+          <Route path="/admin" element={<AdminPage />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
