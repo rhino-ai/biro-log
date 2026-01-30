@@ -6,9 +6,10 @@ import { Avatar } from '@/components/game/Avatar';
 import { XPBar } from '@/components/game/XPBar';
 import { StatCard } from '@/components/game/StatCard';
 import { RewardsList } from '@/components/game/RewardsList';
+import { ExamDateEditor } from '@/components/game/ExamDateEditor';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Edit2, Save } from 'lucide-react';
+import { Edit2, Save, Zap } from 'lucide-react';
 
 const avatarOptions = ['👨‍🎓', '👩‍🎓', '🧑‍💻', '👨‍🔬', '👩‍🔬', '🦸', '🦹', '🧙', '🥷', '🎮'];
 
@@ -32,10 +33,10 @@ const ProfilePage = () => {
       
       <main className="px-4 py-6 max-w-lg mx-auto space-y-6">
         {/* Profile Card */}
-        <div className="glass-panel rounded-2xl p-6 text-center animate-fade-in">
+        <div className="glass-panel rounded-2xl p-6 text-center animate-fade-in border border-primary/20">
           <div className="flex justify-end mb-2">
             {isEditing ? (
-              <Button size="sm" onClick={handleSave} className="gap-2">
+              <Button size="sm" onClick={handleSave} className="gap-2 bg-accent">
                 <Save size={14} /> Save
               </Button>
             ) : (
@@ -78,17 +79,61 @@ const ProfilePage = () => {
                 onChange={(e) => setEditedProfile({ ...editedProfile, dreamCollege: e.target.value })}
                 className="text-center bg-secondary/50"
               />
+
+              {/* Editable Dream Marks */}
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="text-xs text-muted-foreground">CBSE %</label>
+                  <Input
+                    type="number"
+                    value={editedProfile.dreamMarks.cbse}
+                    onChange={(e) => setEditedProfile({
+                      ...editedProfile,
+                      dreamMarks: { ...editedProfile.dreamMarks, cbse: parseInt(e.target.value) || 0 }
+                    })}
+                    className="text-center bg-secondary/50"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">JEE Main</label>
+                  <Input
+                    type="number"
+                    value={editedProfile.dreamMarks.jeeMain}
+                    onChange={(e) => setEditedProfile({
+                      ...editedProfile,
+                      dreamMarks: { ...editedProfile.dreamMarks, jeeMain: parseInt(e.target.value) || 0 }
+                    })}
+                    className="text-center bg-secondary/50"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground">JEE Adv</label>
+                  <Input
+                    type="number"
+                    value={editedProfile.dreamMarks.jeeAdvanced}
+                    onChange={(e) => setEditedProfile({
+                      ...editedProfile,
+                      dreamMarks: { ...editedProfile.dreamMarks, jeeAdvanced: parseInt(e.target.value) || 0 }
+                    })}
+                    className="text-center bg-secondary/50"
+                  />
+                </div>
+              </div>
             </div>
           ) : (
             <>
-              <h2 className="font-game text-xl mt-4">{profile.name}</h2>
+              <h2 className="font-game text-xl mt-4 flex items-center justify-center gap-2">
+                <Zap className="w-5 h-5 text-accent" />
+                {profile.name}
+                <Zap className="w-5 h-5 text-accent" />
+              </h2>
               <p className="text-muted-foreground text-sm">Level {level} Warrior</p>
             </>
           )}
         </div>
 
         {/* XP Progress */}
-        <div className="glass-panel rounded-2xl p-4 animate-fade-in" style={{ animationDelay: '0.1s' }}>
+        <div className="glass-panel rounded-2xl p-4 animate-fade-in border border-accent/30" style={{ animationDelay: '0.1s' }}>
           <XPBar />
         </div>
 
@@ -101,7 +146,7 @@ const ProfilePage = () => {
         </div>
 
         {/* Dream Goals */}
-        <div className="glass-panel rounded-2xl p-5 space-y-4 animate-fade-in" style={{ animationDelay: '0.2s' }}>
+        <div className="glass-panel rounded-2xl p-5 space-y-4 animate-fade-in border border-primary/20" style={{ animationDelay: '0.2s' }}>
           <h3 className="font-game text-lg flex items-center gap-2">
             <span>🎯</span> Dream Goals
           </h3>
@@ -115,23 +160,28 @@ const ProfilePage = () => {
           </div>
 
           <div className="grid grid-cols-3 gap-3 text-center">
-            <div className="glass-panel rounded-xl p-3">
-              <p className="text-xs text-muted-foreground">CBSE Target</p>
+            <div className="glass-panel rounded-xl p-3 border border-primary/30">
+              <p className="text-xs text-muted-foreground">📘 CBSE</p>
               <p className="font-game text-accent text-lg">{profile.dreamMarks.cbse}%</p>
             </div>
-            <div className="glass-panel rounded-xl p-3">
-              <p className="text-xs text-muted-foreground">JEE Main</p>
+            <div className="glass-panel rounded-xl p-3 border border-accent/30">
+              <p className="text-xs text-muted-foreground">📗 JEE Main</p>
               <p className="font-game text-accent text-lg">{profile.dreamMarks.jeeMain}</p>
             </div>
-            <div className="glass-panel rounded-xl p-3">
-              <p className="text-xs text-muted-foreground">JEE Adv</p>
+            <div className="glass-panel rounded-xl p-3 border border-raid/30">
+              <p className="text-xs text-muted-foreground">📕 JEE Adv</p>
               <p className="font-game text-accent text-lg">{profile.dreamMarks.jeeAdvanced}</p>
             </div>
           </div>
         </div>
 
+        {/* Exam Dates - Editable */}
+        <div className="animate-fade-in" style={{ animationDelay: '0.25s' }}>
+          <ExamDateEditor />
+        </div>
+
         {/* Jungle Status */}
-        <div className="glass-panel rounded-2xl p-5 space-y-4 animate-fade-in" style={{ animationDelay: '0.25s' }}>
+        <div className="glass-panel rounded-2xl p-5 space-y-4 animate-fade-in border border-accent/20" style={{ animationDelay: '0.3s' }}>
           <h3 className="font-game text-lg flex items-center gap-2">
             <span>🌴</span> Jungle Status
           </h3>
@@ -149,18 +199,18 @@ const ProfilePage = () => {
           </div>
 
           {backlogCount > 0 && (
-            <div className="flex items-center gap-3 p-3 bg-raid/10 rounded-xl border border-raid/30">
+            <div className="flex items-center gap-3 p-3 bg-raid/10 rounded-xl border border-raid/30 animate-pulse">
               <span className="text-2xl">⚠️</span>
               <div>
-                <p className="text-sm text-raid font-medium">Backlog Alert!</p>
-                <p className="text-xs text-muted-foreground">{backlogCount} chapters need attention</p>
+                <p className="text-sm text-raid font-medium">RAID MODE ACTIVE!</p>
+                <p className="text-xs text-muted-foreground">{backlogCount} overdue tasks need attention</p>
               </div>
             </div>
           )}
         </div>
 
         {/* Rewards */}
-        <div className="glass-panel rounded-2xl p-5 animate-fade-in" style={{ animationDelay: '0.3s' }}>
+        <div className="glass-panel rounded-2xl p-5 animate-fade-in border border-coins/20" style={{ animationDelay: '0.35s' }}>
           <RewardsList />
         </div>
       </main>
