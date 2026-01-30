@@ -2,7 +2,7 @@ import { useGameStore } from '@/store/gameStore';
 import { Avatar } from '@/components/game/Avatar';
 import { StreakBadge } from '@/components/game/StreakBadge';
 import { Link } from 'react-router-dom';
-import { Shield, Swords } from 'lucide-react';
+import { Shield, Swords, Zap } from 'lucide-react';
 
 export const Header = () => {
   const { coins, xp, level, backlogCount } = useGameStore();
@@ -18,8 +18,10 @@ export const Header = () => {
           </div>
         </Link>
 
-        <Link to="/" className="font-game text-lg text-glow-purple hidden sm:block">
-          Jungle Study
+        <Link to="/" className="font-game text-lg text-glow-purple flex items-center gap-1">
+          <Zap className="w-4 h-4 text-accent" />
+          <span className="hidden sm:inline">Biro-log</span>
+          <Zap className="w-4 h-4 text-accent" />
         </Link>
 
         <div className="flex items-center gap-2">
@@ -27,10 +29,10 @@ export const Header = () => {
           {backlogCount > 0 && (
             <Link 
               to="/raid" 
-              className="flex items-center gap-1 glass-panel px-2 py-1.5 rounded-full border border-destructive/30 animate-pulse"
+              className="flex items-center gap-1 glass-panel px-2 py-1.5 rounded-full border border-raid/30 animate-pulse"
             >
-              <Swords className="w-4 h-4 text-destructive" />
-              <span className="text-xs text-destructive font-medium">{backlogCount}</span>
+              <Swords className="w-4 h-4 text-raid" />
+              <span className="text-xs text-raid font-medium">{backlogCount}</span>
             </Link>
           )}
           

@@ -4,45 +4,48 @@ import { BottomNav } from '@/components/layout/BottomNav';
 import { StatCard } from '@/components/game/StatCard';
 import { XPBar } from '@/components/game/XPBar';
 import { JungleCard } from '@/components/game/JungleCard';
-import { ExamCountdown } from '@/components/game/ExamCountdown';
+import { ExamDateEditor } from '@/components/game/ExamDateEditor';
 import { ActivityLog } from '@/components/game/ActivityLog';
-import { QuestPanel } from '@/components/game/QuestPanel';
+import { GoalPanel } from '@/components/game/GoalPanel';
+import { TestTracker } from '@/components/game/TestTracker';
 import { useNavigate, Link } from 'react-router-dom';
-import { Swords } from 'lucide-react';
+import { Swords, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
-
-// Exam dates for 2026
-const examDates = {
-  cbse: new Date('2026-03-15'),
-  jeeMain: new Date('2026-01-20'),
-  jeeAdvanced: new Date('2026-05-25'),
-};
+import { useEffect } from 'react';
 
 const Index = () => {
   const navigate = useNavigate();
-  const { level, xp, coins, streak, jungles, backlogCount, calculateJungleHealth } = useGameStore();
+  const { level, xp, coins, streak, jungles, backlogCount, calculateJungleHealth, checkDeadlinesAndUpdateBacklog, getOverdueTasks } = useGameStore();
+
+  // Check deadlines on load
+  useEffect(() => {
+    checkDeadlinesAndUpdateBacklog();
+  }, [checkDeadlinesAndUpdateBacklog]);
 
   // Calculate overall progress
   const totalHealth = jungles.reduce((acc, j) => acc + calculateJungleHealth(j.id), 0);
   const averageHealth = Math.round(totalHealth / jungles.length);
+  const overdueTasks = getOverdueTasks();
 
   return (
     <div className="min-h-screen bg-background pb-20">
       <Header />
       
       <main className="px-4 py-6 max-w-lg mx-auto space-y-6">
-        {/* Welcome Section */}
+        {/* Welcome Section - Rebranded */}
         <div className="text-center space-y-2 animate-fade-in">
-          <h1 className="font-game text-2xl text-glow-purple">
-            Jungle Study 🌴
+          <h1 className="font-game text-3xl text-glow-purple flex items-center justify-center gap-2">
+            <Zap className="w-8 h-8 text-accent animate-pulse" />
+            Biro-log
+            <Zap className="w-8 h-8 text-accent animate-pulse" />
           </h1>
-          <p className="text-muted-foreground text-sm">
-            Study → Grow → Conquer!
+          <p className="text-muted-foreground text-sm italic">
+            "Tanik padho, Tanik Badho 🫠"
           </p>
         </div>
 
         {/* XP Progress */}
-        <div className="glass-panel rounded-2xl p-4 animate-fade-in" style={{ animationDelay: '0.1s' }}>
+        <div className="glass-panel rounded-2xl p-4 animate-fade-in border border-accent/30" style={{ animationDelay: '0.1s' }}>
           <XPBar />
         </div>
 
@@ -59,28 +62,30 @@ const Index = () => {
           />
         </div>
 
-        {/* Raid Alert Banner */}
+        {/* Raid Alert Banner - Always visible when backlogs exist */}
         {backlogCount > 0 && (
           <Link 
             to="/raid"
             className={cn(
-              "glass-panel rounded-2xl p-4 border border-destructive/30 flex items-center justify-between",
-              "animate-pulse cursor-pointer hover:border-destructive/50 transition-colors"
+              "glass-panel rounded-2xl p-4 border border-raid/50 flex items-center justify-between",
+              "animate-pulse cursor-pointer hover:border-raid transition-colors bg-raid/10"
             )}
           >
             <div className="flex items-center gap-3">
               <div className="text-3xl animate-bounce-subtle">👹</div>
               <div>
-                <h3 className="font-game text-destructive text-sm">RAID ACTIVE!</h3>
-                <p className="text-xs text-muted-foreground">Defeat the Lecture Backlog boss</p>
+                <h3 className="font-game text-raid text-sm">RAID ACTIVE!</h3>
+                <p className="text-xs text-muted-foreground">
+                  {overdueTasks.length} overdue tasks! Defeat the backlog boss
+                </p>
               </div>
             </div>
-            <Swords className="w-6 h-6 text-destructive" />
+            <Swords className="w-6 h-6 text-raid animate-pulse" />
           </Link>
         )}
 
         {/* Overall Jungle Health */}
-        <div className="glass-panel rounded-2xl p-4 animate-fade-in" style={{ animationDelay: '0.3s' }}>
+        <div className="glass-panel rounded-2xl p-4 animate-fade-in border border-accent/20" style={{ animationDelay: '0.3s' }}>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <span className="text-2xl">🌍</span>
@@ -102,21 +107,19 @@ const Index = () => {
           </div>
         </div>
 
-        {/* Exam Countdowns */}
-        <div className="space-y-3 animate-fade-in" style={{ animationDelay: '0.4s' }}>
-          <h2 className="font-game text-lg flex items-center gap-2">
-            <span>⏰</span> Exam Countdown
-          </h2>
-          <div className="grid gap-3">
-            <ExamCountdown examName="JEE Main 2026" examDate={examDates.jeeMain} icon="📗" />
-            <ExamCountdown examName="CBSE Boards" examDate={examDates.cbse} icon="📘" />
-            <ExamCountdown examName="JEE Advanced" examDate={examDates.jeeAdvanced} icon="📕" />
-          </div>
+        {/* Exam Dates - Editable */}
+        <div className="animate-fade-in" style={{ animationDelay: '0.35s' }}>
+          <ExamDateEditor />
         </div>
 
-        {/* Quest Panel */}
+        {/* Goals Panel - Daily/Weekly/Monthly */}
+        <div className="animate-fade-in" style={{ animationDelay: '0.4s' }}>
+          <GoalPanel />
+        </div>
+
+        {/* Test Tracker */}
         <div className="animate-fade-in" style={{ animationDelay: '0.45s' }}>
-          <QuestPanel />
+          <TestTracker />
         </div>
 
         {/* Jungles Section */}
@@ -140,15 +143,15 @@ const Index = () => {
           <ActivityLog />
         </div>
 
-        {/* Quick Tips */}
-        <div className="glass-panel rounded-2xl p-4 border border-accent/20 animate-fade-in" style={{ animationDelay: '0.6s' }}>
+        {/* Dopamine Tip */}
+        <div className="glass-panel rounded-2xl p-4 border border-accent/30 animate-fade-in bg-gradient-to-r from-primary/10 to-accent/10" style={{ animationDelay: '0.6s' }}>
           <div className="flex items-start gap-3">
-            <span className="text-2xl">💡</span>
+            <span className="text-2xl animate-pulse">⚡</span>
             <div>
-              <h3 className="font-medium text-sm mb-1">Daily Tip</h3>
+              <h3 className="font-game text-sm mb-1 text-accent">DOPAMINE HIT!</h3>
               <p className="text-xs text-muted-foreground">
-                Complete theory, practice & revision for each chapter to grow your jungle! 
-                Keep your streak alive for 2× XP bonus! 🔥
+                Complete a task → Get XP → Level up → Unlock rewards! 
+                Miss a deadline → RAID MODE → Boss Battle! 👹
               </p>
             </div>
           </div>

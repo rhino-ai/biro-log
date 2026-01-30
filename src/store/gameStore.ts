@@ -7,9 +7,36 @@ interface Task {
   title: string;
   completed: boolean;
   dueDate?: string;
+  dueTime?: string;
   jungleId: string;
   chapterId?: string;
-  type: 'daily' | 'weekly' | 'custom';
+  type: 'daily' | 'weekly' | 'monthly' | 'custom';
+  createdAt: string;
+  alarm?: {
+    enabled: boolean;
+    time: string;
+    ringtone: string;
+  };
+}
+
+interface TestRecord {
+  id: string;
+  examType: 'cbse' | 'jee-main' | 'jee-advanced';
+  testName: string;
+  date: string;
+  maxMarks: number;
+  scoredMarks: number;
+  subjects: {
+    physics: number;
+    chemistry: number;
+    mathematics: number;
+  };
+}
+
+interface ExamDates {
+  cbse: string;
+  jeeMain: string;
+  jeeAdvanced: string;
 }
 
 interface UserProfile {
@@ -32,13 +59,19 @@ interface GameState {
   streak: number;
   lastStudyDate: string | null;
   
+  // Exam Dates
+  examDates: ExamDates;
+  
   // Jungles
   jungles: JungleData[];
   
-  // Tasks
+  // Tasks/Goals
   tasks: Task[];
   
-  // Backlog & Raid
+  // Test Records
+  testRecords: TestRecord[];
+  
+  // Backlog & Raid (always on)
   backlogCount: number;
   raidActive: boolean;
   
@@ -47,15 +80,21 @@ interface GameState {
   addXP: (amount: number) => void;
   addCoins: (amount: number) => void;
   updateStreak: () => void;
-  addTask: (task: Omit<Task, 'id'>) => void;
+  addTask: (task: Omit<Task, 'id' | 'createdAt'>) => void;
   toggleTask: (taskId: string) => void;
   deleteTask: (taskId: string) => void;
+  updateTask: (taskId: string, updates: Partial<Task>) => void;
   updateProfile: (profile: Partial<UserProfile>) => void;
+  updateExamDates: (dates: Partial<ExamDates>) => void;
+  addTestRecord: (record: Omit<TestRecord, 'id'>) => void;
+  deleteTestRecord: (id: string) => void;
   calculateJungleHealth: (jungleId: string) => number;
   getTreeState: (chapter: Chapter) => 'dry' | 'growing' | 'healthy' | 'flourishing';
   getCurrentLevel: () => number;
   getXPForNextLevel: () => number;
   getUnlockedRewards: () => typeof rewards;
+  checkDeadlinesAndUpdateBacklog: () => void;
+  getOverdueTasks: () => Task[];
 }
 
 const XP_PER_LEVEL = 100;
@@ -78,10 +117,16 @@ export const useGameStore = create<GameState>()(
       coins: 0,
       streak: 0,
       lastStudyDate: null,
+      examDates: {
+        cbse: '2026-03-15',
+        jeeMain: '2026-01-20',
+        jeeAdvanced: '2026-05-25',
+      },
       jungles: JSON.parse(JSON.stringify(allJungles)),
       tasks: [],
+      testRecords: [],
       backlogCount: 0,
-      raidActive: false,
+      raidActive: true, // Always on
 
       updateChapterProgress: (jungleId, chapterId, field, value) => {
         set((state) => {
@@ -96,7 +141,6 @@ export const useGameStore = create<GameState>()(
             };
           });
 
-          // Add XP and coins when completing something
           let xpGain = 0;
           let coinGain = 0;
           if (value) {
@@ -157,27 +201,90 @@ export const useGameStore = create<GameState>()(
 
       addTask: (task) => {
         set((state) => ({
-          tasks: [...state.tasks, { ...task, id: crypto.randomUUID() }],
+          tasks: [...state.tasks, { 
+            ...task, 
+            id: crypto.randomUUID(),
+            createdAt: new Date().toISOString()
+          }],
         }));
       },
 
       toggleTask: (taskId) => {
-        set((state) => ({
-          tasks: state.tasks.map((task) =>
-            task.id === taskId ? { ...task, completed: !task.completed } : task
-          ),
-        }));
+        set((state) => {
+          const task = state.tasks.find(t => t.id === taskId);
+          const wasCompleted = task?.completed;
+          const newTasks = state.tasks.map((t) =>
+            t.id === taskId ? { ...t, completed: !t.completed } : t
+          );
+          
+          // Add XP and coins for completing task
+          let xpGain = 0;
+          let coinGain = 0;
+          if (task && !wasCompleted) {
+            if (task.type === 'daily') {
+              xpGain = 15;
+              coinGain = 5;
+            } else if (task.type === 'weekly') {
+              xpGain = 50;
+              coinGain = 20;
+            } else if (task.type === 'monthly') {
+              xpGain = 100;
+              coinGain = 50;
+            } else {
+              xpGain = 10;
+              coinGain = 3;
+            }
+          }
+
+          const newXP = state.xp + xpGain;
+          const newLevel = Math.floor(newXP / XP_PER_LEVEL);
+
+          return {
+            tasks: newTasks,
+            xp: newXP,
+            level: newLevel,
+            coins: state.coins + coinGain,
+          };
+        });
+        get().checkDeadlinesAndUpdateBacklog();
       },
 
       deleteTask: (taskId) => {
         set((state) => ({
           tasks: state.tasks.filter((task) => task.id !== taskId),
         }));
+        get().checkDeadlinesAndUpdateBacklog();
+      },
+
+      updateTask: (taskId, updates) => {
+        set((state) => ({
+          tasks: state.tasks.map((task) =>
+            task.id === taskId ? { ...task, ...updates } : task
+          ),
+        }));
       },
 
       updateProfile: (profile) => {
         set((state) => ({
           profile: { ...state.profile, ...profile },
+        }));
+      },
+
+      updateExamDates: (dates) => {
+        set((state) => ({
+          examDates: { ...state.examDates, ...dates },
+        }));
+      },
+
+      addTestRecord: (record) => {
+        set((state) => ({
+          testRecords: [...state.testRecords, { ...record, id: crypto.randomUUID() }],
+        }));
+      },
+
+      deleteTestRecord: (id) => {
+        set((state) => ({
+          testRecords: state.testRecords.filter((r) => r.id !== id),
         }));
       },
 
@@ -223,6 +330,28 @@ export const useGameStore = create<GameState>()(
           ...reward,
           unlocked: level >= reward.level,
         }));
+      },
+
+      checkDeadlinesAndUpdateBacklog: () => {
+        const now = new Date();
+        const overdueTasks = get().tasks.filter((task) => {
+          if (task.completed) return false;
+          if (!task.dueDate) return false;
+          const deadline = new Date(`${task.dueDate}T${task.dueTime || '23:59'}`);
+          return deadline < now;
+        });
+        
+        set({ backlogCount: overdueTasks.length });
+      },
+
+      getOverdueTasks: () => {
+        const now = new Date();
+        return get().tasks.filter((task) => {
+          if (task.completed) return false;
+          if (!task.dueDate) return false;
+          const deadline = new Date(`${task.dueDate}T${task.dueTime || '23:59'}`);
+          return deadline < now;
+        });
       },
     }),
     {
