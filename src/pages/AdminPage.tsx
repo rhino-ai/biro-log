@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { Navigate } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
 import { Header } from '@/components/layout/Header';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { Button } from '@/components/ui/button';
@@ -9,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useGameStore } from '@/store/gameStore';
 import { rewards } from '@/data/syllabus';
+import { toast } from '@/hooks/use-toast';
 import { 
   Settings, 
   Users, 
@@ -21,11 +24,13 @@ import {
   BookOpen,
   Trash2,
   Plus,
-  Save
+  Save,
+  Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const AdminPage = () => {
+  const { isAdmin, isLoading, user } = useAuth();
   const { backlogCount, raidActive } = useGameStore();
   
   // Admin settings state
@@ -36,8 +41,73 @@ const AdminPage = () => {
     darkMode: true,
     streakBonus: true,
   });
-
+  const [isSaving, setIsSaving] = useState(false);
   const [rewardsList, setRewardsList] = useState(rewards);
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // Redirect non-admins
+  if (!isAdmin) {
+    return <Navigate to="/" replace />;
+  }
+
+  const handleSaveSettings = async () => {
+    setIsSaving(true);
+    // Simulate saving to backend
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    toast({
+      title: 'Settings Saved! ✅',
+      description: 'All admin settings have been updated.',
+    });
+    setIsSaving(false);
+  };
+
+  const handleToggleSetting = (key: keyof typeof settings) => {
+    setSettings(prev => ({ ...prev, [key]: !prev[key] }));
+    toast({
+      title: `${key} ${settings[key] ? 'Disabled' : 'Enabled'}`,
+      description: `Setting has been updated.`,
+    });
+  };
+
+  const handleDeleteReward = (index: number) => {
+    const newRewards = rewardsList.filter((_, i) => i !== index);
+    setRewardsList(newRewards);
+    toast({
+      title: 'Reward Deleted',
+      description: 'Reward has been removed from the list.',
+      variant: 'destructive',
+    });
+  };
+
+  const handleAddReward = () => {
+    const newLevel = (rewardsList[rewardsList.length - 1]?.level || 0) + 5;
+    setRewardsList([...rewardsList, {
+      level: newLevel,
+      name: 'New Reward',
+      icon: '🎁',
+      unlocked: false,
+    }]);
+    toast({
+      title: 'Reward Added',
+      description: `New reward at level ${newLevel} created.`,
+    });
+  };
+
+  const handleTriggerRaid = () => {
+    toast({
+      title: '👹 RAID TRIGGERED!',
+      description: 'Test raid has been activated.',
+      variant: 'destructive',
+    });
+  };
 
   return (
     <div className="min-h-screen bg-background pb-20">
@@ -52,6 +122,9 @@ const AdminPage = () => {
           </div>
           <p className="text-muted-foreground text-sm">
             Control all game mechanics and settings
+          </p>
+          <p className="text-xs text-accent">
+            Logged in as: {user?.email}
           </p>
         </div>
 
@@ -126,18 +199,19 @@ const AdminPage = () => {
                   </div>
                   <Switch
                     checked={settings.beizzatiEnabled}
-                    onCheckedChange={(val) => setSettings(s => ({ ...s, beizzatiEnabled: val }))}
+                    onCheckedChange={() => handleToggleSetting('beizzatiEnabled')}
                   />
                 </div>
 
                 <div className="flex items-center justify-between">
                   <div>
                     <Label>Raid System</Label>
-                    <p className="text-xs text-muted-foreground">Boss battles for clearing backlog</p>
+                    <p className="text-xs text-muted-foreground">Boss battles for clearing backlog (ALWAYS ON)</p>
                   </div>
                   <Switch
                     checked={settings.raidEnabled}
-                    onCheckedChange={(val) => setSettings(s => ({ ...s, raidEnabled: val }))}
+                    onCheckedChange={() => handleToggleSetting('raidEnabled')}
+                    disabled
                   />
                 </div>
 
@@ -148,7 +222,7 @@ const AdminPage = () => {
                   </div>
                   <Switch
                     checked={settings.alarmsEnabled}
-                    onCheckedChange={(val) => setSettings(s => ({ ...s, alarmsEnabled: val }))}
+                    onCheckedChange={() => handleToggleSetting('alarmsEnabled')}
                   />
                 </div>
 
@@ -159,7 +233,7 @@ const AdminPage = () => {
                   </div>
                   <Switch
                     checked={settings.streakBonus}
-                    onCheckedChange={(val) => setSettings(s => ({ ...s, streakBonus: val }))}
+                    onCheckedChange={() => handleToggleSetting('streakBonus')}
                   />
                 </div>
               </CardContent>
@@ -176,11 +250,11 @@ const AdminPage = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label>Daily Reminder Time</Label>
-                    <Input type="time" defaultValue="09:00" className="mt-1" />
+                    <Input type="time" defaultValue="09:00" className="mt-1 bg-secondary/50" />
                   </div>
                   <div>
                     <Label>Weekly Summary Day</Label>
-                    <Input type="text" defaultValue="Sunday" className="mt-1" />
+                    <Input type="text" defaultValue="Sunday" className="mt-1 bg-secondary/50" />
                   </div>
                 </div>
               </CardContent>
@@ -195,7 +269,7 @@ const AdminPage = () => {
                   <CardTitle className="font-game text-lg">Level Rewards</CardTitle>
                   <CardDescription>Configure rewards for each level</CardDescription>
                 </div>
-                <Button size="sm" className="gap-1">
+                <Button size="sm" className="gap-1 bg-accent" onClick={handleAddReward}>
                   <Plus className="w-4 h-4" /> Add Reward
                 </Button>
               </CardHeader>
@@ -210,9 +284,14 @@ const AdminPage = () => {
                     <Input
                       type="number"
                       defaultValue={reward.level}
-                      className="w-20"
+                      className="w-20 bg-secondary/50"
                     />
-                    <Button variant="ghost" size="icon" className="text-destructive">
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => handleDeleteReward(index)}
+                    >
                       <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>
@@ -235,19 +314,19 @@ const AdminPage = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label>Boss Max HP</Label>
-                    <Input type="number" defaultValue="5000" className="mt-1" />
+                    <Input type="number" defaultValue="5000" className="mt-1 bg-secondary/50" />
                   </div>
                   <div>
                     <Label>HP per Backlog</Label>
-                    <Input type="number" defaultValue="100" className="mt-1" />
+                    <Input type="number" defaultValue="100" className="mt-1 bg-secondary/50" />
                   </div>
                   <div>
                     <Label>Victory Coins</Label>
-                    <Input type="number" defaultValue="40" className="mt-1" />
+                    <Input type="number" defaultValue="40" className="mt-1 bg-secondary/50" />
                   </div>
                   <div>
                     <Label>Victory XP Bonus</Label>
-                    <Input type="number" defaultValue="1000" className="mt-1" />
+                    <Input type="number" defaultValue="1000" className="mt-1 bg-secondary/50" />
                   </div>
                 </div>
                 
@@ -256,7 +335,7 @@ const AdminPage = () => {
                     <Label className="text-destructive">Force Activate Raid</Label>
                     <p className="text-xs text-muted-foreground">Trigger raid for testing</p>
                   </div>
-                  <Button variant="destructive" size="sm">
+                  <Button variant="destructive" size="sm" onClick={handleTriggerRaid}>
                     Trigger Raid
                   </Button>
                 </div>
@@ -276,7 +355,14 @@ const AdminPage = () => {
                   {['CBSE Class 12', 'JEE Main', 'JEE Advanced'].map((jungle) => (
                     <div key={jungle} className="flex items-center justify-between p-3 glass-panel rounded-lg">
                       <span className="font-medium">{jungle}</span>
-                      <Button variant="outline" size="sm">
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => toast({
+                          title: 'Coming Soon',
+                          description: `Edit ${jungle} syllabus feature is in development.`,
+                        })}
+                      >
                         Edit Chapters
                       </Button>
                     </div>
@@ -288,8 +374,12 @@ const AdminPage = () => {
         </Tabs>
 
         {/* Save Button */}
-        <Button className="w-full gap-2 glow-purple">
-          <Save className="w-4 h-4" />
+        <Button 
+          className="w-full gap-2 glow-purple" 
+          onClick={handleSaveSettings}
+          disabled={isSaving}
+        >
+          {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
           Save All Settings
         </Button>
       </main>

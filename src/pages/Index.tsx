@@ -8,14 +8,17 @@ import { ExamDateEditor } from '@/components/game/ExamDateEditor';
 import { ActivityLog } from '@/components/game/ActivityLog';
 import { GoalPanel } from '@/components/game/GoalPanel';
 import { TestTracker } from '@/components/game/TestTracker';
+import { DailyGoalWidget } from '@/components/game/DailyGoalWidget';
+import { MotivationMessage } from '@/components/game/MotivationMessage';
 import { useNavigate, Link } from 'react-router-dom';
 import { Swords, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 const Index = () => {
   const navigate = useNavigate();
   const { level, xp, coins, streak, jungles, backlogCount, calculateJungleHealth, checkDeadlinesAndUpdateBacklog, getOverdueTasks } = useGameStore();
+  const [showMotivation, setShowMotivation] = useState(true);
 
   // Check deadlines on load
   useEffect(() => {
@@ -43,6 +46,13 @@ const Index = () => {
             "Tanik padho, Tanik Badho 🫠"
           </p>
         </div>
+
+        {/* Motivation Message */}
+        {showMotivation && (
+          <div className="animate-fade-in" style={{ animationDelay: '0.05s' }}>
+            <MotivationMessage onClose={() => setShowMotivation(false)} />
+          </div>
+        )}
 
         {/* XP Progress */}
         <div className="glass-panel rounded-2xl p-4 animate-fade-in border border-accent/30" style={{ animationDelay: '0.1s' }}>
@@ -83,6 +93,11 @@ const Index = () => {
             <Swords className="w-6 h-6 text-raid animate-pulse" />
           </Link>
         )}
+
+        {/* Daily Goal Widget - Like reference image */}
+        <div className="animate-fade-in" style={{ animationDelay: '0.25s' }}>
+          <DailyGoalWidget />
+        </div>
 
         {/* Overall Jungle Health */}
         <div className="glass-panel rounded-2xl p-4 animate-fade-in border border-accent/20" style={{ animationDelay: '0.3s' }}>
