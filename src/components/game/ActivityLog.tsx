@@ -1,56 +1,80 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useGameStore } from '@/store/gameStore';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Calendar, List, Star, Zap, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Calendar, List, CheckCircle, Star, Zap } from 'lucide-react';
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isToday } from 'date-fns';
 
 interface ActivityEntry {
   id: string;
   time: string;
-  type: 'chapter' | 'level' | 'damage' | 'complete' | 'streak';
+  date: string;
+  type: 'chapter' | 'level' | 'damage' | 'complete' | 'streak' | 'task';
   icon: string;
   message: string;
   xp?: number;
   coins?: number;
 }
 
-// Mock activity data - in real app this would come from state/API
-const mockActivities: ActivityEntry[] = [
-  { id: '1', time: '18:55', type: 'chapter', icon: '◆', message: 'Chapter: Electric Potential And Dipole (Physics)', xp: 50 },
-  { id: '2', time: '18:53', type: 'chapter', icon: '◆', message: 'Chapter: Electric Potential And Dipole (Physics)', xp: 30 },
-  { id: '3', time: '18:55', type: 'damage', icon: '💥', message: 'Damaged Lecture Backlog for 100 via Electrics: Lecture 24.' },
-  { id: '4', time: '18:55', type: 'level', icon: '⭐', message: 'Reached Overall Level 9!' },
-  { id: '5', time: '18:55', type: 'complete', icon: '✅', message: 'Completed: Electrics: Lecture 24 (+100 Global EXP, +0 Coins)', xp: 100, coins: 0 },
-];
-
 export const ActivityLog = () => {
-  const { xp, coins, level, streak } = useGameStore();
-  const [activeTab, setActiveTab] = useState<'activity' | 'practice' | 'calendar'>('activity');
-  const [selectedDay, setSelectedDay] = useState<number | null>(null);
+  const { xp, coins, level, streak, tasks, testRecords } = useGameStore();
+  const [activeTab, setActiveTab] = useState<'activity' | 'calendar'>('activity');
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [activities, setActivities] = useState<ActivityEntry[]>([]);
 
-  // Generate days for the week
-  const today = new Date();
-  const weekDays = Array.from({ length: 7 }, (_, i) => {
-    const date = new Date(today);
-    date.setDate(today.getDate() - (6 - i));
-    return {
-      day: date.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase(),
-      date: date.getDate(),
-      isToday: i === 6,
-    };
-  });
+  // Generate activities from completed tasks and real data
+  useEffect(() => {
+    const completedTasks = tasks.filter(t => t.completed);
+    const newActivities: ActivityEntry[] = [];
+
+    completedTasks.forEach((task, index) => {
+      newActivities.push({
+        id: task.id,
+        time: format(new Date(task.createdAt), 'HH:mm'),
+        date: format(new Date(task.createdAt), 'yyyy-MM-dd'),
+        type: 'complete',
+        icon: '✅',
+        message: `Completed: ${task.title}`,
+        xp: task.type === 'daily' ? 15 : task.type === 'weekly' ? 50 : 100,
+        coins: task.type === 'daily' ? 5 : task.type === 'weekly' ? 20 : 50,
+      });
+    });
+
+    // Add test records
+    testRecords.forEach((record) => {
+      newActivities.push({
+        id: record.id,
+        time: '12:00',
+        date: record.date,
+        type: 'task',
+        icon: '📝',
+        message: `Test: ${record.testName} - ${record.scoredMarks}/${record.maxMarks}`,
+        xp: Math.round(record.scoredMarks / 2),
+      });
+    });
+
+    // Sort by date, newest first
+    newActivities.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    
+    setActivities(newActivities);
+  }, [tasks, testRecords]);
+
+  // Calendar data
+  const monthStart = startOfMonth(currentMonth);
+  const monthEnd = endOfMonth(currentMonth);
+  const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
+  
+  // Get activity counts per day
+  const activityByDay = activities.reduce((acc, activity) => {
+    const day = activity.date;
+    if (!acc[day]) acc[day] = 0;
+    acc[day]++;
+    return acc;
+  }, {} as Record<string, number>);
 
   const dailySummary = {
-    totalXP: 500,
-    coinsGained: 10,
-    coinsSpent: 0,
-    subjectXP: {
-      MA: 0,
-      PH: 0,
-      'P.': 0,
-      'I.': 0,
-      'O.': 0,
-    },
+    totalXP: activities.filter(a => a.date === format(new Date(), 'yyyy-MM-dd')).reduce((sum, a) => sum + (a.xp || 0), 0),
+    coinsGained: activities.filter(a => a.date === format(new Date(), 'yyyy-MM-dd')).reduce((sum, a) => sum + (a.coins || 0), 0),
+    tasksCompleted: activities.filter(a => a.date === format(new Date(), 'yyyy-MM-dd') && a.type === 'complete').length,
   };
 
   return (
@@ -61,64 +85,52 @@ export const ActivityLog = () => {
         <h2 className="font-game text-xl text-primary text-glow-purple">ACTIVITY LOG</h2>
       </div>
 
-      {/* Day Selector */}
-      <div className="flex gap-2 p-4 overflow-x-auto">
-        {weekDays.map((day, index) => (
-          <Button
-            key={index}
-            variant={day.isToday ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setSelectedDay(day.date)}
-            className={cn(
-              "min-w-[70px] flex-col gap-0",
-              day.isToday && "bg-primary text-primary-foreground"
-            )}
-          >
-            <span className="text-xs">{day.day}</span>
-            <span className="text-sm font-medium">{day.date}</span>
-          </Button>
-        ))}
-      </div>
-
       {/* Summary Section */}
-      <div className="px-4 pb-4 border-b border-primary/20">
-        <h3 className="font-game text-sm text-muted-foreground mb-3 text-center">SUMMARY FOR TODAY</h3>
+      <div className="px-4 py-3 border-b border-primary/20 bg-gradient-to-r from-accent/5 to-primary/5">
+        <h3 className="font-game text-sm text-muted-foreground mb-2 text-center">TODAY'S SUMMARY</h3>
         <div className="flex justify-around text-sm">
-          <div>
-            <span className="text-muted-foreground">Overall EXP: </span>
-            <span className="text-accent font-medium">{dailySummary.totalXP}</span>
+          <div className="text-center">
+            <div className="flex items-center gap-1 justify-center">
+              <Zap className="w-4 h-4 text-accent" />
+              <span className="font-game text-accent">{dailySummary.totalXP || xp}</span>
+            </div>
+            <span className="text-xs text-muted-foreground">XP Earned</span>
           </div>
-          <div>
-            <span className="text-muted-foreground">Coins Gained: </span>
-            <span className="text-coins font-medium">{dailySummary.coinsGained}</span>
+          <div className="text-center">
+            <div className="flex items-center gap-1 justify-center">
+              <span className="text-coins">🪙</span>
+              <span className="font-game text-coins">{dailySummary.coinsGained || coins}</span>
+            </div>
+            <span className="text-xs text-muted-foreground">Coins</span>
           </div>
-          <div>
-            <span className="text-muted-foreground">Coins Spent: </span>
-            <span className="text-foreground font-medium">{dailySummary.coinsSpent}</span>
+          <div className="text-center">
+            <div className="flex items-center gap-1 justify-center">
+              <CheckCircle className="w-4 h-4 text-green-400" />
+              <span className="font-game text-green-400">{dailySummary.tasksCompleted}</span>
+            </div>
+            <span className="text-xs text-muted-foreground">Tasks Done</span>
           </div>
-        </div>
-        <div className="flex justify-center gap-4 mt-2 text-xs text-muted-foreground">
-          <span>Subject EXP:</span>
-          {Object.entries(dailySummary.subjectXP).map(([key, val]) => (
-            <span key={key}>{key}:{val}</span>
-          ))}
         </div>
       </div>
 
       {/* Tab Navigation */}
       <div className="flex border-b border-primary/20">
-        {['practice', 'activity', 'calendar'].map((tab) => (
+        {[
+          { id: 'activity', label: 'Activity', icon: List },
+          { id: 'calendar', label: 'Calendar', icon: Calendar },
+        ].map((tab) => (
           <button
-            key={tab}
-            onClick={() => setActiveTab(tab as any)}
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id as any)}
             className={cn(
-              "flex-1 py-2 text-sm font-medium transition-colors",
-              activeTab === tab 
-                ? "text-primary border-b-2 border-primary" 
+              "flex-1 py-3 text-sm font-medium transition-colors flex items-center justify-center gap-2",
+              activeTab === tab.id 
+                ? "text-primary border-b-2 border-primary bg-primary/5" 
                 : "text-muted-foreground hover:text-foreground"
             )}
           >
-            • {tab.toUpperCase()}
+            <tab.icon className="w-4 h-4" />
+            {tab.label}
           </button>
         ))}
       </div>
@@ -126,39 +138,105 @@ export const ActivityLog = () => {
       {/* Activity List */}
       {activeTab === 'activity' && (
         <div className="p-4 space-y-3 max-h-64 overflow-y-auto">
-          {mockActivities.map((activity) => (
-            <div key={activity.id} className="flex items-start gap-3 text-sm">
-              <span className="text-muted-foreground text-xs min-w-[40px]">{activity.time}</span>
-              <span className={cn(
-                "text-lg",
-                activity.type === 'chapter' && "text-primary",
-                activity.type === 'level' && "text-coins",
-                activity.type === 'damage' && "text-destructive",
-                activity.type === 'complete' && "text-accent"
-              )}>
-                {activity.icon}
-              </span>
-              <span className={cn(
-                activity.type === 'damage' && "text-destructive",
-                activity.type === 'complete' && "text-accent"
-              )}>
-                {activity.message}
-              </span>
+          {activities.length === 0 ? (
+            <div className="text-center py-8">
+              <span className="text-4xl block mb-2">📊</span>
+              <p className="text-muted-foreground text-sm">No activity yet</p>
+              <p className="text-xs text-muted-foreground">Complete tasks to see your progress!</p>
             </div>
-          ))}
+          ) : (
+            activities.slice(0, 10).map((activity) => (
+              <div key={activity.id} className="flex items-start gap-3 text-sm glass-panel rounded-lg p-2">
+                <span className="text-muted-foreground text-xs min-w-[40px]">{activity.time}</span>
+                <span className={cn(
+                  "text-lg",
+                  activity.type === 'chapter' && "text-primary",
+                  activity.type === 'level' && "text-coins",
+                  activity.type === 'damage' && "text-destructive",
+                  activity.type === 'complete' && "text-accent"
+                )}>
+                  {activity.icon}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <span className={cn(
+                    "text-sm",
+                    activity.type === 'damage' && "text-destructive",
+                    activity.type === 'complete' && "text-accent"
+                  )}>
+                    {activity.message}
+                  </span>
+                  {(activity.xp || activity.coins) && (
+                    <div className="flex gap-2 mt-1 text-xs text-muted-foreground">
+                      {activity.xp && <span>+{activity.xp} XP</span>}
+                      {activity.coins && <span>+{activity.coins} 🪙</span>}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))
+          )}
         </div>
       )}
 
-      {activeTab === 'practice' && (
-        <div className="p-4 text-center text-muted-foreground">
-          <p>Practice questions completed today: 0</p>
-        </div>
-      )}
-
+      {/* Calendar View */}
       {activeTab === 'calendar' && (
-        <div className="p-4 text-center text-muted-foreground">
-          <Calendar className="w-12 h-12 mx-auto mb-2 opacity-50" />
-          <p>Monthly calendar view coming soon</p>
+        <div className="p-4">
+          <div className="flex justify-between items-center mb-4">
+            <button 
+              onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() - 1)))}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              ←
+            </button>
+            <span className="font-game text-sm">{format(currentMonth, 'MMMM yyyy')}</span>
+            <button 
+              onClick={() => setCurrentMonth(new Date(currentMonth.setMonth(currentMonth.getMonth() + 1)))}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              →
+            </button>
+          </div>
+          
+          {/* Weekday headers */}
+          <div className="grid grid-cols-7 gap-1 mb-2">
+            {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, i) => (
+              <div key={i} className="text-center text-xs text-muted-foreground">{day}</div>
+            ))}
+          </div>
+          
+          {/* Calendar grid */}
+          <div className="grid grid-cols-7 gap-1">
+            {/* Empty cells for days before month starts */}
+            {Array.from({ length: monthStart.getDay() }).map((_, i) => (
+              <div key={`empty-${i}`} className="aspect-square" />
+            ))}
+            
+            {daysInMonth.map((day) => {
+              const dateStr = format(day, 'yyyy-MM-dd');
+              const activityCount = activityByDay[dateStr] || 0;
+              const hasActivity = activityCount > 0;
+              
+              return (
+                <div
+                  key={dateStr}
+                  className={cn(
+                    "aspect-square rounded-lg flex flex-col items-center justify-center text-xs",
+                    isToday(day) && "ring-2 ring-primary",
+                    hasActivity && "bg-accent/20"
+                  )}
+                >
+                  <span className={cn(
+                    isToday(day) ? "text-primary font-bold" : "text-muted-foreground"
+                  )}>
+                    {format(day, 'd')}
+                  </span>
+                  {hasActivity && (
+                    <Star className="w-3 h-3 text-accent mt-0.5" />
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>

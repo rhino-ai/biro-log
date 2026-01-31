@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useGameStore } from '@/store/gameStore';
+import { useAuth } from '@/hooks/useAuth';
 import { Header } from '@/components/layout/Header';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { Avatar } from '@/components/game/Avatar';
@@ -9,18 +10,69 @@ import { RewardsList } from '@/components/game/RewardsList';
 import { ExamDateEditor } from '@/components/game/ExamDateEditor';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Edit2, Save, Zap } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
+import { Edit2, Save, Zap, Camera, Upload, LogOut, Loader2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 const avatarOptions = ['👨‍🎓', '👩‍🎓', '🧑‍💻', '👨‍🔬', '👩‍🔬', '🦸', '🦹', '🧙', '🥷', '🎮'];
 
 const ProfilePage = () => {
+  const navigate = useNavigate();
+  const { user, signOut } = useAuth();
   const { profile, updateProfile, level, xp, coins, streak, calculateJungleHealth, jungles, backlogCount } = useGameStore();
   const [isEditing, setIsEditing] = useState(false);
   const [editedProfile, setEditedProfile] = useState(profile);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSave = () => {
     updateProfile(editedProfile);
     setIsEditing(false);
+    toast({
+      title: 'Profile Updated! ✅',
+      description: 'Your profile has been saved.',
+    });
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/auth');
+  };
+
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !user) return;
+
+    setIsUploading(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/avatar.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(fileName, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(fileName);
+
+      setEditedProfile({ ...editedProfile, avatar: publicUrl });
+      toast({
+        title: 'Image Uploaded! 📸',
+        description: 'Your profile picture has been updated.',
+      });
+    } catch (error: any) {
+      toast({
+        title: 'Upload Failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const overallHealth = Math.round(
@@ -34,7 +86,16 @@ const ProfilePage = () => {
       <main className="px-4 py-6 max-w-lg mx-auto space-y-6">
         {/* Profile Card */}
         <div className="glass-panel rounded-2xl p-6 text-center animate-fade-in border border-primary/20">
-          <div className="flex justify-end mb-2">
+          <div className="flex justify-between mb-2">
+            <Button 
+              size="sm" 
+              variant="ghost" 
+              onClick={handleSignOut}
+              className="text-destructive"
+            >
+              <LogOut size={14} className="mr-1" />
+              Logout
+            </Button>
             {isEditing ? (
               <Button size="sm" onClick={handleSave} className="gap-2 bg-accent">
                 <Save size={14} /> Save
@@ -46,7 +107,26 @@ const ProfilePage = () => {
             )}
           </div>
           
-          <Avatar size="lg" showMood />
+          {/* Avatar with Upload Option */}
+          <div className="relative inline-block">
+            <Avatar size="lg" showMood />
+            {isEditing && (
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="absolute bottom-0 right-0 bg-primary text-primary-foreground p-2 rounded-full hover:bg-primary/80 transition-colors"
+                disabled={isUploading}
+              >
+                {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
+              </button>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleImageUpload}
+            />
+          </div>
           
           {isEditing ? (
             <div className="mt-4 space-y-4">
@@ -128,6 +208,7 @@ const ProfilePage = () => {
                 <Zap className="w-5 h-5 text-accent" />
               </h2>
               <p className="text-muted-foreground text-sm">Level {level} Warrior</p>
+              <p className="text-xs text-muted-foreground mt-1">{user?.email}</p>
             </>
           )}
         </div>

@@ -4,12 +4,12 @@ import { useGameStore } from '@/store/gameStore';
 import { Header } from '@/components/layout/Header';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { ChapterList } from '@/components/game/ChapterList';
-import { JungleMap } from '@/components/game/JungleMap';
+import { JungleGardenMap } from '@/components/game/JungleGardenMap';
 import { ProgressRadar } from '@/components/game/ProgressRadar';
 import { ChaptersGrid } from '@/components/game/ChaptersGrid';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Map, List, BarChart3, Grid3X3 } from 'lucide-react';
+import { ArrowLeft, Map, List, Grid3X3, TreeDeciduous } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type Subject = 'all' | 'physics' | 'chemistry' | 'mathematics';
@@ -114,8 +114,12 @@ const JungleDetailPage = () => {
         </div>
 
         {/* View Mode Tabs */}
-        <Tabs defaultValue="list" className="space-y-4">
-          <TabsList className="glass-panel w-full grid grid-cols-3">
+        <Tabs defaultValue="garden" className="space-y-4">
+          <TabsList className="glass-panel w-full grid grid-cols-4">
+            <TabsTrigger value="garden" className="gap-1">
+              <TreeDeciduous className="w-4 h-4" />
+              <span className="hidden sm:inline">Garden</span>
+            </TabsTrigger>
             <TabsTrigger value="list" className="gap-1">
               <List className="w-4 h-4" />
               <span className="hidden sm:inline">List</span>
@@ -129,6 +133,11 @@ const JungleDetailPage = () => {
               <span className="hidden sm:inline">Grid</span>
             </TabsTrigger>
           </TabsList>
+
+          {/* Gardens View - Subject-based with chapter trees */}
+          <TabsContent value="garden">
+            <JungleGardenMap jungle={jungle} />
+          </TabsContent>
 
           <TabsContent value="list" className="space-y-4">
             {/* Subject Filters */}
@@ -158,7 +167,7 @@ const JungleDetailPage = () => {
           </TabsContent>
 
           <TabsContent value="map">
-            <JungleMap jungle={jungle} />
+            <JungleGardenMap jungle={jungle} />
           </TabsContent>
 
           <TabsContent value="grid">
