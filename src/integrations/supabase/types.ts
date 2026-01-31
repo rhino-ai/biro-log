@@ -14,16 +14,261 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      activity_log: {
+        Row: {
+          coins_earned: number | null
+          created_at: string | null
+          id: string
+          message: string
+          type: string
+          user_id: string
+          xp_earned: number | null
+        }
+        Insert: {
+          coins_earned?: number | null
+          created_at?: string | null
+          id?: string
+          message: string
+          type: string
+          user_id: string
+          xp_earned?: number | null
+        }
+        Update: {
+          coins_earned?: number | null
+          created_at?: string | null
+          id?: string
+          message?: string
+          type?: string
+          user_id?: string
+          xp_earned?: number | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar: string | null
+          avatar_url: string | null
+          coins: number | null
+          created_at: string | null
+          dream_college: string | null
+          dream_college_image: string | null
+          dream_marks_cbse: number | null
+          dream_marks_jee_advanced: number | null
+          dream_marks_jee_main: number | null
+          exam_date_cbse: string | null
+          exam_date_jee_advanced: string | null
+          exam_date_jee_main: string | null
+          id: string
+          last_study_date: string | null
+          level: number | null
+          name: string
+          streak: number | null
+          updated_at: string | null
+          user_id: string
+          xp: number | null
+        }
+        Insert: {
+          avatar?: string | null
+          avatar_url?: string | null
+          coins?: number | null
+          created_at?: string | null
+          dream_college?: string | null
+          dream_college_image?: string | null
+          dream_marks_cbse?: number | null
+          dream_marks_jee_advanced?: number | null
+          dream_marks_jee_main?: number | null
+          exam_date_cbse?: string | null
+          exam_date_jee_advanced?: string | null
+          exam_date_jee_main?: string | null
+          id?: string
+          last_study_date?: string | null
+          level?: number | null
+          name?: string
+          streak?: number | null
+          updated_at?: string | null
+          user_id: string
+          xp?: number | null
+        }
+        Update: {
+          avatar?: string | null
+          avatar_url?: string | null
+          coins?: number | null
+          created_at?: string | null
+          dream_college?: string | null
+          dream_college_image?: string | null
+          dream_marks_cbse?: number | null
+          dream_marks_jee_advanced?: number | null
+          dream_marks_jee_main?: number | null
+          exam_date_cbse?: string | null
+          exam_date_jee_advanced?: string | null
+          exam_date_jee_main?: string | null
+          id?: string
+          last_study_date?: string | null
+          level?: number | null
+          name?: string
+          streak?: number | null
+          updated_at?: string | null
+          user_id?: string
+          xp?: number | null
+        }
+        Relationships: []
+      }
+      test_records: {
+        Row: {
+          chemistry_marks: number | null
+          created_at: string | null
+          date: string
+          exam_type: string
+          id: string
+          mathematics_marks: number | null
+          max_marks: number
+          physics_marks: number | null
+          scored_marks: number
+          test_name: string
+          user_id: string
+        }
+        Insert: {
+          chemistry_marks?: number | null
+          created_at?: string | null
+          date: string
+          exam_type: string
+          id?: string
+          mathematics_marks?: number | null
+          max_marks: number
+          physics_marks?: number | null
+          scored_marks: number
+          test_name: string
+          user_id: string
+        }
+        Update: {
+          chemistry_marks?: number | null
+          created_at?: string | null
+          date?: string
+          exam_type?: string
+          id?: string
+          mathematics_marks?: number | null
+          max_marks?: number
+          physics_marks?: number | null
+          scored_marks?: number
+          test_name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_chapter_progress: {
+        Row: {
+          chapter_id: string
+          id: string
+          jungle_id: string
+          practice_done: boolean | null
+          revision_done: boolean | null
+          theory_done: boolean | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          chapter_id: string
+          id?: string
+          jungle_id: string
+          practice_done?: boolean | null
+          revision_done?: boolean | null
+          theory_done?: boolean | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          chapter_id?: string
+          id?: string
+          jungle_id?: string
+          practice_done?: boolean | null
+          revision_done?: boolean | null
+          theory_done?: boolean | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_tasks: {
+        Row: {
+          alarm_enabled: boolean | null
+          alarm_ringtone: string | null
+          alarm_time: string | null
+          chapter_id: string | null
+          completed: boolean | null
+          created_at: string | null
+          due_date: string | null
+          due_time: string | null
+          id: string
+          jungle_id: string
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          alarm_enabled?: boolean | null
+          alarm_ringtone?: string | null
+          alarm_time?: string | null
+          chapter_id?: string | null
+          completed?: boolean | null
+          created_at?: string | null
+          due_date?: string | null
+          due_time?: string | null
+          id?: string
+          jungle_id: string
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          alarm_enabled?: boolean | null
+          alarm_ringtone?: string | null
+          alarm_time?: string | null
+          chapter_id?: string | null
+          completed?: boolean | null
+          created_at?: string | null
+          due_date?: string | null
+          due_time?: string | null
+          id?: string
+          jungle_id?: string
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +395,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+    },
   },
 } as const
