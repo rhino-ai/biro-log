@@ -1,15 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useGameStore } from '@/store/gameStore';
-import { X, Swords, Shield, Zap } from 'lucide-react';
+import { X, Swords, Trophy, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
-
-interface BattleLogEntry {
-  id: string;
-  time: string;
-  message: string;
-  damage: number;
-}
+import { toast } from '@/hooks/use-toast';
+import { format } from 'date-fns';
 
 interface RaidBattleProps {
   isOpen: boolean;
@@ -17,42 +13,69 @@ interface RaidBattleProps {
 }
 
 export const RaidBattle = ({ isOpen, onClose }: RaidBattleProps) => {
-  const { backlogCount, xp, coins, addXP, addCoins } = useGameStore();
+  const { 
+    getOverdueTasks, 
+    toggleTask, 
+    backlogCount, 
+    addXP, 
+    addCoins,
+    addRaidRecord,
+    jungles 
+  } = useGameStore();
   
-  // Boss stats based on backlog
-  const bossMaxHP = 5000;
-  const currentHP = Math.max(0, bossMaxHP - (xp * 0.5));
-  const hpPercentage = (currentHP / bossMaxHP) * 100;
-  
-  const [battleLog, setBattleLog] = useState<BattleLogEntry[]>([
-    { id: '1', time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }), message: "Raid Boss 'Lecture Backlog' appeared!", damage: 0 },
-  ]);
+  const overdueTasks = getOverdueTasks();
+  const [completedInRaid, setCompletedInRaid] = useState<string[]>([]);
+  const [showVictory, setShowVictory] = useState(false);
 
-  const [isAttacking, setIsAttacking] = useState(false);
+  // Boss stats based on backlog
+  const bossMaxHP = Math.max(100, backlogCount * 100);
+  const currentHP = Math.max(0, bossMaxHP - (completedInRaid.length * 100));
+  const hpPercentage = (currentHP / bossMaxHP) * 100;
 
   const victoryRewards = {
-    coins: 40 + (backlogCount * 5),
-    bonusXP: 1000,
-    special: '3 Hours Coding',
+    coins: 40 + (backlogCount * 10),
+    bonusXP: 500 + (backlogCount * 100),
   };
 
-  const handleAttack = (attackType: 'theory' | 'practice' | 'revision') => {
-    setIsAttacking(true);
-    const damages = { theory: 100, practice: 150, revision: 200 };
-    const damage = damages[attackType];
-    const xpGain = damage / 10;
+  // Check for victory
+  useEffect(() => {
+    if (completedInRaid.length > 0 && completedInRaid.length >= overdueTasks.length && !showVictory) {
+      // All backlogs cleared!
+      setShowVictory(true);
+      addXP(victoryRewards.bonusXP);
+      addCoins(victoryRewards.coins);
+      
+      // Record victory in raid history
+      addRaidRecord({
+        date: new Date().toISOString(),
+        bossName: 'Backlog Monster',
+        result: 'victory',
+        tasksCleared: completedInRaid.length,
+        xpGained: victoryRewards.bonusXP,
+        coinsGained: victoryRewards.coins,
+      });
+      
+      toast({
+        title: '🏆 VICTORY!',
+        description: `Boss defeated! +${victoryRewards.bonusXP} XP, +${victoryRewards.coins} coins!`,
+      });
+    }
+  }, [completedInRaid, overdueTasks.length, showVictory, victoryRewards, addXP, addCoins, addRaidRecord]);
+
+  const handleCompleteTask = (taskId: string) => {
+    toggleTask(taskId);
+    setCompletedInRaid((prev) => [...prev, taskId]);
     
-    const newEntry: BattleLogEntry = {
-      id: Date.now().toString(),
-      time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-      message: `Attacked via '${attackType.charAt(0).toUpperCase() + attackType.slice(1)}' for ${damage} damage.`,
-      damage,
-    };
-    
-    setBattleLog(prev => [newEntry, ...prev].slice(0, 10));
-    addXP(xpGain);
-    
-    setTimeout(() => setIsAttacking(false), 500);
+    // Show damage effect
+    toast({
+      title: '💥 Critical Hit!',
+      description: '-100 HP to Boss! Keep going!',
+    });
+  };
+
+  const getJungleName = (jungleId: string) => {
+    const jungle = jungles.find((j) => j.id === jungleId);
+    return jungle ? `${jungle.icon} ${jungle.name}` : 'Unknown';
   };
 
   if (!isOpen) return null;
@@ -65,11 +88,11 @@ export const RaidBattle = ({ isOpen, onClose }: RaidBattleProps) => {
       <div className="absolute bottom-4 left-4 w-24 h-24 border-l-2 border-b-2 border-destructive/50" />
       <div className="absolute bottom-4 right-4 w-24 h-24 border-r-2 border-b-2 border-destructive/50" />
       
-      <div className="relative glass-panel border-destructive/30 rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-auto">
+      <div className="relative glass-panel border-destructive/30 rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-auto">
         {/* Header */}
         <div className="flex items-center justify-center gap-3 mb-6">
           <Swords className="w-8 h-8 text-destructive animate-pulse" />
-          <h2 className="font-game text-3xl text-destructive text-glow-raid">RAID</h2>
+          <h2 className="font-game text-3xl text-destructive text-glow-raid">RAID BATTLE</h2>
           <Button 
             variant="ghost" 
             size="icon" 
@@ -80,102 +103,159 @@ export const RaidBattle = ({ isOpen, onClose }: RaidBattleProps) => {
           </Button>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-6">
-          {/* Battle Log */}
-          <div className="glass-panel rounded-lg p-4 border border-primary/20">
-            <h3 className="font-game text-sm mb-3 text-primary">BATTLE LOG</h3>
-            <div className="space-y-3 max-h-60 overflow-auto">
-              {battleLog.map((entry) => (
-                <div key={entry.id} className="flex items-start gap-2 text-xs">
-                  <span className="text-muted-foreground whitespace-nowrap">{entry.time}</span>
-                  <span className="text-accent">💥</span>
-                  <span className="text-foreground">{entry.message}</span>
+        {/* Victory Screen */}
+        {showVictory ? (
+          <div className="text-center py-8 space-y-6">
+            <div className="text-8xl animate-bounce">🏆</div>
+            <h3 className="font-game text-3xl text-accent text-glow-green">VICTORY!</h3>
+            <p className="text-muted-foreground">You defeated the Backlog Boss!</p>
+            
+            <div className="glass-panel rounded-xl p-4 inline-block">
+              <h4 className="font-game text-sm text-coins mb-3">REWARDS</h4>
+              <div className="flex gap-6">
+                <div className="text-center">
+                  <div className="text-3xl mb-1">⚡</div>
+                  <div className="text-accent font-game text-xl">+{victoryRewards.bonusXP}</div>
+                  <div className="text-xs text-muted-foreground">XP</div>
                 </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Boss Display */}
-          <div className="flex flex-col items-center justify-center">
-            {/* Boss Visual */}
-            <div className={cn(
-              "text-8xl mb-4 transition-transform duration-200",
-              isAttacking && "scale-95 opacity-80"
-            )}>
-              👹
-            </div>
-
-            {/* Boss Name & HP */}
-            <h3 className="font-game text-lg text-destructive mb-2">LECTURE BACKLOG</h3>
-            <div className="w-full space-y-1">
-              <div className="h-4 bg-secondary rounded-full overflow-hidden border border-destructive/30">
-                <div 
-                  className="h-full bg-gradient-to-r from-destructive to-red-400 transition-all duration-500"
-                  style={{ width: `${hpPercentage}%` }}
-                />
+                <div className="text-center">
+                  <div className="text-3xl mb-1">🪙</div>
+                  <div className="text-coins font-game text-xl">+{victoryRewards.coins}</div>
+                  <div className="text-xs text-muted-foreground">Coins</div>
+                </div>
               </div>
-              <div className="flex justify-between text-xs">
-                <span className="text-destructive">{Math.round(hpPercentage)}%</span>
-                <span className="text-muted-foreground">HP: {Math.round(currentHP)} / {bossMaxHP}</span>
-              </div>
-              <p className="text-xs text-destructive text-center">EXP Stolen: {backlogCount * 50}</p>
             </div>
 
-            {/* Attack Buttons */}
-            <div className="flex gap-2 mt-4">
-              <Button 
-                size="sm" 
-                variant="outline" 
-                onClick={() => handleAttack('theory')}
-                className="border-primary/50 hover:bg-primary/20"
-              >
-                📖 Theory
-              </Button>
-              <Button 
-                size="sm" 
-                variant="outline" 
-                onClick={() => handleAttack('practice')}
-                className="border-accent/50 hover:bg-accent/20"
-              >
-                ✏️ Practice
-              </Button>
-              <Button 
-                size="sm" 
-                variant="outline" 
-                onClick={() => handleAttack('revision')}
-                className="border-coins/50 hover:bg-coins/20"
-              >
-                🔄 Revision
-              </Button>
-            </div>
+            <Button onClick={onClose} className="bg-accent hover:bg-accent/80 gap-2">
+              <Trophy className="w-5 h-5" />
+              Claim Rewards & Exit
+            </Button>
           </div>
+        ) : (
+          <div className="space-y-6">
+            {/* Boss Display */}
+            <div className="text-center">
+              <div className={cn(
+                "text-7xl mb-3 transition-transform duration-200",
+                completedInRaid.length > 0 && "animate-bounce-subtle opacity-80"
+              )}>
+                👹
+              </div>
+              <h3 className="font-game text-xl text-destructive mb-2">BACKLOG BOSS</h3>
+              
+              {/* HP Bar */}
+              <div className="w-full max-w-md mx-auto space-y-1">
+                <div className="h-5 bg-secondary rounded-full overflow-hidden border border-destructive/30">
+                  <div 
+                    className="h-full bg-gradient-to-r from-destructive to-destructive/70 transition-all duration-500 relative"
+                    style={{ width: `${hpPercentage}%` }}
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-foreground/20 to-transparent animate-shimmer" />
+                  </div>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-destructive font-medium">{Math.round(hpPercentage)}%</span>
+                  <span className="text-muted-foreground">HP: {Math.round(currentHP)} / {bossMaxHP}</span>
+                </div>
+              </div>
+            </div>
 
-          {/* Victory Rewards */}
-          <div className="glass-panel rounded-lg p-4 border border-coins/20">
-            <h3 className="font-game text-sm mb-3 text-coins text-center">VICTORY REWARDS</h3>
+            {/* Backlog Tasks to Complete */}
             <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Coins:</span>
-                <span className="text-coins font-medium">{victoryRewards.coins} 🪙</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Bonus EXP:</span>
-                <span className="text-accent font-medium">{victoryRewards.bonusXP}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-muted-foreground">Special:</span>
-                <span className="text-primary italic">{victoryRewards.special}</span>
+              <h4 className="font-game text-sm text-accent flex items-center gap-2">
+                <Swords className="w-4 h-4" />
+                DEFEAT BY COMPLETING TASKS ({overdueTasks.length - completedInRaid.length} remaining)
+              </h4>
+              
+              {overdueTasks.length === 0 ? (
+                <div className="glass-panel rounded-xl p-6 text-center">
+                  <span className="text-4xl mb-2 block">🎉</span>
+                  <p className="text-muted-foreground">No overdue tasks! The boss flees!</p>
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-[40vh] overflow-auto pr-2">
+                  {overdueTasks.map((task) => {
+                    const isCompleted = completedInRaid.includes(task.id);
+                    
+                    return (
+                      <div
+                        key={task.id}
+                        className={cn(
+                          "glass-panel rounded-xl p-3 border transition-all duration-300",
+                          isCompleted 
+                            ? "border-accent/50 bg-accent/10 opacity-60" 
+                            : "border-destructive/30 hover:border-destructive/50"
+                        )}
+                      >
+                        <div className="flex items-center gap-3">
+                          {isCompleted ? (
+                            <CheckCircle2 className="w-5 h-5 text-accent shrink-0" />
+                          ) : (
+                            <Checkbox
+                              checked={false}
+                              onCheckedChange={() => handleCompleteTask(task.id)}
+                              className="border-destructive data-[state=checked]:bg-accent"
+                            />
+                          )}
+                          
+                          <div className="flex-1 min-w-0">
+                            <p className={cn(
+                              "text-sm font-medium",
+                              isCompleted && "line-through text-muted-foreground"
+                            )}>
+                              {task.title}
+                            </p>
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
+                              <span>{getJungleName(task.jungleId)}</span>
+                              {task.dueDate && (
+                                <span className="text-destructive">
+                                  Due: {format(new Date(task.dueDate), 'MMM d')} {task.dueTime}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          
+                          {!isCompleted && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleCompleteTask(task.id)}
+                              className="border-accent/50 hover:bg-accent/20 gap-1"
+                            >
+                              ⚔️ Complete
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Victory Rewards Preview */}
+            <div className="glass-panel rounded-xl p-4 border border-coins/20">
+              <h4 className="font-game text-sm text-coins text-center mb-3">VICTORY REWARDS</h4>
+              <div className="flex justify-center gap-8">
+                <div className="text-center">
+                  <div className="text-2xl mb-1">⚡</div>
+                  <div className="text-accent font-medium">{victoryRewards.bonusXP}</div>
+                  <div className="text-xs text-muted-foreground">Bonus XP</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl mb-1">🪙</div>
+                  <div className="text-coins font-medium">{victoryRewards.coins}</div>
+                  <div className="text-xs text-muted-foreground">Coins</div>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
 
-        {/* Navigation */}
-        <div className="flex justify-center gap-4 mt-6">
-          <Button variant="outline" size="sm" className="border-primary/50">
-            ⬅️
-          </Button>
-        </div>
+            {/* Hint */}
+            <p className="text-xs text-center text-muted-foreground">
+              💡 Complete all overdue tasks to defeat the boss and earn rewards!
+            </p>
+          </div>
+        )}
       </div>
     </div>
   );

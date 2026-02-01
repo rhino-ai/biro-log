@@ -39,10 +39,21 @@ interface ExamDates {
   jeeAdvanced: string;
 }
 
+interface RaidRecord {
+  id: string;
+  date: string;
+  bossName: string;
+  result: 'victory' | 'defeat';
+  tasksCleared: number;
+  xpGained?: number;
+  coinsGained?: number;
+}
+
 interface UserProfile {
   name: string;
   avatar: string;
   dreamCollege: string;
+  dreamCollegeImage?: string;
   dreamMarks: {
     cbse: number;
     jeeMain: number;
@@ -71,6 +82,9 @@ interface GameState {
   // Test Records
   testRecords: TestRecord[];
   
+  // Raid History
+  raidHistory: RaidRecord[];
+  
   // Backlog & Raid (always on)
   backlogCount: number;
   raidActive: boolean;
@@ -88,6 +102,7 @@ interface GameState {
   updateExamDates: (dates: Partial<ExamDates>) => void;
   addTestRecord: (record: Omit<TestRecord, 'id'>) => void;
   deleteTestRecord: (id: string) => void;
+  addRaidRecord: (record: Omit<RaidRecord, 'id'>) => void;
   calculateJungleHealth: (jungleId: string) => number;
   getTreeState: (chapter: Chapter) => 'dry' | 'growing' | 'healthy' | 'flourishing';
   getCurrentLevel: () => number;
@@ -106,6 +121,7 @@ export const useGameStore = create<GameState>()(
         name: 'Student',
         avatar: '👨‍🎓',
         dreamCollege: 'IIT Bombay',
+        dreamCollegeImage: undefined,
         dreamMarks: {
           cbse: 95,
           jeeMain: 250,
@@ -125,6 +141,7 @@ export const useGameStore = create<GameState>()(
       jungles: JSON.parse(JSON.stringify(allJungles)),
       tasks: [],
       testRecords: [],
+      raidHistory: [],
       backlogCount: 0,
       raidActive: true, // Always on
 
@@ -285,6 +302,12 @@ export const useGameStore = create<GameState>()(
       deleteTestRecord: (id) => {
         set((state) => ({
           testRecords: state.testRecords.filter((r) => r.id !== id),
+        }));
+      },
+
+      addRaidRecord: (record) => {
+        set((state) => ({
+          raidHistory: [{ ...record, id: crypto.randomUUID() }, ...state.raidHistory].slice(0, 20), // Keep last 20
         }));
       },
 

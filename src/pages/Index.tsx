@@ -10,6 +10,7 @@ import { GoalPanel } from '@/components/game/GoalPanel';
 import { TestTracker } from '@/components/game/TestTracker';
 import { DailyGoalWidget } from '@/components/game/DailyGoalWidget';
 import { MotivationMessage } from '@/components/game/MotivationMessage';
+import { CollegeImageSection } from '@/components/game/CollegeImageSection';
 import { useNavigate, Link } from 'react-router-dom';
 import { Swords, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -54,8 +55,13 @@ const Index = () => {
           </div>
         )}
 
+        {/* Dream College Image Section */}
+        <div className="animate-fade-in" style={{ animationDelay: '0.1s' }}>
+          <CollegeImageSection />
+        </div>
+
         {/* XP Progress */}
-        <div className="glass-panel rounded-2xl p-4 animate-fade-in border border-accent/30" style={{ animationDelay: '0.1s' }}>
+        <div className="glass-panel rounded-2xl p-4 animate-fade-in border border-accent/30" style={{ animationDelay: '0.15s' }}>
           <XPBar />
         </div>
 
