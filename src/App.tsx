@@ -5,7 +5,6 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
-import { useAlarmManager } from "@/hooks/useAlarmManager";
 import { toast } from "@/hooks/use-toast";
 import Index from "./pages/Index";
 import JunglesPage from "./pages/JunglesPage";
@@ -19,17 +18,14 @@ import GuidePage from "./pages/GuidePage";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 
-const queryClient = new QueryClient();
-
-// Alarm Manager wrapper component
-const AlarmManagerProvider = ({ children }: { children: React.ReactNode }) => {
-  try {
-    useAlarmManager(); // This hook runs the alarm checking logic
-  } catch (error) {
-    console.error('Alarm manager error:', error);
-  }
-  return <>{children}</>;
-};
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      staleTime: 5 * 60 * 1000,
+    },
+  },
+});
 
 // Protected route wrapper
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -38,7 +34,10 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          <p className="text-muted-foreground text-sm">Loading...</p>
+        </div>
       </div>
     );
   }
@@ -57,7 +56,10 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+          <p className="text-muted-foreground text-sm">Loading...</p>
+        </div>
       </div>
     );
   }
@@ -132,12 +134,8 @@ const GlobalErrorHandler = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {
     const handleRejection = (event: PromiseRejectionEvent) => {
       console.error("Unhandled rejection:", event.reason);
-      toast({
-        title: "An error occurred",
-        description: "Please try again or refresh the page.",
-        variant: "destructive",
-      });
-      event.preventDefault(); // Prevent crash
+      // Don't show toast for every rejection - it can be noisy
+      event.preventDefault();
     };
 
     const handleError = (event: ErrorEvent) => {
@@ -160,17 +158,15 @@ const GlobalErrorHandler = ({ children }: { children: React.ReactNode }) => {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <GlobalErrorHandler>
-      <AuthProvider>
-        <TooltipProvider>
-          <AlarmManagerProvider>
+      <BrowserRouter>
+        <AuthProvider>
+          <TooltipProvider>
             <Toaster />
             <Sonner />
-            <BrowserRouter>
-              <AppRoutes />
-            </BrowserRouter>
-          </AlarmManagerProvider>
-        </TooltipProvider>
-      </AuthProvider>
+            <AppRoutes />
+          </TooltipProvider>
+        </AuthProvider>
+      </BrowserRouter>
     </GlobalErrorHandler>
   </QueryClientProvider>
 );
