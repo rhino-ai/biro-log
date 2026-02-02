@@ -1,11 +1,10 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useGameStore } from '@/store/gameStore';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import { Camera, Upload, X, School, Loader2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Camera, X, School, Loader2 } from 'lucide-react';
 
 // Default college images
 const defaultCollegeImages: Record<string, string> = {
@@ -19,17 +18,24 @@ export const CollegeImageSection = () => {
   const { user } = useAuth();
   const { profile, updateProfile } = useGameStore();
   const [isUploading, setIsUploading] = useState(false);
-  const [collegeImage, setCollegeImage] = useState<string | null>(null);
+  const [collegeImage, setCollegeImage] = useState<string | null>(profile.dreamCollegeImage || null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Sync with profile changes
+  useEffect(() => {
+    if (profile.dreamCollegeImage) {
+      setCollegeImage(profile.dreamCollegeImage);
+    }
+  }, [profile.dreamCollegeImage]);
 
   // Get image - user uploaded or default
   const displayImage = collegeImage || 
-    profile.dreamCollege && defaultCollegeImages[profile.dreamCollege] ||
+    (profile.dreamCollege && defaultCollegeImages[profile.dreamCollege]) ||
     'https://images.unsplash.com/photo-1562774053-701939374585?w=400&h=200&fit=crop';
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || !user) return;
+    if (!file) return;
 
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
@@ -41,39 +47,74 @@ export const CollegeImageSection = () => {
       return;
     }
 
-    setIsUploading(true);
-    try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}/college.${fileExt}`;
-      
-      const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(fileName, file, { upsert: true });
-
-      if (uploadError) throw uploadError;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(fileName);
-
-      setCollegeImage(publicUrl);
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
       toast({
-        title: 'College Image Uploaded! 🏫',
-        description: 'Your dream college image has been set.',
+        title: 'Invalid file type',
+        description: 'Please upload an image file',
+        variant: 'destructive',
       });
+      return;
+    }
+
+    setIsUploading(true);
+    
+    try {
+      // If user is logged in, upload to Supabase
+      if (user) {
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${user.id}/college-${Date.now()}.${fileExt}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('avatars')
+          .upload(fileName, file, { upsert: true });
+
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('avatars')
+          .getPublicUrl(fileName);
+
+        setCollegeImage(publicUrl);
+        updateProfile({ dreamCollegeImage: publicUrl });
+        
+        toast({
+          title: 'College Image Uploaded! 🏫',
+          description: 'Your dream college image has been saved.',
+        });
+      } else {
+        // For offline/non-logged users, use local storage via FileReader
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const dataUrl = e.target?.result as string;
+          setCollegeImage(dataUrl);
+          updateProfile({ dreamCollegeImage: dataUrl });
+          toast({
+            title: 'Image Set! 🏫',
+            description: 'Your dream college image has been set locally.',
+          });
+        };
+        reader.readAsDataURL(file);
+      }
     } catch (error: any) {
+      console.error('Upload error:', error);
       toast({
         title: 'Upload Failed',
-        description: error.message,
+        description: error.message || 'Failed to upload image',
         variant: 'destructive',
       });
     } finally {
       setIsUploading(false);
+      // Reset file input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
   const removeImage = () => {
     setCollegeImage(null);
+    updateProfile({ dreamCollegeImage: undefined });
     toast({
       title: 'Image Removed',
       description: 'Using default college image.',
