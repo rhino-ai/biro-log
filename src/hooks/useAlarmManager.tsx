@@ -12,32 +12,37 @@ const alarmSounds: Record<string, string> = {
 };
 
 export const useAlarmManager = () => {
-  const { tasks, getOverdueTasks } = useGameStore();
+  const tasks = useGameStore((state) => state.tasks);
+  const getOverdueTasks = useGameStore((state) => state.getOverdueTasks);
   const checkedAlarmsRef = useRef<Set<string>>(new Set());
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const playAlarm = useCallback((soundId: string) => {
-    const soundUrl = alarmSounds[soundId] || alarmSounds.default;
-    
-    // Stop any currently playing alarm
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current = null;
-    }
-
-    audioRef.current = new Audio(soundUrl);
-    audioRef.current.loop = true;
-    audioRef.current.play().catch((error) => {
-      console.error('Failed to play alarm:', error);
-    });
-
-    // Stop after 30 seconds
-    setTimeout(() => {
+    try {
+      const soundUrl = alarmSounds[soundId] || alarmSounds.default;
+      
+      // Stop any currently playing alarm
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current = null;
       }
-    }, 30000);
+
+      audioRef.current = new Audio(soundUrl);
+      audioRef.current.loop = true;
+      audioRef.current.play().catch((error) => {
+        console.error('Failed to play alarm:', error);
+      });
+
+      // Stop after 30 seconds
+      setTimeout(() => {
+        if (audioRef.current) {
+          audioRef.current.pause();
+          audioRef.current = null;
+        }
+      }, 30000);
+    } catch (error) {
+      console.error('Error playing alarm:', error);
+    }
   }, []);
 
   const stopAlarm = useCallback(() => {
@@ -48,65 +53,77 @@ export const useAlarmManager = () => {
   }, []);
 
   const checkAlarms = useCallback(() => {
-    const now = new Date();
-    const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-    const currentDate = now.toISOString().split('T')[0];
+    try {
+      const now = new Date();
+      const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+      const currentDate = now.toISOString().split('T')[0];
 
-    tasks.forEach((task) => {
-      if (task.completed) return;
-      if (!task.alarm?.enabled) return;
-      
-      // Create unique key for this alarm instance
-      const alarmKey = `${task.id}-${currentDate}-${task.alarm.time}`;
-      
-      // Skip if already triggered today
-      if (checkedAlarmsRef.current.has(alarmKey)) return;
-
-      // Check if alarm time matches current time
-      if (task.alarm.time === currentTime) {
-        checkedAlarmsRef.current.add(alarmKey);
+      tasks.forEach((task) => {
+        if (task.completed) return;
+        if (!task.alarm?.enabled) return;
         
-        // Play alarm sound
-        playAlarm(task.alarm.ringtone || 'default');
+        // Create unique key for this alarm instance
+        const alarmKey = `${task.id}-${currentDate}-${task.alarm.time}`;
         
-        // Show notification toast
-        toast({
-          title: '⏰ Task Reminder!',
-          description: task.title,
-          duration: 10000,
-        });
+        // Skip if already triggered today
+        if (checkedAlarmsRef.current.has(alarmKey)) return;
 
-        // Request browser notification if permitted
-        if ('Notification' in window && Notification.permission === 'granted') {
-          new Notification('📋 Task Reminder', {
-            body: task.title,
-            icon: '/favicon.ico',
-            tag: task.id,
+        // Check if alarm time matches current time
+        if (task.alarm.time === currentTime) {
+          checkedAlarmsRef.current.add(alarmKey);
+          
+          // Play alarm sound
+          playAlarm(task.alarm.ringtone || 'default');
+          
+          // Show notification toast
+          toast({
+            title: '⏰ Task Reminder!',
+            description: task.title,
+            duration: 10000,
+          });
+
+          // Request browser notification if permitted
+          if ('Notification' in window && Notification.permission === 'granted') {
+            try {
+              new Notification('📋 Task Reminder', {
+                body: task.title,
+                icon: '/favicon.ico',
+                tag: task.id,
+              });
+            } catch (notifError) {
+              console.error('Notification error:', notifError);
+            }
+          }
+        }
+      });
+
+      // Check for overdue tasks and show alerts
+      const overdueTasks = getOverdueTasks();
+      if (overdueTasks.length > 0) {
+        const overdueKey = `overdue-${currentDate}-${now.getHours()}`;
+        if (!checkedAlarmsRef.current.has(overdueKey)) {
+          checkedAlarmsRef.current.add(overdueKey);
+          toast({
+            title: '⚠️ RAID ALERT!',
+            description: `${overdueTasks.length} tasks are overdue! Enter the Raid Arena!`,
+            variant: 'destructive',
+            duration: 15000,
           });
         }
       }
-    });
-
-    // Check for overdue tasks and show alerts
-    const overdueTasks = getOverdueTasks();
-    if (overdueTasks.length > 0) {
-      const overdueKey = `overdue-${currentDate}-${now.getHours()}`;
-      if (!checkedAlarmsRef.current.has(overdueKey)) {
-        checkedAlarmsRef.current.add(overdueKey);
-        toast({
-          title: '⚠️ RAID ALERT!',
-          description: `${overdueTasks.length} tasks are overdue! Enter the Raid Arena!`,
-          variant: 'destructive',
-          duration: 15000,
-        });
-      }
+    } catch (error) {
+      console.error('Error checking alarms:', error);
     }
   }, [tasks, playAlarm, getOverdueTasks]);
 
   // Request notification permission on mount
   useEffect(() => {
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission();
+    try {
+      if ('Notification' in window && Notification.permission === 'default') {
+        Notification.requestPermission().catch(console.error);
+      }
+    } catch (error) {
+      console.error('Error requesting notification permission:', error);
     }
   }, []);
 
