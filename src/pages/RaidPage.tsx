@@ -2,16 +2,18 @@ import { useState } from 'react';
 import { Header } from '@/components/layout/Header';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { RaidBattle } from '@/components/game/RaidBattle';
+import { PunishmentModal } from '@/components/game/PunishmentModal';
 import { useGameStore } from '@/store/gameStore';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Swords, Shield, Zap, Trophy, Flame, Calendar } from 'lucide-react';
+import { Swords, Shield, Zap, Trophy, Flame, Calendar, Skull } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 
 const RaidPage = () => {
   const { backlogCount, xp, coins, streak, level, raidHistory, getOverdueTasks } = useGameStore();
   const [showBattle, setShowBattle] = useState(false);
+  const [showPunishment, setShowPunishment] = useState(false);
   
   const overdueTasks = getOverdueTasks();
 
@@ -92,23 +94,56 @@ const RaidPage = () => {
               </div>
             )}
 
-            {/* Battle Button */}
-            <Button 
-              onClick={() => setShowBattle(true)}
-              className={cn(
-                "w-full font-game gap-2",
-                backlogCount > 0 
-                  ? "bg-destructive hover:bg-destructive/90 text-white"
-                  : "bg-muted text-muted-foreground cursor-not-allowed"
+            {/* Action Buttons */}
+            <div className="flex gap-3">
+              <Button 
+                onClick={() => setShowBattle(true)}
+                className={cn(
+                  "flex-1 font-game gap-2",
+                  backlogCount > 0 
+                    ? "bg-destructive hover:bg-destructive/90 text-white"
+                    : "bg-muted text-muted-foreground cursor-not-allowed"
+                )}
+                size="lg"
+                disabled={backlogCount === 0}
+              >
+                <Swords className="w-5 h-5" />
+                {backlogCount > 0 ? 'ENTER BATTLE' : 'NO BACKLOGS'}
+              </Button>
+              
+              {/* Punishment Button */}
+              {backlogCount > 0 && (
+                <Button
+                  onClick={() => setShowPunishment(true)}
+                  variant="outline"
+                  size="lg"
+                  className="border-raid/50 text-raid hover:bg-raid/10 gap-2"
+                >
+                  <Skull className="w-5 h-5" />
+                  Beijjati
+                </Button>
               )}
-              size="lg"
-              disabled={backlogCount === 0}
-            >
-              <Swords className="w-5 h-5" />
-              {backlogCount > 0 ? 'ENTER BATTLE' : 'NO BACKLOGS'}
-            </Button>
+            </div>
           </CardContent>
         </Card>
+
+        {/* Punishment Warning */}
+        {backlogCount > 0 && (
+          <Card className="glass-panel border-raid/30 bg-raid/5">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="text-3xl animate-bounce-subtle">😈</div>
+                <div className="flex-1">
+                  <h4 className="font-game text-sm text-raid">BOSS SAYS:</h4>
+                  <p className="text-xs text-muted-foreground">
+                    "Lazy student! You have {backlogCount} pending tasks. 
+                    Complete them or face BEIJJATI punishment!"
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Player Stats */}
         <div className="grid grid-cols-4 gap-2">
@@ -236,6 +271,7 @@ const RaidPage = () => {
                   <li>• Overdue tasks become Backlog Boss HP</li>
                   <li>• Complete each task = Deal 100 damage</li>
                   <li>• Clear all backlogs = Victory + Rewards!</li>
+                  <li>• Skip tasks = Face BEIJJATI punishment! 😈</li>
                   <li>• Stay consistent to avoid raids!</li>
                 </ul>
               </div>
@@ -248,6 +284,13 @@ const RaidPage = () => {
 
       {/* Battle Modal */}
       <RaidBattle isOpen={showBattle} onClose={() => setShowBattle(false)} />
+      
+      {/* Punishment Modal */}
+      <PunishmentModal 
+        isOpen={showPunishment} 
+        onClose={() => setShowPunishment(false)} 
+        backlogCount={backlogCount}
+      />
     </div>
   );
 };

@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -5,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import { useAlarmManager } from "@/hooks/useAlarmManager";
+import { toast } from "@/hooks/use-toast";
 import Index from "./pages/Index";
 import JunglesPage from "./pages/JunglesPage";
 import JungleDetailPage from "./pages/JungleDetailPage";
@@ -21,7 +23,11 @@ const queryClient = new QueryClient();
 
 // Alarm Manager wrapper component
 const AlarmManagerProvider = ({ children }: { children: React.ReactNode }) => {
-  useAlarmManager(); // This hook runs the alarm checking logic
+  try {
+    useAlarmManager(); // This hook runs the alarm checking logic
+  } catch (error) {
+    console.error('Alarm manager error:', error);
+  }
   return <>{children}</>;
 };
 
@@ -121,19 +127,51 @@ const AppRoutes = () => {
   );
 };
 
+// Global error handler component
+const GlobalErrorHandler = ({ children }: { children: React.ReactNode }) => {
+  useEffect(() => {
+    const handleRejection = (event: PromiseRejectionEvent) => {
+      console.error("Unhandled rejection:", event.reason);
+      toast({
+        title: "An error occurred",
+        description: "Please try again or refresh the page.",
+        variant: "destructive",
+      });
+      event.preventDefault(); // Prevent crash
+    };
+
+    const handleError = (event: ErrorEvent) => {
+      console.error("Unhandled error:", event.error);
+      event.preventDefault();
+    };
+
+    window.addEventListener("unhandledrejection", handleRejection);
+    window.addEventListener("error", handleError);
+    
+    return () => {
+      window.removeEventListener("unhandledrejection", handleRejection);
+      window.removeEventListener("error", handleError);
+    };
+  }, []);
+
+  return <>{children}</>;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <AuthProvider>
-      <TooltipProvider>
-        <AlarmManagerProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <AppRoutes />
-          </BrowserRouter>
-        </AlarmManagerProvider>
-      </TooltipProvider>
-    </AuthProvider>
+    <GlobalErrorHandler>
+      <AuthProvider>
+        <TooltipProvider>
+          <AlarmManagerProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <AppRoutes />
+            </BrowserRouter>
+          </AlarmManagerProvider>
+        </TooltipProvider>
+      </AuthProvider>
+    </GlobalErrorHandler>
   </QueryClientProvider>
 );
 
