@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useGameStore } from '@/store/gameStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,14 +9,24 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from '@/hooks/use-toast';
 import { Zap, Mail, Lock, User, Loader2 } from 'lucide-react';
+import { TrackSelection } from '@/components/game/TrackSelection';
 
 const AuthPage = () => {
   const navigate = useNavigate();
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, user } = useAuth();
+  const { hasSelectedTrack } = useGameStore();
   const [isLoading, setIsLoading] = useState(false);
+  const [showTrackSelection, setShowTrackSelection] = useState(false);
   
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [signupForm, setSignupForm] = useState({ email: '', password: '', name: '' });
+
+  // Check if user just signed up and needs to select track
+  useEffect(() => {
+    if (user && !hasSelectedTrack) {
+      setShowTrackSelection(true);
+    }
+  }, [user, hasSelectedTrack]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,18 +66,35 @@ const AuthPage = () => {
     } else {
       toast({
         title: 'Account Created! 🌱',
-        description: 'Please check your email to verify your account.',
+        description: 'Please check your email to verify your account, then select your study track.',
       });
+      // Show track selection for new users
+      setShowTrackSelection(true);
     }
     
     setIsLoading(false);
   };
+
+  const handleTrackComplete = () => {
+    setShowTrackSelection(false);
+    navigate('/');
+  };
+
+  // Show track selection if user needs to choose
+  if (showTrackSelection) {
+    return <TrackSelection onComplete={handleTrackComplete} />;
+  }
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
       <div className="w-full max-w-md space-y-6">
         {/* Logo */}
         <div className="text-center space-y-2 animate-fade-in">
+          <img 
+            src="/logo.png" 
+            alt="Biro-log" 
+            className="w-20 h-20 mx-auto rounded-xl shadow-lg"
+          />
           <h1 className="font-game text-4xl text-glow-purple flex items-center justify-center gap-2">
             <Zap className="w-10 h-10 text-accent animate-pulse" />
             Biro-log

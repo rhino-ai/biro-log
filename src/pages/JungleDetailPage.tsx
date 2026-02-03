@@ -7,26 +7,22 @@ import { ChapterList } from '@/components/game/ChapterList';
 import { JungleGardenMap } from '@/components/game/JungleGardenMap';
 import { ProgressRadar } from '@/components/game/ProgressRadar';
 import { ChaptersGrid } from '@/components/game/ChaptersGrid';
+import { ChapterEditor } from '@/components/game/ChapterEditor';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Map, List, Grid3X3, TreeDeciduous } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { ArrowLeft, Map, List, Grid3X3, TreeDeciduous, Edit2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { subjectIcons } from '@/data/syllabus';
 
-type Subject = 'all' | 'physics' | 'chemistry' | 'mathematics';
-
-const subjectFilters: { key: Subject; label: string; icon: string }[] = [
-  { key: 'all', label: 'All', icon: '📚' },
-  { key: 'physics', label: 'Physics', icon: '⚛️' },
-  { key: 'chemistry', label: 'Chemistry', icon: '🧪' },
-  { key: 'mathematics', label: 'Maths', icon: '📐' },
-];
+type Subject = 'all' | 'physics' | 'chemistry' | 'mathematics' | 'biology' | 'science' | 'english' | 'hindi' | 'social_science' | 'computer';
 
 const JungleDetailPage = () => {
   const { jungleId } = useParams();
   const navigate = useNavigate();
   const { jungles, calculateJungleHealth } = useGameStore();
   const [activeSubject, setActiveSubject] = useState<Subject>('all');
-  const [viewMode, setViewMode] = useState<'list' | 'map' | 'grid'>('list');
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
 
   const jungle = jungles.find((j) => j.id === jungleId);
 
@@ -43,28 +39,57 @@ const JungleDetailPage = () => {
     (ch) => ch.theoryDone && ch.practiceDone && ch.revisionDone
   ).length;
 
+  // Get unique subjects in this jungle
+  const uniqueSubjects = [...new Set(jungle.chapters.map((ch) => ch.subject))];
+  const subjectFilters = [
+    { key: 'all' as Subject, label: 'All', icon: '📚' },
+    ...uniqueSubjects.map((subject) => ({
+      key: subject as Subject,
+      label: subject.charAt(0).toUpperCase() + subject.slice(1).replace('_', ' '),
+      icon: subjectIcons[subject] || '📚',
+    })),
+  ];
+
   // Count by subject
-  const subjectCounts = {
-    physics: jungle.chapters.filter((ch) => ch.subject === 'physics').length,
-    chemistry: jungle.chapters.filter((ch) => ch.subject === 'chemistry').length,
-    mathematics: jungle.chapters.filter((ch) => ch.subject === 'mathematics').length,
-  };
+  const subjectCounts = uniqueSubjects.reduce((acc, subject) => {
+    acc[subject] = jungle.chapters.filter((ch) => ch.subject === subject).length;
+    return acc;
+  }, {} as Record<string, number>);
 
   return (
     <div className="min-h-screen bg-background pb-20">
       <Header />
       
       <main className="px-4 py-6 max-w-lg mx-auto space-y-6">
-        {/* Back Button */}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => navigate(-1)}
-          className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft size={16} />
-          Back
-        </Button>
+        {/* Back Button & Edit */}
+        <div className="flex items-center justify-between">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => navigate(-1)}
+            className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft size={16} />
+            Back
+          </Button>
+
+          <Dialog open={isEditorOpen} onOpenChange={setIsEditorOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-2">
+                <Edit2 className="w-4 h-4" />
+                Edit Chapters
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="glass-panel border-primary/30 max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="font-game flex items-center gap-2">
+                  {jungle.icon} Edit {jungle.name} Chapters
+                </DialogTitle>
+              </DialogHeader>
+              <ChapterEditor jungleId={jungle.id} />
+            </DialogContent>
+          </Dialog>
+        </div>
 
         {/* Jungle Header */}
         <div className={cn('glass-panel rounded-2xl p-5 animate-fade-in relative overflow-hidden')}>
@@ -96,8 +121,12 @@ const JungleDetailPage = () => {
             {/* Stats */}
             <div className="flex gap-4 text-sm">
               <div className="glass-panel px-3 py-2 rounded-lg">
-                <span className="text-muted-foreground">Completed: </span>
+                <span className="text-muted-foreground">Chapters: </span>
                 <span className="text-accent font-medium">{completedChapters}/{jungle.chapters.length}</span>
+              </div>
+              <div className="glass-panel px-3 py-2 rounded-lg">
+                <span className="text-muted-foreground">Trees: </span>
+                <span className="text-accent font-medium">🌳 {jungle.chapters.length}</span>
               </div>
               <div className="flex items-center gap-1">
                 {health >= 70 && <span className="animate-float">🦜</span>}
@@ -155,7 +184,7 @@ const JungleDetailPage = () => {
                 >
                   <span>{filter.icon}</span>
                   <span className="text-sm">{filter.label}</span>
-                  {filter.key !== 'all' && (
+                  {filter.key !== 'all' && subjectCounts[filter.key] && (
                     <span className="text-xs opacity-70">({subjectCounts[filter.key]})</span>
                   )}
                 </button>

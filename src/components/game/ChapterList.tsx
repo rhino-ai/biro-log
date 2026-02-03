@@ -1,4 +1,4 @@
-import { Chapter, JungleData } from '@/data/syllabus';
+import { Chapter, JungleData, subjectIcons, subjectColors } from '@/data/syllabus';
 import { useGameStore } from '@/store/gameStore';
 import { TreeIcon } from './TreeIcon';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -6,20 +6,8 @@ import { cn } from '@/lib/utils';
 
 interface ChapterListProps {
   jungle: JungleData;
-  filterSubject?: 'physics' | 'chemistry' | 'mathematics' | 'all';
+  filterSubject?: string;
 }
-
-const subjectColors = {
-  physics: 'border-l-blue-500',
-  chemistry: 'border-l-green-500',
-  mathematics: 'border-l-purple-500',
-};
-
-const subjectIcons = {
-  physics: '⚛️',
-  chemistry: '🧪',
-  mathematics: '📐',
-};
 
 export const ChapterList = ({ jungle, filterSubject = 'all' }: ChapterListProps) => {
   const { jungles, updateChapterProgress, getTreeState } = useGameStore();
@@ -38,12 +26,15 @@ export const ChapterList = ({ jungle, filterSubject = 'all' }: ChapterListProps)
     <div className="space-y-3">
       {filteredChapters.map((chapter) => {
         const treeState = getTreeState(chapter);
+        const subjectIcon = subjectIcons[chapter.subject] || '📚';
+        const subjectColor = subjectColors[chapter.subject] || 'border-l-gray-500';
+        
         return (
           <div
             key={chapter.id}
             className={cn(
               'glass-panel rounded-xl p-4 border-l-4 transition-all duration-300',
-              subjectColors[chapter.subject]
+              subjectColor
             )}
           >
             <div className="flex items-start gap-3">
@@ -51,8 +42,13 @@ export const ChapterList = ({ jungle, filterSubject = 'all' }: ChapterListProps)
               
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-2">
-                  <span>{subjectIcons[chapter.subject]}</span>
+                  <span>{subjectIcon}</span>
                   <h4 className="font-medium text-sm truncate">{chapter.name}</h4>
+                  {chapter.isCustom && (
+                    <span className="text-xs px-1.5 py-0.5 bg-accent/20 text-accent rounded">
+                      Custom
+                    </span>
+                  )}
                 </div>
                 
                 <div className="flex flex-wrap gap-4">
@@ -107,6 +103,12 @@ export const ChapterList = ({ jungle, filterSubject = 'all' }: ChapterListProps)
           </div>
         );
       })}
+      
+      {filteredChapters.length === 0 && (
+        <div className="text-center py-8 text-muted-foreground">
+          <p>No chapters found</p>
+        </div>
+      )}
     </div>
   );
 };

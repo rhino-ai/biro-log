@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { Chapter, allJungles, JungleData, rewards } from '@/data/syllabus';
+import { Chapter, allJungles, JungleData, rewards, StudyTrack, getJunglesByTrack, createChapter, SubjectType } from '@/data/syllabus';
 
 interface Task {
   id: string;
@@ -69,6 +69,8 @@ interface GameState {
   coins: number;
   streak: number;
   lastStudyDate: string | null;
+  studyTrack: StudyTrack;
+  hasSelectedTrack: boolean;
   
   // Exam Dates
   examDates: ExamDates;
@@ -110,6 +112,13 @@ interface GameState {
   getUnlockedRewards: () => typeof rewards;
   checkDeadlinesAndUpdateBacklog: () => void;
   getOverdueTasks: () => Task[];
+  
+  // New actions for track and chapter management
+  setStudyTrack: (track: StudyTrack) => void;
+  setJungles: (jungles: JungleData[]) => void;
+  addChapter: (jungleId: string, chapter: Chapter) => void;
+  updateChapterName: (jungleId: string, chapterId: string, newName: string) => void;
+  deleteChapter: (jungleId: string, chapterId: string) => void;
 }
 
 const XP_PER_LEVEL = 100;
@@ -133,6 +142,8 @@ export const useGameStore = create<GameState>()(
       coins: 0,
       streak: 0,
       lastStudyDate: null,
+      studyTrack: 'jee' as StudyTrack,
+      hasSelectedTrack: false,
       examDates: {
         cbse: '2026-03-15',
         jeeMain: '2026-01-20',
@@ -375,6 +386,50 @@ export const useGameStore = create<GameState>()(
           const deadline = new Date(`${task.dueDate}T${task.dueTime || '23:59'}`);
           return deadline < now;
         });
+      },
+
+      // New actions for track and chapter management
+      setStudyTrack: (track: StudyTrack) => {
+        set({ studyTrack: track, hasSelectedTrack: true });
+      },
+
+      setJungles: (jungles: JungleData[]) => {
+        set({ jungles });
+      },
+
+      addChapter: (jungleId: string, chapter: Chapter) => {
+        set((state) => ({
+          jungles: state.jungles.map((jungle) =>
+            jungle.id === jungleId
+              ? { ...jungle, chapters: [...jungle.chapters, chapter] }
+              : jungle
+          ),
+        }));
+      },
+
+      updateChapterName: (jungleId: string, chapterId: string, newName: string) => {
+        set((state) => ({
+          jungles: state.jungles.map((jungle) =>
+            jungle.id === jungleId
+              ? {
+                  ...jungle,
+                  chapters: jungle.chapters.map((ch) =>
+                    ch.id === chapterId ? { ...ch, name: newName } : ch
+                  ),
+                }
+              : jungle
+          ),
+        }));
+      },
+
+      deleteChapter: (jungleId: string, chapterId: string) => {
+        set((state) => ({
+          jungles: state.jungles.map((jungle) =>
+            jungle.id === jungleId
+              ? { ...jungle, chapters: jungle.chapters.filter((ch) => ch.id !== chapterId) }
+              : jungle
+          ),
+        }));
       },
     }),
     {
