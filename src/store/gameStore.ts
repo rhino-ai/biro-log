@@ -61,33 +61,46 @@ interface UserProfile {
   };
 }
 
+// Per-track data structure
+interface TrackData {
+  xp: number;
+  level: number;
+  coins: number;
+  streak: number;
+  lastStudyDate: string | null;
+  jungles: JungleData[];
+  tasks: Task[];
+  testRecords: TestRecord[];
+  raidHistory: RaidRecord[];
+  backlogCount: number;
+  profile: UserProfile;
+  examDates: ExamDates;
+}
+
 interface GameState {
-  // User Data
+  // Current track
+  studyTrack: StudyTrack;
+  hasSelectedTrack: boolean;
+  
+  // Track-specific data storage
+  trackData: {
+    jee: TrackData;
+    neet: TrackData;
+    highschool: TrackData;
+  };
+  
+  // Computed getters for current track (for backwards compatibility)
   profile: UserProfile;
   xp: number;
   level: number;
   coins: number;
   streak: number;
   lastStudyDate: string | null;
-  studyTrack: StudyTrack;
-  hasSelectedTrack: boolean;
-  
-  // Exam Dates
   examDates: ExamDates;
-  
-  // Jungles
   jungles: JungleData[];
-  
-  // Tasks/Goals
   tasks: Task[];
-  
-  // Test Records
   testRecords: TestRecord[];
-  
-  // Raid History
   raidHistory: RaidRecord[];
-  
-  // Backlog & Raid (always on)
   backlogCount: number;
   raidActive: boolean;
   
@@ -113,7 +126,7 @@ interface GameState {
   checkDeadlinesAndUpdateBacklog: () => void;
   getOverdueTasks: () => Task[];
   
-  // New actions for track and chapter management
+  // Track and chapter management
   setStudyTrack: (track: StudyTrack) => void;
   setJungles: (jungles: JungleData[]) => void;
   addChapter: (jungleId: string, chapter: Chapter) => void;
@@ -123,42 +136,110 @@ interface GameState {
 
 const XP_PER_LEVEL = 100;
 
+// Create default track data
+const createDefaultTrackData = (track: StudyTrack): TrackData => ({
+  xp: 0,
+  level: 0,
+  coins: 0,
+  streak: 0,
+  lastStudyDate: null,
+  jungles: JSON.parse(JSON.stringify(getJunglesByTrack(track))),
+  tasks: [],
+  testRecords: [],
+  raidHistory: [],
+  backlogCount: 0,
+  profile: {
+    name: 'Student',
+    avatar: '👨‍🎓',
+    dreamCollege: track === 'jee' ? 'IIT Bombay' : track === 'neet' ? 'AIIMS Delhi' : 'Top School',
+    dreamCollegeImage: undefined,
+    dreamMarks: {
+      cbse: 95,
+      jeeMain: 250,
+      jeeAdvanced: 180,
+    },
+  },
+  examDates: {
+    cbse: '2026-03-15',
+    jeeMain: '2026-01-20',
+    jeeAdvanced: '2026-05-25',
+  },
+});
+
 export const useGameStore = create<GameState>()(
   persist(
-    (set, get) => ({
-      profile: {
-        name: 'Student',
-        avatar: '👨‍🎓',
-        dreamCollege: 'IIT Bombay',
-        dreamCollegeImage: undefined,
-        dreamMarks: {
-          cbse: 95,
-          jeeMain: 250,
-          jeeAdvanced: 180,
-        },
-      },
-      xp: 0,
-      level: 0,
-      coins: 0,
-      streak: 0,
-      lastStudyDate: null,
-      studyTrack: 'jee' as StudyTrack,
-      hasSelectedTrack: false,
-      examDates: {
-        cbse: '2026-03-15',
-        jeeMain: '2026-01-20',
-        jeeAdvanced: '2026-05-25',
-      },
-      jungles: JSON.parse(JSON.stringify(allJungles)),
-      tasks: [],
-      testRecords: [],
-      raidHistory: [],
-      backlogCount: 0,
-      raidActive: true, // Always on
+    (set, get) => {
+      // Helper to get current track data
+      const getCurrentTrackData = (): TrackData => {
+        const state = get();
+        return state.trackData[state.studyTrack];
+      };
 
-      updateChapterProgress: (jungleId, chapterId, field, value) => {
-        set((state) => {
-          const newJungles = state.jungles.map((jungle) => {
+      // Helper to update current track data
+      const updateCurrentTrackData = (updates: Partial<TrackData>) => {
+        set((state) => ({
+          trackData: {
+            ...state.trackData,
+            [state.studyTrack]: {
+              ...state.trackData[state.studyTrack],
+              ...updates,
+            },
+          },
+        }));
+      };
+
+      return {
+        studyTrack: 'jee' as StudyTrack,
+        hasSelectedTrack: false,
+        
+        trackData: {
+          jee: createDefaultTrackData('jee'),
+          neet: createDefaultTrackData('neet'),
+          highschool: createDefaultTrackData('highschool'),
+        },
+
+        // Getters that return current track's data
+        get profile() {
+          return getCurrentTrackData().profile;
+        },
+        get xp() {
+          return getCurrentTrackData().xp;
+        },
+        get level() {
+          return getCurrentTrackData().level;
+        },
+        get coins() {
+          return getCurrentTrackData().coins;
+        },
+        get streak() {
+          return getCurrentTrackData().streak;
+        },
+        get lastStudyDate() {
+          return getCurrentTrackData().lastStudyDate;
+        },
+        get examDates() {
+          return getCurrentTrackData().examDates;
+        },
+        get jungles() {
+          return getCurrentTrackData().jungles;
+        },
+        get tasks() {
+          return getCurrentTrackData().tasks;
+        },
+        get testRecords() {
+          return getCurrentTrackData().testRecords;
+        },
+        get raidHistory() {
+          return getCurrentTrackData().raidHistory;
+        },
+        get backlogCount() {
+          return getCurrentTrackData().backlogCount;
+        },
+        raidActive: true,
+
+        updateChapterProgress: (jungleId, chapterId, field, value) => {
+          const currentData = getCurrentTrackData();
+          const newJungles = currentData.jungles.map((jungle) => {
             if (jungle.id !== jungleId) return jungle;
             return {
               ...jungle,
@@ -184,68 +265,74 @@ export const useGameStore = create<GameState>()(
             }
           }
 
-          const newXP = state.xp + xpGain;
+          const newXP = currentData.xp + xpGain;
           const newLevel = Math.floor(newXP / XP_PER_LEVEL);
-          const newCoins = state.coins + coinGain;
+          const newCoins = currentData.coins + coinGain;
 
-          return {
+          updateCurrentTrackData({
             jungles: newJungles,
             xp: newXP,
             level: newLevel,
             coins: newCoins,
-          };
-        });
-        get().updateStreak();
-      },
+          });
+          
+          get().updateStreak();
+        },
 
-      addXP: (amount) => {
-        set((state) => {
-          const newXP = state.xp + amount;
+        addXP: (amount) => {
+          const currentData = getCurrentTrackData();
+          const newXP = currentData.xp + amount;
           const newLevel = Math.floor(newXP / XP_PER_LEVEL);
-          return { xp: newXP, level: newLevel };
-        });
-      },
+          updateCurrentTrackData({ xp: newXP, level: newLevel });
+        },
 
-      addCoins: (amount) => {
-        set((state) => ({ coins: state.coins + amount }));
-      },
+        addCoins: (amount) => {
+          const currentData = getCurrentTrackData();
+          updateCurrentTrackData({ coins: currentData.coins + amount });
+        },
 
-      updateStreak: () => {
-        const today = new Date().toDateString();
-        const lastDate = get().lastStudyDate;
-        
-        if (lastDate === today) return;
-        
-        const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
-        
-        set((state) => {
+        updateStreak: () => {
+          const today = new Date().toDateString();
+          const currentData = getCurrentTrackData();
+          const lastDate = currentData.lastStudyDate;
+          
+          if (lastDate === today) return;
+          
+          const yesterday = new Date();
+          yesterday.setDate(yesterday.getDate() - 1);
+          
           if (lastDate === yesterday.toDateString()) {
-            return { streak: state.streak + 1, lastStudyDate: today };
+            updateCurrentTrackData({ 
+              streak: currentData.streak + 1, 
+              lastStudyDate: today 
+            });
+          } else {
+            updateCurrentTrackData({ 
+              streak: 1, 
+              lastStudyDate: today 
+            });
           }
-          return { streak: 1, lastStudyDate: today };
-        });
-      },
+        },
 
-      addTask: (task) => {
-        set((state) => ({
-          tasks: [...state.tasks, { 
-            ...task, 
-            id: crypto.randomUUID(),
-            createdAt: new Date().toISOString()
-          }],
-        }));
-      },
+        addTask: (task) => {
+          const currentData = getCurrentTrackData();
+          updateCurrentTrackData({
+            tasks: [...currentData.tasks, { 
+              ...task, 
+              id: crypto.randomUUID(),
+              createdAt: new Date().toISOString()
+            }],
+          });
+        },
 
-      toggleTask: (taskId) => {
-        set((state) => {
-          const task = state.tasks.find(t => t.id === taskId);
+        toggleTask: (taskId) => {
+          const currentData = getCurrentTrackData();
+          const task = currentData.tasks.find(t => t.id === taskId);
           const wasCompleted = task?.completed;
-          const newTasks = state.tasks.map((t) =>
+          const newTasks = currentData.tasks.map((t) =>
             t.id === taskId ? { ...t, completed: !t.completed } : t
           );
           
-          // Add XP and coins for completing task
           let xpGain = 0;
           let coinGain = 0;
           if (task && !wasCompleted) {
@@ -264,174 +351,187 @@ export const useGameStore = create<GameState>()(
             }
           }
 
-          const newXP = state.xp + xpGain;
+          const newXP = currentData.xp + xpGain;
           const newLevel = Math.floor(newXP / XP_PER_LEVEL);
 
-          return {
+          updateCurrentTrackData({
             tasks: newTasks,
             xp: newXP,
             level: newLevel,
-            coins: state.coins + coinGain,
-          };
-        });
-        get().checkDeadlinesAndUpdateBacklog();
-      },
+            coins: currentData.coins + coinGain,
+          });
+          
+          get().checkDeadlinesAndUpdateBacklog();
+        },
 
-      deleteTask: (taskId) => {
-        set((state) => ({
-          tasks: state.tasks.filter((task) => task.id !== taskId),
-        }));
-        get().checkDeadlinesAndUpdateBacklog();
-      },
+        deleteTask: (taskId) => {
+          const currentData = getCurrentTrackData();
+          updateCurrentTrackData({
+            tasks: currentData.tasks.filter((task) => task.id !== taskId),
+          });
+          get().checkDeadlinesAndUpdateBacklog();
+        },
 
-      updateTask: (taskId, updates) => {
-        set((state) => ({
-          tasks: state.tasks.map((task) =>
-            task.id === taskId ? { ...task, ...updates } : task
-          ),
-        }));
-      },
+        updateTask: (taskId, updates) => {
+          const currentData = getCurrentTrackData();
+          updateCurrentTrackData({
+            tasks: currentData.tasks.map((task) =>
+              task.id === taskId ? { ...task, ...updates } : task
+            ),
+          });
+        },
 
-      updateProfile: (profile) => {
-        set((state) => ({
-          profile: { ...state.profile, ...profile },
-        }));
-      },
+        updateProfile: (profile) => {
+          const currentData = getCurrentTrackData();
+          updateCurrentTrackData({
+            profile: { ...currentData.profile, ...profile },
+          });
+        },
 
-      updateExamDates: (dates) => {
-        set((state) => ({
-          examDates: { ...state.examDates, ...dates },
-        }));
-      },
+        updateExamDates: (dates) => {
+          const currentData = getCurrentTrackData();
+          updateCurrentTrackData({
+            examDates: { ...currentData.examDates, ...dates },
+          });
+        },
 
-      addTestRecord: (record) => {
-        set((state) => ({
-          testRecords: [...state.testRecords, { ...record, id: crypto.randomUUID() }],
-        }));
-      },
+        addTestRecord: (record) => {
+          const currentData = getCurrentTrackData();
+          updateCurrentTrackData({
+            testRecords: [...currentData.testRecords, { ...record, id: crypto.randomUUID() }],
+          });
+        },
 
-      deleteTestRecord: (id) => {
-        set((state) => ({
-          testRecords: state.testRecords.filter((r) => r.id !== id),
-        }));
-      },
+        deleteTestRecord: (id) => {
+          const currentData = getCurrentTrackData();
+          updateCurrentTrackData({
+            testRecords: currentData.testRecords.filter((r) => r.id !== id),
+          });
+        },
 
-      addRaidRecord: (record) => {
-        set((state) => ({
-          raidHistory: [{ ...record, id: crypto.randomUUID() }, ...state.raidHistory].slice(0, 20), // Keep last 20
-        }));
-      },
+        addRaidRecord: (record) => {
+          const currentData = getCurrentTrackData();
+          updateCurrentTrackData({
+            raidHistory: [{ ...record, id: crypto.randomUUID() }, ...currentData.raidHistory].slice(0, 20),
+          });
+        },
 
-      calculateJungleHealth: (jungleId) => {
-        const jungle = get().jungles.find((j) => j.id === jungleId);
-        if (!jungle) return 0;
+        calculateJungleHealth: (jungleId) => {
+          const currentData = getCurrentTrackData();
+          const jungle = currentData.jungles.find((j) => j.id === jungleId);
+          if (!jungle || jungle.chapters.length === 0) return 0;
 
-        const totalProgress = jungle.chapters.reduce((acc, chapter) => {
-          let progress = 0;
-          if (chapter.theoryDone) progress += 33;
-          if (chapter.practiceDone) progress += 33;
-          if (chapter.revisionDone) progress += 34;
-          return acc + progress;
-        }, 0);
+          const totalProgress = jungle.chapters.reduce((acc, chapter) => {
+            let progress = 0;
+            if (chapter.theoryDone) progress += 33;
+            if (chapter.practiceDone) progress += 33;
+            if (chapter.revisionDone) progress += 34;
+            return acc + progress;
+          }, 0);
 
-        return Math.round(totalProgress / jungle.chapters.length);
-      },
+          return Math.round(totalProgress / jungle.chapters.length);
+        },
 
-      getTreeState: (chapter) => {
-        if (!chapter.theoryDone && !chapter.practiceDone && !chapter.revisionDone) {
-          return 'dry';
-        }
-        if (chapter.theoryDone && !chapter.practiceDone) {
-          return 'growing';
-        }
-        if (chapter.theoryDone && chapter.practiceDone && !chapter.revisionDone) {
-          return 'healthy';
-        }
-        return 'flourishing';
-      },
+        getTreeState: (chapter) => {
+          if (!chapter.theoryDone && !chapter.practiceDone && !chapter.revisionDone) {
+            return 'dry';
+          }
+          if (chapter.theoryDone && !chapter.practiceDone) {
+            return 'growing';
+          }
+          if (chapter.theoryDone && chapter.practiceDone && !chapter.revisionDone) {
+            return 'healthy';
+          }
+          return 'flourishing';
+        },
 
-      getCurrentLevel: () => get().level,
+        getCurrentLevel: () => getCurrentTrackData().level,
 
-      getXPForNextLevel: () => {
-        const currentXP = get().xp;
-        const currentLevel = get().level;
-        return (currentLevel + 1) * XP_PER_LEVEL - currentXP;
-      },
+        getXPForNextLevel: () => {
+          const currentData = getCurrentTrackData();
+          return (currentData.level + 1) * XP_PER_LEVEL - currentData.xp;
+        },
 
-      getUnlockedRewards: () => {
-        const level = get().level;
-        return rewards.map((reward) => ({
-          ...reward,
-          unlocked: level >= reward.level,
-        }));
-      },
+        getUnlockedRewards: () => {
+          const level = getCurrentTrackData().level;
+          return rewards.map((reward) => ({
+            ...reward,
+            unlocked: level >= reward.level,
+          }));
+        },
 
-      checkDeadlinesAndUpdateBacklog: () => {
-        const now = new Date();
-        const overdueTasks = get().tasks.filter((task) => {
-          if (task.completed) return false;
-          if (!task.dueDate) return false;
-          const deadline = new Date(`${task.dueDate}T${task.dueTime || '23:59'}`);
-          return deadline < now;
-        });
-        
-        set({ backlogCount: overdueTasks.length });
-      },
+        checkDeadlinesAndUpdateBacklog: () => {
+          const now = new Date();
+          const currentData = getCurrentTrackData();
+          const overdueTasks = currentData.tasks.filter((task) => {
+            if (task.completed) return false;
+            if (!task.dueDate) return false;
+            const deadline = new Date(`${task.dueDate}T${task.dueTime || '23:59'}`);
+            return deadline < now;
+          });
+          
+          updateCurrentTrackData({ backlogCount: overdueTasks.length });
+        },
 
-      getOverdueTasks: () => {
-        const now = new Date();
-        return get().tasks.filter((task) => {
-          if (task.completed) return false;
-          if (!task.dueDate) return false;
-          const deadline = new Date(`${task.dueDate}T${task.dueTime || '23:59'}`);
-          return deadline < now;
-        });
-      },
+        getOverdueTasks: () => {
+          const now = new Date();
+          const currentData = getCurrentTrackData();
+          return currentData.tasks.filter((task) => {
+            if (task.completed) return false;
+            if (!task.dueDate) return false;
+            const deadline = new Date(`${task.dueDate}T${task.dueTime || '23:59'}`);
+            return deadline < now;
+          });
+        },
 
-      // New actions for track and chapter management
-      setStudyTrack: (track: StudyTrack) => {
-        set({ studyTrack: track, hasSelectedTrack: true });
-      },
+        // Track and chapter management
+        setStudyTrack: (track: StudyTrack) => {
+          set({ studyTrack: track, hasSelectedTrack: true });
+        },
 
-      setJungles: (jungles: JungleData[]) => {
-        set({ jungles });
-      },
+        setJungles: (jungles: JungleData[]) => {
+          updateCurrentTrackData({ jungles });
+        },
 
-      addChapter: (jungleId: string, chapter: Chapter) => {
-        set((state) => ({
-          jungles: state.jungles.map((jungle) =>
-            jungle.id === jungleId
-              ? { ...jungle, chapters: [...jungle.chapters, chapter] }
-              : jungle
-          ),
-        }));
-      },
+        addChapter: (jungleId: string, chapter: Chapter) => {
+          const currentData = getCurrentTrackData();
+          updateCurrentTrackData({
+            jungles: currentData.jungles.map((jungle) =>
+              jungle.id === jungleId
+                ? { ...jungle, chapters: [...jungle.chapters, chapter] }
+                : jungle
+            ),
+          });
+        },
 
-      updateChapterName: (jungleId: string, chapterId: string, newName: string) => {
-        set((state) => ({
-          jungles: state.jungles.map((jungle) =>
-            jungle.id === jungleId
-              ? {
-                  ...jungle,
-                  chapters: jungle.chapters.map((ch) =>
-                    ch.id === chapterId ? { ...ch, name: newName } : ch
-                  ),
-                }
-              : jungle
-          ),
-        }));
-      },
+        updateChapterName: (jungleId: string, chapterId: string, newName: string) => {
+          const currentData = getCurrentTrackData();
+          updateCurrentTrackData({
+            jungles: currentData.jungles.map((jungle) =>
+              jungle.id === jungleId
+                ? {
+                    ...jungle,
+                    chapters: jungle.chapters.map((ch) =>
+                      ch.id === chapterId ? { ...ch, name: newName } : ch
+                    ),
+                  }
+                : jungle
+            ),
+          });
+        },
 
-      deleteChapter: (jungleId: string, chapterId: string) => {
-        set((state) => ({
-          jungles: state.jungles.map((jungle) =>
-            jungle.id === jungleId
-              ? { ...jungle, chapters: jungle.chapters.filter((ch) => ch.id !== chapterId) }
-              : jungle
-          ),
-        }));
-      },
-    }),
+        deleteChapter: (jungleId: string, chapterId: string) => {
+          const currentData = getCurrentTrackData();
+          updateCurrentTrackData({
+            jungles: currentData.jungles.map((jungle) =>
+              jungle.id === jungleId
+                ? { ...jungle, chapters: jungle.chapters.filter((ch) => ch.id !== chapterId) }
+                : jungle
+            ),
+          });
+        },
+      };
+    },
     {
       name: 'jungle-study-game',
     }

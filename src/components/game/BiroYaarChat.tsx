@@ -3,9 +3,10 @@ import { useGameStore } from '@/store/gameStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, Bot, User, Clock, X, Sparkles, AlertTriangle } from 'lucide-react';
+import { Send, Clock, ArrowLeft, Sparkles, AlertTriangle, MessageCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
+import { useNavigate } from 'react-router-dom';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -53,20 +54,16 @@ const formatTime = (ms: number) => {
 const SimpleMarkdown = ({ content }: { content: string }) => {
   if (!content) return <span className="opacity-50">...</span>;
   
-  // Split by lines and process
   const lines = content.split('\n');
   
   return (
     <div className="space-y-1">
       {lines.map((line, idx) => {
-        // Bold: **text**
         let processed = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-        // Italic: *text* or _text_
         processed = processed.replace(/\*(.*?)\*/g, '<em>$1</em>');
         processed = processed.replace(/_(.*?)_/g, '<em>$1</em>');
-        // Code: `code`
         processed = processed.replace(/`(.*?)`/g, '<code class="bg-secondary/50 px-1 rounded text-xs">$1</code>');
-        // Headers
+        
         if (line.startsWith('### ')) {
           return <h3 key={idx} className="font-bold text-sm mt-2">{line.slice(4)}</h3>;
         }
@@ -76,7 +73,6 @@ const SimpleMarkdown = ({ content }: { content: string }) => {
         if (line.startsWith('# ')) {
           return <h1 key={idx} className="font-bold text-lg mt-2">{line.slice(2)}</h1>;
         }
-        // List items
         if (line.startsWith('- ') || line.startsWith('* ')) {
           return (
             <div key={idx} className="flex gap-2">
@@ -85,7 +81,6 @@ const SimpleMarkdown = ({ content }: { content: string }) => {
             </div>
           );
         }
-        // Numbered list
         const numberedMatch = line.match(/^(\d+)\.\s/);
         if (numberedMatch) {
           return (
@@ -95,28 +90,22 @@ const SimpleMarkdown = ({ content }: { content: string }) => {
             </div>
           );
         }
-        // Empty line
         if (line.trim() === '') {
-          return <div key={idx} className="h-2" />;
+          return <div key={idx} className="h-1" />;
         }
-        // Regular paragraph
         return <p key={idx} dangerouslySetInnerHTML={{ __html: processed }} />;
       })}
     </div>
   );
 };
 
-interface BiroYaarChatProps {
-  onClose?: () => void;
-  isFullScreen?: boolean;
-}
-
-export const BiroYaarChat = ({ onClose, isFullScreen = false }: BiroYaarChatProps) => {
+export const BiroYaarChat = () => {
+  const navigate = useNavigate();
   const { profile, studyTrack } = useGameStore();
   const [messages, setMessages] = useState<Message[]>([
     {
       role: 'assistant',
-      content: `Hey ${profile.name}! 👋 Main hoon Biro-yaar, tera study buddy!\n\nKya chal raha hai? Koi doubt hai ya motivation chahiye? Bol bhai, I'm here to help! 💪`,
+      content: `Yo ${profile.name}! 👋 Kya scene hai bhai?`,
       timestamp: new Date(),
     },
   ]);
@@ -139,7 +128,7 @@ export const BiroYaarChat = ({ onClose, isFullScreen = false }: BiroYaarChatProp
   useEffect(() => {
     if (sessionStartTime) {
       const interval = setInterval(() => {
-        updateUsage(1000); // Update every second
+        updateUsage(1000);
         setRemainingTime(DAILY_LIMIT_MS - getUsageData().usedMs);
       }, 1000);
       return () => clearInterval(interval);
@@ -175,7 +164,6 @@ export const BiroYaarChat = ({ onClose, isFullScreen = false }: BiroYaarChatProp
     setInput('');
     setIsLoading(true);
 
-    // Prepare messages for API (only role and content)
     const apiMessages = [...messages, userMessage].map((m) => ({
       role: m.role,
       content: m.content,
@@ -203,7 +191,6 @@ export const BiroYaarChat = ({ onClose, isFullScreen = false }: BiroYaarChatProp
         throw new Error(errorData.error || 'Failed to get response');
       }
 
-      // Handle streaming response
       const reader = response.body?.getReader();
       if (!reader) throw new Error('No response body');
 
@@ -211,7 +198,6 @@ export const BiroYaarChat = ({ onClose, isFullScreen = false }: BiroYaarChatProp
       let assistantContent = '';
       let textBuffer = '';
 
-      // Add empty assistant message
       setMessages((prev) => [
         ...prev,
         { role: 'assistant', content: '', timestamp: new Date() },
@@ -262,7 +248,6 @@ export const BiroYaarChat = ({ onClose, isFullScreen = false }: BiroYaarChatProp
         description: error instanceof Error ? error.message : 'Failed to send message',
         variant: 'destructive',
       });
-      // Remove the last message if failed
       setMessages((prev) => prev.slice(0, -1));
     } finally {
       setIsLoading(false);
@@ -278,96 +263,83 @@ export const BiroYaarChat = ({ onClose, isFullScreen = false }: BiroYaarChatProp
   };
 
   return (
-    <div
-      className={cn(
-        'flex flex-col glass-panel border border-primary/30 overflow-hidden',
-        isFullScreen ? 'fixed inset-0 z-50 rounded-none' : 'rounded-2xl h-[500px]'
-      )}
-    >
+    <div className="fixed inset-0 z-50 flex flex-col bg-background">
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-white/10 bg-primary/10">
+      <div className="flex items-center justify-between p-3 border-b border-white/10 bg-gradient-to-r from-primary/20 to-accent/20">
         <div className="flex items-center gap-3">
-          <div className="relative">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-              <Bot className="w-6 h-6 text-white" />
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate(-1)}
+            className="shrink-0"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <div className="flex items-center gap-2">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-xl">
+              🤝
             </div>
-            <span className="absolute -bottom-1 -right-1 text-lg">🎓</span>
-          </div>
-          <div>
-            <h3 className="font-game text-sm">Biro-yaar</h3>
-            <p className="text-xs text-muted-foreground flex items-center gap-1">
-              <Sparkles className="w-3 h-3" /> AI Study Mentor
-            </p>
+            <div>
+              <h3 className="font-game text-sm flex items-center gap-1">
+                Biro-yaar 
+                <span className="text-xs text-green-400">● online</span>
+              </h3>
+              <p className="text-[10px] text-muted-foreground">
+                tera study buddy 📚
+              </p>
+            </div>
           </div>
         </div>
         
-        <div className="flex items-center gap-2">
-          {/* Time Remaining */}
-          <div className={cn(
-            "flex items-center gap-1 px-2 py-1 rounded-full text-xs",
-            remainingTime < 30 * 60 * 1000 ? "bg-raid/20 text-raid" : "bg-secondary"
-          )}>
-            <Clock className="w-3 h-3" />
-            <span>{formatTime(Math.max(0, remainingTime))}</span>
-          </div>
-          
-          {onClose && (
-            <Button variant="ghost" size="icon" onClick={onClose}>
-              <X className="w-5 h-5" />
-            </Button>
-          )}
+        {/* Time Remaining */}
+        <div className={cn(
+          "flex items-center gap-1 px-2 py-1 rounded-full text-xs",
+          remainingTime < 30 * 60 * 1000 ? "bg-raid/20 text-raid" : "bg-secondary/50"
+        )}>
+          <Clock className="w-3 h-3" />
+          <span>{formatTime(Math.max(0, remainingTime))}</span>
         </div>
       </div>
 
+      {/* Chat Background */}
+      <div className="absolute inset-0 top-14 bottom-16 opacity-5 pointer-events-none">
+        <div className="w-full h-full bg-repeat" style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+        }} />
+      </div>
+
       {/* Messages */}
-      <ScrollArea className="flex-1 p-4" ref={scrollRef}>
-        <div className="space-y-4">
+      <ScrollArea className="flex-1 p-4 relative" ref={scrollRef}>
+        <div className="space-y-3 pb-4">
           {messages.map((message, index) => (
             <div
               key={index}
               className={cn(
-                'flex gap-3 animate-fade-in',
-                message.role === 'user' ? 'flex-row-reverse' : ''
+                'flex animate-fade-in',
+                message.role === 'user' ? 'justify-end' : 'justify-start'
               )}
             >
               <div
                 className={cn(
-                  'w-8 h-8 rounded-full flex items-center justify-center shrink-0',
+                  'max-w-[85%] rounded-2xl px-3 py-2 shadow-sm',
                   message.role === 'user'
-                    ? 'bg-accent/20'
-                    : 'bg-gradient-to-br from-primary to-accent'
-                )}
-              >
-                {message.role === 'user' ? (
-                  <User className="w-4 h-4" />
-                ) : (
-                  <Bot className="w-4 h-4 text-white" />
-                )}
-              </div>
-              <div
-                className={cn(
-                  'max-w-[80%] rounded-2xl px-4 py-2',
-                  message.role === 'user'
-                    ? 'bg-accent text-accent-foreground rounded-tr-sm'
-                    : 'bg-secondary rounded-tl-sm'
+                    ? 'bg-accent text-accent-foreground rounded-br-sm'
+                    : 'bg-card border border-white/10 rounded-bl-sm'
                 )}
               >
                 <div className="text-sm">
                   <SimpleMarkdown content={message.content} />
                 </div>
-                <span className="text-[10px] opacity-50 mt-1 block">
+                <span className="text-[10px] opacity-40 mt-1 block text-right">
                   {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </span>
               </div>
             </div>
           ))}
           
-          {isLoading && (
-            <div className="flex gap-3 animate-fade-in">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                <Bot className="w-4 h-4 text-white animate-pulse" />
-              </div>
-              <div className="bg-secondary rounded-2xl rounded-tl-sm px-4 py-2">
+          {isLoading && messages[messages.length - 1]?.role === 'user' && (
+            <div className="flex justify-start animate-fade-in">
+              <div className="bg-card border border-white/10 rounded-2xl rounded-bl-sm px-4 py-3">
                 <span className="flex gap-1">
                   <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
                   <span className="w-2 h-2 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
@@ -383,33 +355,46 @@ export const BiroYaarChat = ({ onClose, isFullScreen = false }: BiroYaarChatProp
       {isLimitReached && (
         <div className="p-3 bg-raid/20 border-t border-raid/30 flex items-center gap-2 text-sm">
           <AlertTriangle className="w-4 h-4 text-raid" />
-          <span className="text-raid">Daily limit reached! Come back tomorrow. 📚</span>
+          <span className="text-raid">Aaj ka limit ho gaya! Kal milte hain 👋</span>
+        </div>
+      )}
+
+      {/* Quick Suggestions */}
+      {messages.length <= 2 && (
+        <div className="px-4 py-2 flex gap-2 overflow-x-auto">
+          {['Motivation do yaar 💪', 'Doubt hai bhai', 'Bore ho raha 😅', 'Study plan banao'].map((suggestion) => (
+            <button
+              key={suggestion}
+              onClick={() => setInput(suggestion)}
+              className="px-3 py-1.5 rounded-full bg-secondary/50 border border-white/10 text-xs whitespace-nowrap hover:bg-secondary transition-colors"
+            >
+              {suggestion}
+            </button>
+          ))}
         </div>
       )}
 
       {/* Input */}
-      <div className="p-4 border-t border-white/10">
-        <div className="flex gap-2">
+      <div className="p-3 border-t border-white/10 bg-card/50 backdrop-blur-sm">
+        <div className="flex gap-2 max-w-lg mx-auto">
           <Input
             ref={inputRef}
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder={isLimitReached ? "Daily limit reached..." : "Ask anything..."}
+            placeholder={isLimitReached ? "Kal milte hain..." : "Type kar yaar..."}
             disabled={isLoading || isLimitReached}
-            className="flex-1 bg-secondary/50"
+            className="flex-1 bg-secondary/50 border-white/10"
           />
           <Button
             onClick={sendMessage}
             disabled={!input.trim() || isLoading || isLimitReached}
-            className="bg-primary"
+            size="icon"
+            className="bg-accent hover:bg-accent/90 shrink-0"
           >
             <Send className="w-4 h-4" />
           </Button>
         </div>
-        <p className="text-[10px] text-center text-muted-foreground mt-2">
-          Biro-yaar helps with doubts & motivation • 3hrs/day limit
-        </p>
       </div>
     </div>
   );

@@ -3,6 +3,7 @@ import { useGameStore } from '@/store/gameStore';
 import { useAuth } from '@/hooks/useAuth';
 import { Header } from '@/components/layout/Header';
 import { BottomNav } from '@/components/layout/BottomNav';
+import { BackButton } from '@/components/layout/BackButton';
 import { Avatar } from '@/components/game/Avatar';
 import { XPBar } from '@/components/game/XPBar';
 import { StatCard } from '@/components/game/StatCard';
@@ -14,7 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { Edit2, Save, Zap, Camera, Upload, LogOut, Loader2 } from 'lucide-react';
+import { Edit2, Save, Zap, Camera, LogOut, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const avatarOptions = ['👨‍🎓', '👩‍🎓', '🧑‍💻', '👨‍🔬', '👩‍🔬', '🦸', '🦹', '🧙', '🥷', '🎮'];
@@ -86,6 +87,10 @@ const ProfilePage = () => {
       <Header />
       
       <main className="px-4 py-6 max-w-lg mx-auto space-y-6">
+        {/* Back Button */}
+        <div className="animate-fade-in">
+          <BackButton to="/" />
+        </div>
         {/* Profile Card */}
         <div className="glass-panel rounded-2xl p-6 text-center animate-fade-in border border-primary/20">
           <div className="flex justify-between mb-2">

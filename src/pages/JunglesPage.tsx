@@ -3,6 +3,7 @@ import { useGameStore } from '@/store/gameStore';
 import { Header } from '@/components/layout/Header';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { JungleCard } from '@/components/game/JungleCard';
+import { BackButton } from '@/components/layout/BackButton';
 
 const JunglesPage = () => {
   const navigate = useNavigate();
@@ -18,13 +19,17 @@ const JunglesPage = () => {
       <Header />
       
       <main className="px-4 py-6 max-w-lg mx-auto space-y-6">
-        <div className="text-center space-y-2 animate-fade-in">
-          <h1 className="font-game text-2xl text-glow-green">
-            🌴 Your Jungles
-          </h1>
-          <p className="text-muted-foreground text-sm">
-            Tap a jungle to explore chapters
-          </p>
+        <div className="flex items-center justify-between animate-fade-in">
+          <BackButton to="/" />
+          <div className="text-center flex-1">
+            <h1 className="font-game text-xl text-glow-green">
+              🌴 Your Jungles
+            </h1>
+            <p className="text-muted-foreground text-xs">
+              Tap a jungle to explore
+            </p>
+          </div>
+          <div className="w-16" /> {/* Spacer for alignment */}
         </div>
 
         {/* Legend */}

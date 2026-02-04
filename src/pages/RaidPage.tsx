@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Header } from '@/components/layout/Header';
 import { BottomNav } from '@/components/layout/BottomNav';
+import { BackButton } from '@/components/layout/BackButton';
 import { RaidBattle } from '@/components/game/RaidBattle';
 import { PunishmentModal } from '@/components/game/PunishmentModal';
 import { useGameStore } from '@/store/gameStore';
@@ -27,15 +28,14 @@ const RaidPage = () => {
       <Header />
       
       <main className="px-4 py-6 max-w-lg mx-auto space-y-6">
-        {/* Raid Header */}
-        <div className="text-center space-y-2">
-          <div className="flex items-center justify-center gap-2">
-            <Swords className="w-8 h-8 text-destructive animate-pulse" />
-            <h1 className="font-game text-2xl text-destructive">RAID ARENA</h1>
+        {/* Back + Raid Header */}
+        <div className="flex items-center justify-between animate-fade-in">
+          <BackButton to="/" />
+          <div className="flex items-center gap-2">
+            <Swords className="w-6 h-6 text-destructive animate-pulse" />
+            <h1 className="font-game text-xl text-destructive">RAID ARENA</h1>
           </div>
-          <p className="text-muted-foreground text-sm">
-            Complete overdue tasks to defeat the Backlog Boss!
-          </p>
+          <div className="w-16" />
         </div>
 
         {/* Current Raid Status */}

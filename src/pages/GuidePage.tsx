@@ -1,5 +1,6 @@
 import { Header } from '@/components/layout/Header';
 import { BottomNav } from '@/components/layout/BottomNav';
+import { BackButton } from '@/components/layout/BackButton';
 import { GuideSection } from '@/components/game/GuideSection';
 import { FocusTimer } from '@/components/game/FocusTimer';
 
@@ -9,14 +10,15 @@ const GuidePage = () => {
       <Header />
       
       <main className="px-4 py-6 max-w-lg mx-auto space-y-6">
-        {/* Page Title */}
-        <div className="text-center space-y-2 animate-fade-in">
-          <h1 className="font-game text-2xl text-glow-purple flex items-center justify-center gap-2">
-            📖 User Guide
-          </h1>
-          <p className="text-muted-foreground text-sm">
-            Learn how to maximize your jungle growth!
-          </p>
+        {/* Back + Page Title */}
+        <div className="flex items-center justify-between animate-fade-in">
+          <BackButton to="/" />
+          <div className="text-center flex-1">
+            <h1 className="font-game text-xl text-glow-purple flex items-center justify-center gap-2">
+              📖 User Guide
+            </h1>
+          </div>
+          <div className="w-16" />
         </div>
 
         {/* Focus Timer */}
