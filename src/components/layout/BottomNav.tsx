@@ -5,9 +5,9 @@ import { useGameStore } from '@/store/gameStore';
 const navItems = [
   { path: '/', icon: '🏠', label: 'Home' },
   { path: '/jungles', icon: '🌴', label: 'Jungles' },
+  { path: '/biro-yaar', icon: '🤖', label: 'Biro-yaar' },
   { path: '/raid', icon: '⚔️', label: 'Raid' },
   { path: '/tasks', icon: '✅', label: 'Tasks' },
-  { path: '/guide', icon: '📖', label: 'Guide' },
 ];
 
 export const BottomNav = () => {
