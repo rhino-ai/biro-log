@@ -34,14 +34,16 @@
       "icons": [{ "src": "/logo.png", "sizes": "192x192" }]
     },
     {
+      "name": "Biro-yaar Chat",
+      "url": "/biro-yaar",
+      "icons": [{ "src": "/logo.png", "sizes": "192x192" }]
+    },
+    {
       "name": "Raid Arena",
       "url": "/raid",
       "icons": [{ "src": "/logo.png", "sizes": "192x192" }]
     }
-  ]
-}
   ],
-  "categories": ["education", "productivity"],
   "screenshots": [],
   "prefer_related_applications": false
 }

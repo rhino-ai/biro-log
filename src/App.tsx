@@ -15,6 +15,7 @@ import RaidPage from "./pages/RaidPage";
 import AdminPage from "./pages/AdminPage";
 import AuthPage from "./pages/AuthPage";
 import GuidePage from "./pages/GuidePage";
+import BiroYaarPage from "./pages/BiroYaarPage";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 
@@ -120,6 +121,11 @@ const AppRoutes = () => {
       <Route path="/guide" element={
         <ProtectedRoute>
           <GuidePage />
+        </ProtectedRoute>
+      } />
+      <Route path="/biro-yaar" element={
+        <ProtectedRoute>
+          <BiroYaarPage />
         </ProtectedRoute>
       } />
       

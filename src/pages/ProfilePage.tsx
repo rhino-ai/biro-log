@@ -8,6 +8,8 @@ import { XPBar } from '@/components/game/XPBar';
 import { StatCard } from '@/components/game/StatCard';
 import { RewardsList } from '@/components/game/RewardsList';
 import { ExamDateEditor } from '@/components/game/ExamDateEditor';
+import { TrackSwitcher } from '@/components/game/TrackSwitcher';
+import { PWAInstallButton } from '@/components/game/PWAInstallButton';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
@@ -256,9 +258,19 @@ const ProfilePage = () => {
           </div>
         </div>
 
+        {/* Study Track Switcher */}
+        <div className="animate-fade-in" style={{ animationDelay: '0.22s' }}>
+          <TrackSwitcher />
+        </div>
+
         {/* Exam Dates - Editable */}
         <div className="animate-fade-in" style={{ animationDelay: '0.25s' }}>
           <ExamDateEditor />
+        </div>
+
+        {/* PWA Install Button */}
+        <div className="animate-fade-in" style={{ animationDelay: '0.27s' }}>
+          <PWAInstallButton />
         </div>
 
         {/* Jungle Status */}

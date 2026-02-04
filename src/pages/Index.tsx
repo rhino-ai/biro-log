@@ -11,8 +11,9 @@ import { TestTracker } from '@/components/game/TestTracker';
 import { DailyGoalWidget } from '@/components/game/DailyGoalWidget';
 import { MotivationMessage } from '@/components/game/MotivationMessage';
 import { CollegeImageSection } from '@/components/game/CollegeImageSection';
+import { PWAInstallButton } from '@/components/game/PWAInstallButton';
 import { useNavigate, Link } from 'react-router-dom';
-import { Swords, Zap } from 'lucide-react';
+import { Swords, Zap, MessageCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEffect, useState } from 'react';
 
@@ -100,8 +101,31 @@ const Index = () => {
           </Link>
         )}
 
+        {/* Biro-yaar Quick Access */}
+        <Link 
+          to="/biro-yaar"
+          className="glass-panel rounded-2xl p-4 border border-primary/30 flex items-center justify-between cursor-pointer hover:border-primary/50 transition-colors animate-fade-in"
+          style={{ animationDelay: '0.22s' }}
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+              <span className="text-2xl">🤖</span>
+            </div>
+            <div>
+              <h3 className="font-game text-sm">Biro-yaar</h3>
+              <p className="text-xs text-muted-foreground">AI Study Mentor • Ask doubts!</p>
+            </div>
+          </div>
+          <MessageCircle className="w-5 h-5 text-primary" />
+        </Link>
+
+        {/* PWA Install */}
+        <div className="animate-fade-in" style={{ animationDelay: '0.24s' }}>
+          <PWAInstallButton />
+        </div>
+
         {/* Daily Goal Widget - Like reference image */}
-        <div className="animate-fade-in" style={{ animationDelay: '0.25s' }}>
+        <div className="animate-fade-in" style={{ animationDelay: '0.26s' }}>
           <DailyGoalWidget />
         </div>
 
