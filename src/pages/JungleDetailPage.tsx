@@ -8,10 +8,11 @@ import { JungleGardenMap } from '@/components/game/JungleGardenMap';
 import { ProgressRadar } from '@/components/game/ProgressRadar';
 import { ChaptersGrid } from '@/components/game/ChaptersGrid';
 import { ChapterEditor } from '@/components/game/ChapterEditor';
+import { BackButton } from '@/components/layout/BackButton';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { ArrowLeft, Map, List, Grid3X3, TreeDeciduous, Edit2 } from 'lucide-react';
+import { Map, List, Grid3X3, TreeDeciduous, Edit2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { subjectIcons } from '@/data/syllabus';
 
@@ -63,15 +64,7 @@ const JungleDetailPage = () => {
       <main className="px-4 py-6 max-w-lg mx-auto space-y-6">
         {/* Back Button & Edit */}
         <div className="flex items-center justify-between">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => navigate(-1)}
-            className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
-          >
-            <ArrowLeft size={16} />
-            Back
-          </Button>
+          <BackButton to="/jungles" />
 
           <Dialog open={isEditorOpen} onOpenChange={setIsEditorOpen}>
             <DialogTrigger asChild>

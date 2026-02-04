@@ -1,6 +1,6 @@
 import { useGameStore } from '@/store/gameStore';
 import { cn } from '@/lib/utils';
-import { JungleData, Chapter } from '@/data/syllabus';
+import { JungleData, Chapter, SubjectType } from '@/data/syllabus';
 import { TreeIcon } from './TreeIcon';
 
 interface JungleGardenMapProps {
@@ -8,7 +8,7 @@ interface JungleGardenMapProps {
   className?: string;
 }
 
-const subjectConfig = {
+const subjectConfig: Record<SubjectType, { name: string; icon: string; color: string; borderColor: string; bgColor: string }> = {
   physics: { 
     name: 'Physics Garden', 
     icon: '⚡', 
@@ -30,6 +30,64 @@ const subjectConfig = {
     borderColor: 'border-yellow-500/30',
     bgColor: 'bg-yellow-500/10'
   },
+  biology: { 
+    name: 'Biology Garden', 
+    icon: '🧬', 
+    color: 'from-emerald-500/20 to-green-500/20',
+    borderColor: 'border-emerald-500/30',
+    bgColor: 'bg-emerald-500/10'
+  },
+  science: { 
+    name: 'Science Garden', 
+    icon: '🔬', 
+    color: 'from-purple-500/20 to-pink-500/20',
+    borderColor: 'border-purple-500/30',
+    bgColor: 'bg-purple-500/10'
+  },
+  english: { 
+    name: 'English Garden', 
+    icon: '📖', 
+    color: 'from-amber-500/20 to-orange-500/20',
+    borderColor: 'border-amber-500/30',
+    bgColor: 'bg-amber-500/10'
+  },
+  hindi: { 
+    name: 'Hindi Garden', 
+    icon: '🔤', 
+    color: 'from-orange-500/20 to-red-500/20',
+    borderColor: 'border-orange-500/30',
+    bgColor: 'bg-orange-500/10'
+  },
+  social_science: { 
+    name: 'Social Science Garden', 
+    icon: '🌍', 
+    color: 'from-teal-500/20 to-cyan-500/20',
+    borderColor: 'border-teal-500/30',
+    bgColor: 'bg-teal-500/10'
+  },
+  computer: { 
+    name: 'Computer Garden', 
+    icon: '💻', 
+    color: 'from-indigo-500/20 to-purple-500/20',
+    borderColor: 'border-indigo-500/30',
+    bgColor: 'bg-indigo-500/10'
+  },
+  art: { 
+    name: 'Art Garden', 
+    icon: '🎨', 
+    color: 'from-rose-500/20 to-pink-500/20',
+    borderColor: 'border-rose-500/30',
+    bgColor: 'bg-rose-500/10'
+  },
+};
+
+// Default config for unknown subjects
+const defaultConfig = {
+  name: 'Study Garden',
+  icon: '📚',
+  color: 'from-gray-500/20 to-slate-500/20',
+  borderColor: 'border-gray-500/30',
+  bgColor: 'bg-gray-500/10'
 };
 
 export const JungleGardenMap = ({ jungle, className }: JungleGardenMapProps) => {
@@ -59,9 +117,9 @@ export const JungleGardenMap = ({ jungle, className }: JungleGardenMapProps) => 
   return (
     <div className={cn("space-y-6", className)}>
       {Object.entries(chaptersBySubject).map(([subject, chapters]) => {
-        const config = subjectConfig[subject as keyof typeof subjectConfig];
+        const config = subjectConfig[subject as SubjectType] || defaultConfig;
         const completedCount = chapters.filter(c => c.theoryDone && c.practiceDone && c.revisionDone).length;
-        const gardenHealth = Math.round((completedCount / chapters.length) * 100);
+        const gardenHealth = chapters.length > 0 ? Math.round((completedCount / chapters.length) * 100) : 0;
         
         return (
           <div 

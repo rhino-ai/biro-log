@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useGameStore } from '@/store/gameStore';
 import { Header } from '@/components/layout/Header';
 import { BottomNav } from '@/components/layout/BottomNav';
+import { BackButton } from '@/components/layout/BackButton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -102,13 +103,14 @@ const TasksPage = () => {
       <Header />
       
       <main className="px-4 py-6 max-w-lg mx-auto space-y-6">
-        <div className="text-center space-y-2 animate-fade-in">
-          <h1 className="font-game text-2xl text-glow-purple">
-            🎯 Goals & Tasks
-          </h1>
-          <p className="text-muted-foreground text-sm">
-            Set goals, meet deadlines, avoid the RAID!
-          </p>
+        <div className="flex items-center justify-between animate-fade-in">
+          <BackButton to="/" />
+          <div className="text-center flex-1">
+            <h1 className="font-game text-xl text-glow-purple">
+              🎯 Goals & Tasks
+            </h1>
+          </div>
+          <div className="w-16" />
         </div>
 
         {/* Tab Navigation */}
