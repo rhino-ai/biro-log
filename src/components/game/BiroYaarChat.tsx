@@ -6,7 +6,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Send, Bot, User, Clock, X, Sparkles, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
-import ReactMarkdown from 'react-markdown';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -26,9 +25,13 @@ const getUsageData = (): UsageData => {
   const today = new Date().toDateString();
   const stored = localStorage.getItem(STORAGE_KEY);
   if (stored) {
-    const data = JSON.parse(stored) as UsageData;
-    if (data.date === today) {
-      return data;
+    try {
+      const data = JSON.parse(stored) as UsageData;
+      if (data.date === today) {
+        return data;
+      }
+    } catch {
+      // Invalid data, reset
     }
   }
   return { date: today, usedMs: 0 };
@@ -44,6 +47,63 @@ const formatTime = (ms: number) => {
   const hours = Math.floor(ms / (60 * 60 * 1000));
   const minutes = Math.floor((ms % (60 * 60 * 1000)) / (60 * 1000));
   return `${hours}h ${minutes}m`;
+};
+
+// Simple markdown renderer without external dependencies
+const SimpleMarkdown = ({ content }: { content: string }) => {
+  if (!content) return <span className="opacity-50">...</span>;
+  
+  // Split by lines and process
+  const lines = content.split('\n');
+  
+  return (
+    <div className="space-y-1">
+      {lines.map((line, idx) => {
+        // Bold: **text**
+        let processed = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        // Italic: *text* or _text_
+        processed = processed.replace(/\*(.*?)\*/g, '<em>$1</em>');
+        processed = processed.replace(/_(.*?)_/g, '<em>$1</em>');
+        // Code: `code`
+        processed = processed.replace(/`(.*?)`/g, '<code class="bg-secondary/50 px-1 rounded text-xs">$1</code>');
+        // Headers
+        if (line.startsWith('### ')) {
+          return <h3 key={idx} className="font-bold text-sm mt-2">{line.slice(4)}</h3>;
+        }
+        if (line.startsWith('## ')) {
+          return <h2 key={idx} className="font-bold text-base mt-2">{line.slice(3)}</h2>;
+        }
+        if (line.startsWith('# ')) {
+          return <h1 key={idx} className="font-bold text-lg mt-2">{line.slice(2)}</h1>;
+        }
+        // List items
+        if (line.startsWith('- ') || line.startsWith('* ')) {
+          return (
+            <div key={idx} className="flex gap-2">
+              <span>•</span>
+              <span dangerouslySetInnerHTML={{ __html: processed.slice(2) }} />
+            </div>
+          );
+        }
+        // Numbered list
+        const numberedMatch = line.match(/^(\d+)\.\s/);
+        if (numberedMatch) {
+          return (
+            <div key={idx} className="flex gap-2">
+              <span>{numberedMatch[1]}.</span>
+              <span dangerouslySetInnerHTML={{ __html: processed.slice(numberedMatch[0].length) }} />
+            </div>
+          );
+        }
+        // Empty line
+        if (line.trim() === '') {
+          return <div key={idx} className="h-2" />;
+        }
+        // Regular paragraph
+        return <p key={idx} dangerouslySetInnerHTML={{ __html: processed }} />;
+      })}
+    </div>
+  );
 };
 
 interface BiroYaarChatProps {
@@ -79,7 +139,6 @@ export const BiroYaarChat = ({ onClose, isFullScreen = false }: BiroYaarChatProp
   useEffect(() => {
     if (sessionStartTime) {
       const interval = setInterval(() => {
-        const elapsed = Date.now() - sessionStartTime.getTime();
         updateUsage(1000); // Update every second
         setRemainingTime(DAILY_LIMIT_MS - getUsageData().usedMs);
       }, 1000);
@@ -203,7 +262,7 @@ export const BiroYaarChat = ({ onClose, isFullScreen = false }: BiroYaarChatProp
         description: error instanceof Error ? error.message : 'Failed to send message',
         variant: 'destructive',
       });
-      // Remove the user message if failed
+      // Remove the last message if failed
       setMessages((prev) => prev.slice(0, -1));
     } finally {
       setIsLoading(false);
@@ -293,8 +352,8 @@ export const BiroYaarChat = ({ onClose, isFullScreen = false }: BiroYaarChatProp
                     : 'bg-secondary rounded-tl-sm'
                 )}
               >
-                <div className="prose prose-sm prose-invert max-w-none">
-                  <ReactMarkdown>{message.content || '...'}</ReactMarkdown>
+                <div className="text-sm">
+                  <SimpleMarkdown content={message.content} />
                 </div>
                 <span className="text-[10px] opacity-50 mt-1 block">
                   {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
