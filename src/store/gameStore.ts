@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { Chapter, allJungles, JungleData, rewards, StudyTrack, getJunglesByTrack, createChapter, SubjectType } from '@/data/syllabus';
+import { Chapter, allJungles, JungleData, rewards, StudyTrack, getJunglesByTrack, createChapter, SubjectType, OtherCategory } from '@/data/syllabus';
 
 interface Task {
   id: string;
@@ -87,7 +87,13 @@ interface GameState {
     jee: TrackData;
     neet: TrackData;
     highschool: TrackData;
+    teacher: TrackData;
+    other: TrackData;
   };
+  
+  // New track-specific settings
+  teacherSubjects: string[];
+  otherCategory: OtherCategory | null;
   
   // Computed getters for current track (for backwards compatibility)
   profile: UserProfile;
@@ -129,6 +135,9 @@ interface GameState {
   // Track and chapter management
   setStudyTrack: (track: StudyTrack) => void;
   setJungles: (jungles: JungleData[]) => void;
+  setHasSelectedTrack: (value: boolean) => void;
+  setTeacherSubjects: (subjects: string[]) => void;
+  setOtherCategory: (category: OtherCategory) => void;
   addChapter: (jungleId: string, chapter: Chapter) => void;
   updateChapterName: (jungleId: string, chapterId: string, newName: string) => void;
   deleteChapter: (jungleId: string, chapterId: string) => void;
@@ -196,7 +205,12 @@ export const useGameStore = create<GameState>()(
           jee: createDefaultTrackData('jee'),
           neet: createDefaultTrackData('neet'),
           highschool: createDefaultTrackData('highschool'),
+          teacher: createDefaultTrackData('teacher'),
+          other: createDefaultTrackData('other'),
         },
+
+        teacherSubjects: [],
+        otherCategory: null,
 
         // Getters that return current track's data
         get profile() {
@@ -491,6 +505,18 @@ export const useGameStore = create<GameState>()(
 
         setJungles: (jungles: JungleData[]) => {
           updateCurrentTrackData({ jungles });
+        },
+
+        setHasSelectedTrack: (value: boolean) => {
+          set({ hasSelectedTrack: value });
+        },
+
+        setTeacherSubjects: (subjects: string[]) => {
+          set({ teacherSubjects: subjects });
+        },
+
+        setOtherCategory: (category: OtherCategory) => {
+          set({ otherCategory: category });
         },
 
         addChapter: (jungleId: string, chapter: Chapter) => {

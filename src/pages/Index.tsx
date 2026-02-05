@@ -13,7 +13,7 @@ import { MotivationMessage } from '@/components/game/MotivationMessage';
 import { CollegeImageSection } from '@/components/game/CollegeImageSection';
 import { PWAInstallButton } from '@/components/game/PWAInstallButton';
 import { useNavigate, Link } from 'react-router-dom';
-import { Swords, Zap, MessageCircle } from 'lucide-react';
+import { Swords, Zap, MessageCircle, Users, Trophy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEffect, useState } from 'react';
 
@@ -118,6 +118,35 @@ const Index = () => {
           </div>
           <MessageCircle className="w-5 h-5 text-primary" />
         </Link>
+
+        {/* Quick Access: Friends & Leaderboard */}
+        <div className="grid grid-cols-2 gap-3 animate-fade-in" style={{ animationDelay: '0.23s' }}>
+          <Link 
+            to="/friends"
+            className="glass-panel rounded-xl p-3 border border-white/10 flex items-center gap-3 hover:border-primary/30 transition-colors"
+          >
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center">
+              <Users className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h3 className="font-game text-xs">Friends</h3>
+              <p className="text-[10px] text-muted-foreground">Chat & Call</p>
+            </div>
+          </Link>
+          
+          <Link 
+            to="/leaderboard"
+            className="glass-panel rounded-xl p-3 border border-white/10 flex items-center gap-3 hover:border-accent/30 transition-colors"
+          >
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-yellow-500 to-amber-500 flex items-center justify-center">
+              <Trophy className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h3 className="font-game text-xs">Leaderboard</h3>
+              <p className="text-[10px] text-muted-foreground">Top Rankers</p>
+            </div>
+          </Link>
+        </div>
 
         {/* PWA Install */}
         <div className="animate-fade-in" style={{ animationDelay: '0.24s' }}>

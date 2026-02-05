@@ -3,19 +3,31 @@ import { useGameStore } from '@/store/gameStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, Clock, ArrowLeft, Sparkles, AlertTriangle, MessageCircle } from 'lucide-react';
+import { Send, Clock, ArrowLeft, AlertTriangle, Trash2, Smile, MoreVertical } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
+import { useChatStorage, ChatMessage } from '@/hooks/useChatStorage';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
-interface Message {
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: Date;
-}
-
-const DAILY_LIMIT_MS = 3 * 60 * 60 * 1000; // 3 hours in milliseconds
+const DAILY_LIMIT_MS = 3 * 60 * 60 * 1000;
 const STORAGE_KEY = 'biro-yaar-usage';
+const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🔥', '💯'];
 
 interface UsageData {
   date: string;
@@ -28,12 +40,8 @@ const getUsageData = (): UsageData => {
   if (stored) {
     try {
       const data = JSON.parse(stored) as UsageData;
-      if (data.date === today) {
-        return data;
-      }
-    } catch {
-      // Invalid data, reset
-    }
+      if (data.date === today) return data;
+    } catch {}
   }
   return { date: today, usedMs: 0 };
 };
@@ -50,49 +58,29 @@ const formatTime = (ms: number) => {
   return `${hours}h ${minutes}m`;
 };
 
-// Simple markdown renderer without external dependencies
 const SimpleMarkdown = ({ content }: { content: string }) => {
   if (!content) return <span className="opacity-50">...</span>;
   
-  const lines = content.split('\n');
-  
   return (
     <div className="space-y-1">
-      {lines.map((line, idx) => {
-        let processed = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-        processed = processed.replace(/\*(.*?)\*/g, '<em>$1</em>');
-        processed = processed.replace(/_(.*?)_/g, '<em>$1</em>');
-        processed = processed.replace(/`(.*?)`/g, '<code class="bg-secondary/50 px-1 rounded text-xs">$1</code>');
+      {content.split('\n').map((line, idx) => {
+        let processed = line
+          .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+          .replace(/\*(.*?)\*/g, '<em>$1</em>')
+          .replace(/_(.*?)_/g, '<em>$1</em>')
+          .replace(/`(.*?)`/g, '<code class="bg-secondary/50 px-1 rounded text-xs">$1</code>');
         
-        if (line.startsWith('### ')) {
-          return <h3 key={idx} className="font-bold text-sm mt-2">{line.slice(4)}</h3>;
-        }
-        if (line.startsWith('## ')) {
-          return <h2 key={idx} className="font-bold text-base mt-2">{line.slice(3)}</h2>;
-        }
-        if (line.startsWith('# ')) {
-          return <h1 key={idx} className="font-bold text-lg mt-2">{line.slice(2)}</h1>;
-        }
+        if (line.startsWith('### ')) return <h3 key={idx} className="font-bold text-sm mt-2">{line.slice(4)}</h3>;
+        if (line.startsWith('## ')) return <h2 key={idx} className="font-bold text-base mt-2">{line.slice(3)}</h2>;
+        if (line.startsWith('# ')) return <h1 key={idx} className="font-bold text-lg mt-2">{line.slice(2)}</h1>;
         if (line.startsWith('- ') || line.startsWith('* ')) {
-          return (
-            <div key={idx} className="flex gap-2">
-              <span>•</span>
-              <span dangerouslySetInnerHTML={{ __html: processed.slice(2) }} />
-            </div>
-          );
+          return <div key={idx} className="flex gap-2"><span>•</span><span dangerouslySetInnerHTML={{ __html: processed.slice(2) }} /></div>;
         }
         const numberedMatch = line.match(/^(\d+)\.\s/);
         if (numberedMatch) {
-          return (
-            <div key={idx} className="flex gap-2">
-              <span>{numberedMatch[1]}.</span>
-              <span dangerouslySetInnerHTML={{ __html: processed.slice(numberedMatch[0].length) }} />
-            </div>
-          );
+          return <div key={idx} className="flex gap-2"><span>{numberedMatch[1]}.</span><span dangerouslySetInnerHTML={{ __html: processed.slice(numberedMatch[0].length) }} /></div>;
         }
-        if (line.trim() === '') {
-          return <div key={idx} className="h-1" />;
-        }
+        if (line.trim() === '') return <div key={idx} className="h-1" />;
         return <p key={idx} dangerouslySetInnerHTML={{ __html: processed }} />;
       })}
     </div>
@@ -102,21 +90,29 @@ const SimpleMarkdown = ({ content }: { content: string }) => {
 export const BiroYaarChat = () => {
   const navigate = useNavigate();
   const { profile, studyTrack } = useGameStore();
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      role: 'assistant',
-      content: `Yo ${profile.name}! 👋 Kya scene hai bhai?`,
-      timestamp: new Date(),
-    },
-  ]);
+  const { messages, addMessage, updateMessage, deleteMessage, addReaction, clearAllMessages } = useChatStorage();
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
   const [remainingTime, setRemainingTime] = useState(DAILY_LIMIT_MS - getUsageData().usedMs);
+  const [showClearDialog, setShowClearDialog] = useState(false);
+  const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
+  const [showReactionPicker, setShowReactionPicker] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const [currentAssistantId, setCurrentAssistantId] = useState<string | null>(null);
 
-  // Update remaining time every minute
+  // Add welcome message if no messages
+  useEffect(() => {
+    if (messages.length === 0) {
+      addMessage({
+        role: 'assistant',
+        content: `Yo ${profile.name}! 👋 Kya scene hai bhai?\n\n_Maine galti kar sakta hu qki aaphi ke class mein pdhta hu 😅_`,
+        timestamp: new Date(),
+      });
+    }
+  }, [messages.length, profile.name, addMessage]);
+
   useEffect(() => {
     const interval = setInterval(() => {
       setRemainingTime(DAILY_LIMIT_MS - getUsageData().usedMs);
@@ -124,7 +120,6 @@ export const BiroYaarChat = () => {
     return () => clearInterval(interval);
   }, []);
 
-  // Track session time
   useEffect(() => {
     if (sessionStartTime) {
       const interval = setInterval(() => {
@@ -135,14 +130,12 @@ export const BiroYaarChat = () => {
     }
   }, [sessionStartTime]);
 
-  // Start session on first interaction
   useEffect(() => {
     if (messages.length > 1 && !sessionStartTime) {
       setSessionStartTime(new Date());
     }
   }, [messages, sessionStartTime]);
 
-  // Auto-scroll to bottom
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -154,17 +147,17 @@ export const BiroYaarChat = () => {
   const sendMessage = useCallback(async () => {
     if (!input.trim() || isLoading || isLimitReached) return;
 
-    const userMessage: Message = {
+    const userMessage: Omit<ChatMessage, 'id'> = {
       role: 'user',
       content: input.trim(),
       timestamp: new Date(),
     };
 
-    setMessages((prev) => [...prev, userMessage]);
+    addMessage(userMessage);
     setInput('');
     setIsLoading(true);
 
-    const apiMessages = [...messages, userMessage].map((m) => ({
+    const apiMessages = [...messages, { ...userMessage, id: 'temp' }].map((m) => ({
       role: m.role,
       content: m.content,
     }));
@@ -198,10 +191,12 @@ export const BiroYaarChat = () => {
       let assistantContent = '';
       let textBuffer = '';
 
-      setMessages((prev) => [
-        ...prev,
-        { role: 'assistant', content: '', timestamp: new Date() },
-      ]);
+      const assistantMsgId = addMessage({
+        role: 'assistant',
+        content: '',
+        timestamp: new Date(),
+      });
+      setCurrentAssistantId(assistantMsgId);
 
       while (true) {
         const { done, value } = await reader.read();
@@ -226,14 +221,9 @@ export const BiroYaarChat = () => {
             const content = parsed.choices?.[0]?.delta?.content;
             if (content) {
               assistantContent += content;
-              setMessages((prev) => {
-                const updated = [...prev];
-                updated[updated.length - 1] = {
-                  ...updated[updated.length - 1],
-                  content: assistantContent,
-                };
-                return updated;
-              });
+              if (assistantMsgId) {
+                updateMessage(assistantMsgId, assistantContent);
+              }
             }
           } catch {
             textBuffer = line + '\n' + textBuffer;
@@ -248,12 +238,12 @@ export const BiroYaarChat = () => {
         description: error instanceof Error ? error.message : 'Failed to send message',
         variant: 'destructive',
       });
-      setMessages((prev) => prev.slice(0, -1));
     } finally {
       setIsLoading(false);
+      setCurrentAssistantId(null);
       inputRef.current?.focus();
     }
-  }, [input, isLoading, isLimitReached, messages, studyTrack, profile.name]);
+  }, [input, isLoading, isLimitReached, messages, studyTrack, profile.name, addMessage, updateMessage]);
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -262,42 +252,57 @@ export const BiroYaarChat = () => {
     }
   };
 
+  const handleDeleteMessage = (id: string) => {
+    deleteMessage(id);
+    setMessageToDelete(null);
+    toast({ title: 'Message deleted' });
+  };
+
+  const handleReaction = (messageId: string, emoji: string) => {
+    addReaction(messageId, emoji);
+    setShowReactionPicker(null);
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-background">
       {/* Header */}
       <div className="flex items-center justify-between p-3 border-b border-white/10 bg-gradient-to-r from-primary/20 to-accent/20">
         <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => navigate(-1)}
-            className="shrink-0"
-          >
+          <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="shrink-0">
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <div className="flex items-center gap-2">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-xl">
-              🤝
-            </div>
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-xl">🤝</div>
             <div>
               <h3 className="font-game text-sm flex items-center gap-1">
-                Biro-yaar 
-                <span className="text-xs text-green-400">● online</span>
+                Biro-yaar <span className="text-xs text-green-400">● online</span>
               </h3>
-              <p className="text-[10px] text-muted-foreground">
-                tera study buddy 📚
-              </p>
+              <p className="text-[10px] text-muted-foreground">tera classmate buddy 📚</p>
             </div>
           </div>
         </div>
         
-        {/* Time Remaining */}
-        <div className={cn(
-          "flex items-center gap-1 px-2 py-1 rounded-full text-xs",
-          remainingTime < 30 * 60 * 1000 ? "bg-raid/20 text-raid" : "bg-secondary/50"
-        )}>
-          <Clock className="w-3 h-3" />
-          <span>{formatTime(Math.max(0, remainingTime))}</span>
+        <div className="flex items-center gap-2">
+          <div className={cn(
+            "flex items-center gap-1 px-2 py-1 rounded-full text-xs",
+            remainingTime < 30 * 60 * 1000 ? "bg-raid/20 text-raid" : "bg-secondary/50"
+          )}>
+            <Clock className="w-3 h-3" />
+            <span>{formatTime(Math.max(0, remainingTime))}</span>
+          </div>
+          
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <MoreVertical className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="glass-panel">
+              <DropdownMenuItem onClick={() => setShowClearDialog(true)} className="text-raid">
+                <Trash2 className="w-4 h-4 mr-2" />Clear All Chats
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -311,28 +316,58 @@ export const BiroYaarChat = () => {
       {/* Messages */}
       <ScrollArea className="flex-1 p-4 relative" ref={scrollRef}>
         <div className="space-y-3 pb-4">
-          {messages.map((message, index) => (
+          {messages.map((message) => (
             <div
-              key={index}
-              className={cn(
-                'flex animate-fade-in',
-                message.role === 'user' ? 'justify-end' : 'justify-start'
-              )}
+              key={message.id}
+              className={cn('flex animate-fade-in', message.role === 'user' ? 'justify-end' : 'justify-start')}
             >
-              <div
-                className={cn(
-                  'max-w-[85%] rounded-2xl px-3 py-2 shadow-sm',
+              <div className="group relative max-w-[85%]">
+                <div className={cn(
+                  'rounded-2xl px-3 py-2 shadow-sm',
                   message.role === 'user'
                     ? 'bg-accent text-accent-foreground rounded-br-sm'
                     : 'bg-card border border-white/10 rounded-bl-sm'
-                )}
-              >
-                <div className="text-sm">
-                  <SimpleMarkdown content={message.content} />
+                )}>
+                  <div className="text-sm"><SimpleMarkdown content={message.content} /></div>
+                  <span className="text-[10px] opacity-40 mt-1 block text-right">
+                    {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                  
+                  {message.reactions && message.reactions.length > 0 && (
+                    <div className="flex gap-1 mt-1 flex-wrap">
+                      {message.reactions.map((emoji, idx) => (
+                        <span key={idx} className="text-sm bg-secondary/50 rounded-full px-1.5 py-0.5 cursor-pointer hover:scale-110 transition-transform"
+                          onClick={() => handleReaction(message.id, emoji)}>{emoji}</span>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <span className="text-[10px] opacity-40 mt-1 block text-right">
-                  {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
+                
+                <div className={cn(
+                  'absolute top-0 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity',
+                  message.role === 'user' ? '-left-16' : '-right-16'
+                )}>
+                  <Button variant="ghost" size="icon" className="h-6 w-6"
+                    onClick={() => setShowReactionPicker(showReactionPicker === message.id ? null : message.id)}>
+                    <Smile className="w-3 h-3" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-6 w-6 text-raid hover:text-raid"
+                    onClick={() => setMessageToDelete(message.id)}>
+                    <Trash2 className="w-3 h-3" />
+                  </Button>
+                </div>
+                
+                {showReactionPicker === message.id && (
+                  <div className={cn(
+                    'absolute z-10 bg-card border border-white/20 rounded-full px-2 py-1 flex gap-1 shadow-lg',
+                    message.role === 'user' ? 'right-0 -bottom-8' : 'left-0 -bottom-8'
+                  )}>
+                    {REACTION_EMOJIS.map((emoji) => (
+                      <button key={emoji} onClick={() => handleReaction(message.id, emoji)}
+                        className="text-lg hover:scale-125 transition-transform">{emoji}</button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           ))}
@@ -351,7 +386,6 @@ export const BiroYaarChat = () => {
         </div>
       </ScrollArea>
 
-      {/* Limit Warning */}
       {isLimitReached && (
         <div className="p-3 bg-raid/20 border-t border-raid/30 flex items-center gap-2 text-sm">
           <AlertTriangle className="w-4 h-4 text-raid" />
@@ -359,43 +393,56 @@ export const BiroYaarChat = () => {
         </div>
       )}
 
-      {/* Quick Suggestions */}
       {messages.length <= 2 && (
         <div className="px-4 py-2 flex gap-2 overflow-x-auto">
           {['Motivation do yaar 💪', 'Doubt hai bhai', 'Bore ho raha 😅', 'Study plan banao'].map((suggestion) => (
-            <button
-              key={suggestion}
-              onClick={() => setInput(suggestion)}
-              className="px-3 py-1.5 rounded-full bg-secondary/50 border border-white/10 text-xs whitespace-nowrap hover:bg-secondary transition-colors"
-            >
+            <button key={suggestion} onClick={() => setInput(suggestion)}
+              className="px-3 py-1.5 rounded-full bg-secondary/50 border border-white/10 text-xs whitespace-nowrap hover:bg-secondary transition-colors">
               {suggestion}
             </button>
           ))}
         </div>
       )}
 
-      {/* Input */}
       <div className="p-3 border-t border-white/10 bg-card/50 backdrop-blur-sm">
         <div className="flex gap-2 max-w-lg mx-auto">
-          <Input
-            ref={inputRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyPress={handleKeyPress}
+          <Input ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)} onKeyPress={handleKeyPress}
             placeholder={isLimitReached ? "Kal milte hain..." : "Type kar yaar..."}
-            disabled={isLoading || isLimitReached}
-            className="flex-1 bg-secondary/50 border-white/10"
-          />
-          <Button
-            onClick={sendMessage}
-            disabled={!input.trim() || isLoading || isLimitReached}
-            size="icon"
-            className="bg-accent hover:bg-accent/90 shrink-0"
-          >
+            disabled={isLoading || isLimitReached} className="flex-1 bg-secondary/50 border-white/10" />
+          <Button onClick={sendMessage} disabled={!input.trim() || isLoading || isLimitReached}
+            size="icon" className="bg-accent hover:bg-accent/90 shrink-0">
             <Send className="w-4 h-4" />
           </Button>
         </div>
       </div>
+
+      <AlertDialog open={!!messageToDelete} onOpenChange={() => setMessageToDelete(null)}>
+        <AlertDialogContent className="glass-panel border-primary/30">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Message?</AlertDialogTitle>
+            <AlertDialogDescription>This message will be permanently deleted.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => messageToDelete && handleDeleteMessage(messageToDelete)}
+              className="bg-raid hover:bg-raid/90">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={showClearDialog} onOpenChange={setShowClearDialog}>
+        <AlertDialogContent className="glass-panel border-primary/30">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-raid">Clear All Chats?</AlertDialogTitle>
+            <AlertDialogDescription>All messages will be permanently deleted.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { clearAllMessages(); setShowClearDialog(false); toast({ title: 'All chats cleared' }); }}
+              className="bg-raid hover:bg-raid/90">Clear All</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

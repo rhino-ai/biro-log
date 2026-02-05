@@ -130,11 +130,6 @@ const JungleDetailPage = () => {
           </div>
         </div>
 
-        {/* Progress Radar */}
-        <div className="animate-fade-in" style={{ animationDelay: '0.1s' }}>
-          <ProgressRadar jungleId={jungle.id} />
-        </div>
-
         {/* View Mode Tabs */}
         <Tabs defaultValue="garden" className="space-y-4">
           <TabsList className="glass-panel w-full grid grid-cols-4">
