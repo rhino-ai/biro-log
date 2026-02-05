@@ -1,5 +1,45 @@
 export type SubjectType = 'physics' | 'chemistry' | 'mathematics' | 'biology' | 'science' | 'english' | 'hindi' | 'social_science' | 'computer' | 'art';
-export type StudyTrack = 'jee' | 'neet' | 'highschool';
+export type StudyTrack = 'jee' | 'neet' | 'highschool' | 'teacher' | 'other';
+
+export type OtherCategory = 'businessman' | 'jobholder' | 'housewife' | 'freelancer' | 'retired';
+
+export interface TeacherSubject {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+}
+
+export const teacherSubjects: TeacherSubject[] = [
+  { id: 'physics', name: 'Physics', icon: '⚛️', color: 'from-blue-500 to-indigo-500' },
+  { id: 'chemistry', name: 'Chemistry', icon: '🧪', color: 'from-green-500 to-teal-500' },
+  { id: 'biology', name: 'Biology', icon: '🧬', color: 'from-emerald-500 to-green-500' },
+  { id: 'mathematics', name: 'Mathematics', icon: '📐', color: 'from-purple-500 to-pink-500' },
+  { id: 'english', name: 'English', icon: '📖', color: 'from-amber-500 to-orange-500' },
+  { id: 'hindi', name: 'Hindi', icon: '🔤', color: 'from-orange-500 to-red-500' },
+  { id: 'history', name: 'History', icon: '📜', color: 'from-yellow-500 to-amber-500' },
+  { id: 'geography', name: 'Geography', icon: '🌍', color: 'from-teal-500 to-cyan-500' },
+  { id: 'economics', name: 'Economics', icon: '💰', color: 'from-emerald-500 to-teal-500' },
+  { id: 'computer', name: 'Computer Science', icon: '💻', color: 'from-indigo-500 to-purple-500' },
+  { id: 'arts', name: 'Arts', icon: '🎨', color: 'from-pink-500 to-rose-500' },
+  { id: 'music', name: 'Music', icon: '🎵', color: 'from-violet-500 to-purple-500' },
+];
+
+export interface OtherProfile {
+  id: OtherCategory;
+  name: string;
+  icon: string;
+  description: string;
+  color: string;
+}
+
+export const otherProfiles: OtherProfile[] = [
+  { id: 'businessman', name: 'Businessman', icon: '💼', description: 'Managing business tasks & goals', color: 'from-blue-500 to-cyan-500' },
+  { id: 'jobholder', name: 'Job Holder', icon: '👔', description: 'Balancing work & personal growth', color: 'from-green-500 to-emerald-500' },
+  { id: 'housewife', name: 'Homemaker', icon: '🏠', description: 'Managing home & personal goals', color: 'from-pink-500 to-rose-500' },
+  { id: 'freelancer', name: 'Freelancer', icon: '🚀', description: 'Managing projects & clients', color: 'from-purple-500 to-violet-500' },
+  { id: 'retired', name: 'Retired', icon: '🌅', description: 'Enjoying & productive retirement', color: 'from-amber-500 to-orange-500' },
+];
 
 export interface Chapter {
   id: string;
@@ -413,6 +453,10 @@ export const getJunglesByTrack = (track: StudyTrack): JungleData[] => {
       return neetJungles;
     case 'highschool':
       return highSchoolJungles;
+    case 'teacher':
+      return []; // Teachers create their own
+    case 'other':
+      return []; // Others create their own
     default:
       return jeeJungles;
   }

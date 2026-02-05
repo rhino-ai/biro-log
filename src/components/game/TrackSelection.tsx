@@ -1,191 +1,253 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useGameStore } from '@/store/gameStore';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { StudyTrack, getJunglesByTrack } from '@/data/syllabus';
-import { Zap, GraduationCap, Stethoscope, School } from 'lucide-react';
+import { StudyTrack, getJunglesByTrack, teacherSubjects, otherProfiles, OtherCategory } from '@/data/syllabus';
+import { GraduationCap, Stethoscope, School, BookOpen, Briefcase, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { toast } from '@/hooks/use-toast';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface TrackOption {
   id: StudyTrack;
   name: string;
-  icon: React.ReactNode;
   description: string;
-  subjects: string[];
+  icon: React.ReactNode;
+  emoji: string;
   color: string;
 }
 
 const trackOptions: TrackOption[] = [
   {
     id: 'jee',
-    name: 'JEE (Engineering)',
+    name: 'JEE',
+    description: 'Engineering (PCM)',
     icon: <GraduationCap className="w-8 h-8" />,
-    description: 'For IIT-JEE, NIT, and engineering aspirants',
-    subjects: ['Physics', 'Chemistry', 'Mathematics'],
-    color: 'from-blue-500 to-purple-500',
+    emoji: '🎯',
+    color: 'from-blue-500 to-cyan-500',
   },
   {
     id: 'neet',
-    name: 'NEET (Medical)',
+    name: 'NEET',
+    description: 'Medical (PCB)',
     icon: <Stethoscope className="w-8 h-8" />,
-    description: 'For medical and dental aspirants',
-    subjects: ['Physics', 'Chemistry', 'Biology'],
+    emoji: '🩺',
     color: 'from-green-500 to-emerald-500',
   },
   {
     id: 'highschool',
     name: 'High School',
+    description: 'All Subjects',
     icon: <School className="w-8 h-8" />,
-    description: 'For classes 9-10 and general studies',
-    subjects: ['Science', 'Maths', 'English', 'Hindi', 'SST', 'Computer'],
+    emoji: '📚',
     color: 'from-orange-500 to-amber-500',
+  },
+  {
+    id: 'teacher',
+    name: 'Teacher',
+    description: 'Choose Subjects',
+    icon: <BookOpen className="w-8 h-8" />,
+    emoji: '👨‍🏫',
+    color: 'from-purple-500 to-violet-500',
+  },
+  {
+    id: 'other',
+    name: 'Other',
+    description: 'Professional/Personal',
+    icon: <Briefcase className="w-8 h-8" />,
+    emoji: '💼',
+    color: 'from-pink-500 to-rose-500',
   },
 ];
 
 interface TrackSelectionProps {
-  onComplete: () => void;
+  onComplete?: () => void;
 }
 
-export const TrackSelection = ({ onComplete }: TrackSelectionProps) => {
-  const navigate = useNavigate();
-  const { setStudyTrack, setJungles } = useGameStore();
+export const TrackSelection = ({ onComplete }: TrackSelectionProps = {}) => {
+  const { setStudyTrack, setJungles, setHasSelectedTrack, setTeacherSubjects, setOtherCategory } = useGameStore();
   const [selectedTrack, setSelectedTrack] = useState<StudyTrack | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
+  const [selectedOtherCategory, setSelectedOtherCategory] = useState<OtherCategory | null>(null);
+  const [step, setStep] = useState<'track' | 'teacher-subjects' | 'other-category'>('track');
 
-  const handleSelectTrack = (track: StudyTrack) => {
+  const handleTrackSelect = (track: StudyTrack) => {
     setSelectedTrack(track);
-  };
-
-  const handleConfirm = async () => {
-    if (!selectedTrack) return;
-    
-    setIsLoading(true);
-    
-    try {
-      // Get jungles for the selected track
-      const jungles = getJunglesByTrack(selectedTrack);
-      
-      // Update the store
-      setStudyTrack(selectedTrack);
-      setJungles(JSON.parse(JSON.stringify(jungles)));
-      
-      toast({
-        title: '🎉 Track Selected!',
-        description: `Welcome to ${trackOptions.find(t => t.id === selectedTrack)?.name}!`,
-      });
-      
-      onComplete();
-      navigate('/');
-    } catch (error) {
-      console.error('Error setting track:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to set study track. Please try again.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsLoading(false);
+    if (track === 'teacher') {
+      setStep('teacher-subjects');
+    } else if (track === 'other') {
+      setStep('other-category');
     }
   };
 
+  const handleSubjectToggle = (subjectId: string) => {
+    setSelectedSubjects(prev => {
+      if (prev.includes(subjectId)) {
+        return prev.filter(s => s !== subjectId);
+      }
+      if (prev.length >= 5) {
+        return prev; // Max 5 subjects
+      }
+      return [...prev, subjectId];
+    });
+  };
+
+  const handleConfirm = () => {
+    if (!selectedTrack) return;
+
+    if (selectedTrack === 'teacher') {
+      if (selectedSubjects.length === 0) return;
+      setTeacherSubjects(selectedSubjects);
+    } else if (selectedTrack === 'other') {
+      if (!selectedOtherCategory) return;
+      setOtherCategory(selectedOtherCategory);
+    }
+
+    const jungles = getJunglesByTrack(selectedTrack);
+    setStudyTrack(selectedTrack);
+    setJungles(JSON.parse(JSON.stringify(jungles)));
+    setHasSelectedTrack(true);
+    
+    if (onComplete) {
+      onComplete();
+    }
+  };
+
+  const canConfirm = () => {
+    if (!selectedTrack) return false;
+    if (selectedTrack === 'teacher' && selectedSubjects.length === 0) return false;
+    if (selectedTrack === 'other' && !selectedOtherCategory) return false;
+    return true;
+  };
+
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <div className="w-full max-w-2xl space-y-6">
-        {/* Logo */}
-        <div className="text-center space-y-2 animate-fade-in">
-          <img 
-            src="/logo.png" 
-            alt="Biro-log" 
-            className="w-20 h-20 mx-auto rounded-xl shadow-lg"
-          />
-          <h1 className="font-game text-3xl text-glow-purple flex items-center justify-center gap-2">
-            <Zap className="w-8 h-8 text-accent animate-pulse" />
-            Biro-log
-            <Zap className="w-8 h-8 text-accent animate-pulse" />
-          </h1>
-          <p className="text-muted-foreground italic">
-            "Tanik padho, Tanik Badho 🫠"
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6">
+      <div className="w-full max-w-md space-y-6 animate-fade-in">
+        {/* Header */}
+        <div className="text-center space-y-2">
+          <h1 className="font-game text-3xl text-glow-purple">🌴 Biro-log</h1>
+          <p className="text-muted-foreground text-sm">
+            {step === 'track' && "Apna track chuno!"}
+            {step === 'teacher-subjects' && "Subjects chuno (Max 5)"}
+            {step === 'other-category' && "Apna category chuno!"}
           </p>
         </div>
 
-        <Card className="glass-panel border-primary/30 animate-fade-in" style={{ animationDelay: '0.1s' }}>
-          <CardHeader className="text-center">
-            <CardTitle className="font-game text-xl text-primary">Choose Your Path</CardTitle>
-            <CardDescription>
-              Select your study track to begin your journey
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {/* Track Options */}
-            <div className="grid gap-4">
-              {trackOptions.map((track) => (
+        {/* Track Selection */}
+        {step === 'track' && (
+          <div className="grid gap-3">
+            {trackOptions.map((track) => (
+              <button
+                key={track.id}
+                onClick={() => handleTrackSelect(track.id)}
+                className={cn(
+                  'glass-panel rounded-2xl p-4 flex items-center gap-4 transition-all duration-300 border-2',
+                  selectedTrack === track.id
+                    ? 'border-accent bg-accent/20 scale-[1.02]'
+                    : 'border-transparent hover:border-primary/30'
+                )}
+              >
+                <div className={cn(
+                  'w-16 h-16 rounded-xl flex items-center justify-center bg-gradient-to-br',
+                  track.color
+                )}>
+                  <span className="text-3xl">{track.emoji}</span>
+                </div>
+                <div className="flex-1 text-left">
+                  <h3 className="font-game text-lg">{track.name}</h3>
+                  <p className="text-sm text-muted-foreground">{track.description}</p>
+                </div>
+                {selectedTrack === track.id && (
+                  <Check className="w-6 h-6 text-accent" />
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Teacher Subject Selection */}
+        {step === 'teacher-subjects' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Button variant="ghost" size="sm" onClick={() => setStep('track')}>
+                ← Back
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                {selectedSubjects.length}/5 selected
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              {teacherSubjects.map((subject) => (
                 <button
-                  key={track.id}
-                  onClick={() => handleSelectTrack(track.id)}
+                  key={subject.id}
+                  onClick={() => handleSubjectToggle(subject.id)}
+                  disabled={selectedSubjects.length >= 5 && !selectedSubjects.includes(subject.id)}
                   className={cn(
-                    'w-full p-4 rounded-xl border-2 transition-all duration-300 text-left',
-                    'hover:scale-[1.02] hover:shadow-lg',
-                    selectedTrack === track.id
-                      ? 'border-primary bg-primary/10 shadow-lg'
-                      : 'border-secondary bg-secondary/20 hover:border-primary/50'
+                    'glass-panel rounded-xl p-3 flex items-center gap-2 transition-all border-2',
+                    selectedSubjects.includes(subject.id)
+                      ? 'border-accent bg-accent/20'
+                      : 'border-transparent hover:border-primary/30',
+                    selectedSubjects.length >= 5 && !selectedSubjects.includes(subject.id) && 'opacity-50'
                   )}
                 >
-                  <div className="flex items-start gap-4">
-                    <div className={cn(
-                      'p-3 rounded-xl bg-gradient-to-br text-white',
-                      track.color
-                    )}>
-                      {track.icon}
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-game text-lg">{track.name}</h3>
-                      <p className="text-sm text-muted-foreground mb-2">{track.description}</p>
-                      <div className="flex flex-wrap gap-2">
-                        {track.subjects.map((subject) => (
-                          <span
-                            key={subject}
-                            className="text-xs px-2 py-1 rounded-full bg-secondary text-secondary-foreground"
-                          >
-                            {subject}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                    {selectedTrack === track.id && (
-                      <span className="text-2xl animate-bounce-subtle">✅</span>
-                    )}
-                  </div>
+                  <span className="text-xl">{subject.icon}</span>
+                  <span className="text-sm font-medium">{subject.name}</span>
+                  {selectedSubjects.includes(subject.id) && (
+                    <Check className="w-4 h-4 text-accent ml-auto" />
+                  )}
                 </button>
               ))}
             </div>
+          </div>
+        )}
 
-            {/* Confirm Button */}
-            <Button
-              className="w-full bg-primary glow-purple mt-4"
-              size="lg"
-              disabled={!selectedTrack || isLoading}
-              onClick={handleConfirm}
-            >
-              {isLoading ? (
-                <span className="flex items-center gap-2">
-                  <span className="animate-spin">⏳</span>
-                  Setting up...
-                </span>
-              ) : (
-                <span className="flex items-center gap-2">
-                  <Zap className="w-5 h-5" />
-                  Start My Journey 🚀
-                </span>
-              )}
+        {/* Other Category Selection */}
+        {step === 'other-category' && (
+          <div className="space-y-4">
+            <Button variant="ghost" size="sm" onClick={() => setStep('track')}>
+              ← Back
             </Button>
+            <div className="grid gap-3">
+              {otherProfiles.map((profile) => (
+                <button
+                  key={profile.id}
+                  onClick={() => setSelectedOtherCategory(profile.id)}
+                  className={cn(
+                    'glass-panel rounded-xl p-4 flex items-center gap-3 transition-all border-2',
+                    selectedOtherCategory === profile.id
+                      ? 'border-accent bg-accent/20'
+                      : 'border-transparent hover:border-primary/30'
+                  )}
+                >
+                  <div className={cn(
+                    'w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br',
+                    profile.color
+                  )}>
+                    <span className="text-2xl">{profile.icon}</span>
+                  </div>
+                  <div className="flex-1 text-left">
+                    <h3 className="font-medium">{profile.name}</h3>
+                    <p className="text-xs text-muted-foreground">{profile.description}</p>
+                  </div>
+                  {selectedOtherCategory === profile.id && (
+                    <Check className="w-5 h-5 text-accent" />
+                  )}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
-            <p className="text-xs text-center text-muted-foreground">
-              You can change your track later from Profile settings
-            </p>
-          </CardContent>
-        </Card>
+        {/* Confirm Button */}
+        {(selectedTrack && (selectedTrack !== 'teacher' && selectedTrack !== 'other')) || 
+         (step === 'teacher-subjects' && selectedSubjects.length > 0) ||
+         (step === 'other-category' && selectedOtherCategory) ? (
+          <Button
+            onClick={handleConfirm}
+            disabled={!canConfirm()}
+            className="w-full py-6 font-game text-lg bg-gradient-to-r from-primary to-accent hover:opacity-90 transition-opacity"
+          >
+            Shuru Karo! 🚀
+          </Button>
+        ) : null}
       </div>
     </div>
   );

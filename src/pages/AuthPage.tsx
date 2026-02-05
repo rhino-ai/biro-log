@@ -82,7 +82,7 @@ const AuthPage = () => {
 
   // Show track selection if user needs to choose
   if (showTrackSelection) {
-    return <TrackSelection onComplete={handleTrackComplete} />;
+    return <TrackSelection />;
   }
 
   return (
