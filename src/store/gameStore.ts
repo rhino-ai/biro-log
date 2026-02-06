@@ -560,6 +560,13 @@ export const useGameStore = create<GameState>()(
     },
     {
       name: 'jungle-study-game',
+      partialize: (state) => ({
+        studyTrack: state.studyTrack,
+        hasSelectedTrack: state.hasSelectedTrack,
+        trackData: state.trackData,
+        teacherSubjects: state.teacherSubjects,
+        otherCategory: state.otherCategory,
+      }),
     }
   )
 );
