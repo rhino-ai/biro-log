@@ -44,6 +44,148 @@ export type Database = {
         }
         Relationships: []
       }
+      chat_groups: {
+        Row: {
+          created_at: string
+          created_by: string
+          icon: string | null
+          id: string
+          is_public: boolean | null
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          icon?: string | null
+          id?: string
+          is_public?: boolean | null
+          name: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          icon?: string | null
+          id?: string
+          is_public?: boolean | null
+          name?: string
+        }
+        Relationships: []
+      }
+      contacts: {
+        Row: {
+          contact_user_id: string
+          created_at: string
+          id: string
+          nickname: string | null
+          user_id: string
+        }
+        Insert: {
+          contact_user_id: string
+          created_at?: string
+          id?: string
+          nickname?: string | null
+          user_id: string
+        }
+        Update: {
+          contact_user_id?: string
+          created_at?: string
+          id?: string
+          nickname?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      direct_messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          read_at: string | null
+          receiver_id: string
+          sender_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          read_at?: string | null
+          receiver_id: string
+          sender_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          read_at?: string | null
+          receiver_id?: string
+          sender_id?: string
+        }
+        Relationships: []
+      }
+      group_members: {
+        Row: {
+          group_id: string
+          id: string
+          joined_at: string
+          role: string | null
+          user_id: string
+        }
+        Insert: {
+          group_id: string
+          id?: string
+          joined_at?: string
+          role?: string | null
+          user_id: string
+        }
+        Update: {
+          group_id?: string
+          id?: string
+          joined_at?: string
+          role?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_members_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "chat_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_messages: {
+        Row: {
+          content: string
+          created_at: string
+          group_id: string
+          id: string
+          sender_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          group_id: string
+          id?: string
+          sender_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          group_id?: string
+          id?: string
+          sender_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_messages_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "chat_groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar: string | null
@@ -55,6 +197,7 @@ export type Database = {
           dream_marks_cbse: number | null
           dream_marks_jee_advanced: number | null
           dream_marks_jee_main: number | null
+          email: string | null
           exam_date_cbse: string | null
           exam_date_jee_advanced: string | null
           exam_date_jee_main: string | null
@@ -62,6 +205,7 @@ export type Database = {
           last_study_date: string | null
           level: number | null
           name: string
+          phone: string | null
           streak: number | null
           updated_at: string | null
           user_id: string
@@ -77,6 +221,7 @@ export type Database = {
           dream_marks_cbse?: number | null
           dream_marks_jee_advanced?: number | null
           dream_marks_jee_main?: number | null
+          email?: string | null
           exam_date_cbse?: string | null
           exam_date_jee_advanced?: string | null
           exam_date_jee_main?: string | null
@@ -84,6 +229,7 @@ export type Database = {
           last_study_date?: string | null
           level?: number | null
           name?: string
+          phone?: string | null
           streak?: number | null
           updated_at?: string | null
           user_id: string
@@ -99,6 +245,7 @@ export type Database = {
           dream_marks_cbse?: number | null
           dream_marks_jee_advanced?: number | null
           dream_marks_jee_main?: number | null
+          email?: string | null
           exam_date_cbse?: string | null
           exam_date_jee_advanced?: string | null
           exam_date_jee_main?: string | null
@@ -106,6 +253,7 @@ export type Database = {
           last_study_date?: string | null
           level?: number | null
           name?: string
+          phone?: string | null
           streak?: number | null
           updated_at?: string | null
           user_id?: string
