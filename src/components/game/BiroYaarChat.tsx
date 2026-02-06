@@ -3,7 +3,7 @@ import { useGameStore } from '@/store/gameStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, Clock, ArrowLeft, AlertTriangle, Trash2, Smile, MoreVertical } from 'lucide-react';
+import { Send, Clock, ArrowLeft, AlertTriangle, Trash2, Smile, MoreVertical, Volume2, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
@@ -101,6 +101,34 @@ export const BiroYaarChat = () => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const [currentAssistantId, setCurrentAssistantId] = useState<string | null>(null);
+  const [playingAudio, setPlayingAudio] = useState<string | null>(null);
+
+  const playTTS = useCallback(async (text: string, messageId: string) => {
+    setPlayingAudio(messageId);
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({ text: text.slice(0, 500) }),
+        }
+      );
+      if (!response.ok) throw new Error('TTS failed');
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audio.onended = () => setPlayingAudio(null);
+      await audio.play();
+    } catch {
+      toast({ title: 'Voice not available', variant: 'destructive' });
+      setPlayingAudio(null);
+    }
+  }, []);
 
   // Add welcome message if no messages
   useEffect(() => {
@@ -277,7 +305,7 @@ export const BiroYaarChat = () => {
               <h3 className="font-game text-sm flex items-center gap-1">
                 Biro-yaar <span className="text-xs text-green-400">● online</span>
               </h3>
-              <p className="text-[10px] text-muted-foreground">tera classmate buddy 📚</p>
+              <p className="text-[10px] text-muted-foreground">tera classmate buddy 📚 • Maine galti kar sakta hu 🙏</p>
             </div>
           </div>
         </div>
@@ -329,9 +357,16 @@ export const BiroYaarChat = () => {
                     : 'bg-card border border-white/10 rounded-bl-sm'
                 )}>
                   <div className="text-sm"><SimpleMarkdown content={message.content} /></div>
-                  <span className="text-[10px] opacity-40 mt-1 block text-right">
-                    {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </span>
+                  <div className="flex items-center justify-end gap-1 mt-1">
+                    {message.role === 'assistant' && message.content && (
+                      <button onClick={() => playTTS(message.content, message.id)} className="opacity-40 hover:opacity-100 transition-opacity">
+                        {playingAudio === message.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Volume2 className="w-3 h-3" />}
+                      </button>
+                    )}
+                    <span className="text-[10px] opacity-40">
+                      {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
                   
                   {message.reactions && message.reactions.length > 0 && (
                     <div className="flex gap-1 mt-1 flex-wrap">

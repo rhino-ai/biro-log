@@ -101,23 +101,29 @@ const Index = () => {
           </Link>
         )}
 
-        {/* Biro-yaar Quick Access */}
-        <Link 
-          to="/biro-yaar"
-          className="glass-panel rounded-2xl p-4 border border-primary/30 flex items-center justify-between cursor-pointer hover:border-primary/50 transition-colors animate-fade-in"
-          style={{ animationDelay: '0.22s' }}
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-              <span className="text-2xl">🤖</span>
+        {/* Biro-yaar & Mentor Quick Access */}
+        <div className="grid grid-cols-2 gap-3 animate-fade-in" style={{ animationDelay: '0.22s' }}>
+          <Link to="/biro-yaar"
+            className="glass-panel rounded-xl p-3 border border-primary/30 flex items-center gap-3 hover:border-primary/50 transition-colors">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
+              <span className="text-xl">🤝</span>
             </div>
             <div>
-              <h3 className="font-game text-sm">Biro-yaar</h3>
-              <p className="text-xs text-muted-foreground">AI Study Mentor • Ask doubts!</p>
+              <h3 className="font-game text-xs">Biro-yaar</h3>
+              <p className="text-[10px] text-muted-foreground">AI Buddy</p>
             </div>
-          </div>
-          <MessageCircle className="w-5 h-5 text-primary" />
-        </Link>
+          </Link>
+          <Link to="/mentor"
+            className="glass-panel rounded-xl p-3 border border-amber-500/30 flex items-center gap-3 hover:border-amber-500/50 transition-colors">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center">
+              <span className="text-xl">🎓</span>
+            </div>
+            <div>
+              <h3 className="font-game text-xs">Mentor</h3>
+              <p className="text-[10px] text-muted-foreground">AI Guide</p>
+            </div>
+          </Link>
+        </div>
 
         {/* Quick Access: Friends & Leaderboard */}
         <div className="grid grid-cols-2 gap-3 animate-fade-in" style={{ animationDelay: '0.23s' }}>
