@@ -130,16 +130,18 @@ export const BiroYaarChat = () => {
     }
   }, []);
 
-  // Add welcome message if no messages
+  // Add welcome message if no messages - only once
+  const hasAddedWelcome = useRef(false);
   useEffect(() => {
-    if (messages.length === 0) {
+    if (messages.length === 0 && !hasAddedWelcome.current) {
+      hasAddedWelcome.current = true;
       addMessage({
         role: 'assistant',
-        content: `Yo ${profile.name}! 👋 Kya scene hai bhai?\n\n_Maine galti kar sakta hu qki aaphi ke class mein pdhta hu 😅_`,
+        content: `Yo ${profile.name}! 👋 Kya scene hai bhai?`,
         timestamp: new Date(),
       });
     }
-  }, [messages.length, profile.name, addMessage]);
+  }, []);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -305,7 +307,7 @@ export const BiroYaarChat = () => {
               <h3 className="font-game text-sm flex items-center gap-1">
                 Biro-yaar <span className="text-xs text-green-400">● online</span>
               </h3>
-              <p className="text-[10px] text-muted-foreground">tera classmate buddy 📚 • Maine galti kar sakta hu 🙏</p>
+              <p className="text-[10px] text-muted-foreground">tera classmate buddy 📚 • Main galti kar sakta hu 🙏</p>
             </div>
           </div>
         </div>

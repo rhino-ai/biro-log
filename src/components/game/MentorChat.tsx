@@ -60,15 +60,17 @@ export const MentorChat = () => {
 
   const mentor = trackMentorNames[studyTrack] || trackMentorNames.jee;
 
+  const hasAddedWelcome = useRef(false);
   useEffect(() => {
-    if (messages.length === 0) {
+    if (messages.length === 0 && !hasAddedWelcome.current) {
+      hasAddedWelcome.current = true;
       addMessage({
         role: 'assistant',
         content: `Namaste ${profile.name}! 🙏\n\nMain aapka ${mentor.name} hun. Aapki ${studyTrack.toUpperCase()} journey mein main aapka guide rahunga.\n\nAaj kya padha? Batao, hum milke plan banate hain! 📋`,
         timestamp: new Date(),
       });
     }
-  }, [messages.length, profile.name, mentor.name, studyTrack, addMessage]);
+  }, []);
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -171,7 +173,7 @@ export const MentorChat = () => {
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center text-xl">{mentor.emoji}</div>
             <div>
               <h3 className="font-game text-sm flex items-center gap-1">{mentor.name} <span className="text-xs text-green-400">● online</span></h3>
-              <p className="text-[10px] text-muted-foreground">{mentor.desc} • No mistakes ✅</p>
+              <p className="text-[10px] text-muted-foreground">{mentor.desc} • Galti nahi karunga ✅</p>
             </div>
           </div>
         </div>

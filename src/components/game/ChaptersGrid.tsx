@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useGameStore } from '@/store/gameStore';
 import { cn } from '@/lib/utils';
-import { JungleData, Chapter } from '@/data/syllabus';
+import { JungleData, Chapter, subjectIcons } from '@/data/syllabus';
 import { Button } from '@/components/ui/button';
 import { Star, BookOpen } from 'lucide-react';
 
@@ -10,28 +10,27 @@ interface ChaptersGridProps {
   onSelectChapter?: (chapter: Chapter) => void;
 }
 
-type SubjectFilter = 'all' | 'mathematics' | 'physics' | 'chemistry';
-
-const subjectTabs: { id: SubjectFilter; label: string }[] = [
-  { id: 'all', label: 'ALL' },
-  { id: 'mathematics', label: 'MATHS' },
-  { id: 'physics', label: 'PHY' },
-  { id: 'chemistry', label: 'P. CH' },
-];
-
 export const ChaptersGrid = ({ jungle, onSelectChapter }: ChaptersGridProps) => {
   const { getTreeState, jungles } = useGameStore();
-  const [activeFilter, setActiveFilter] = useState<SubjectFilter>('all');
+  const [activeFilter, setActiveFilter] = useState<string>('all');
 
-  // Get the current jungle from state
   const currentJungle = jungles.find(j => j.id === jungle.id) || jungle;
 
-  // Filter chapters
+  // Build dynamic subject tabs from the jungle's actual subjects
+  const subjectTabs = useMemo(() => {
+    const uniqueSubjects = [...new Set(currentJungle.chapters.map(ch => ch.subject))];
+    const tabs = [{ id: 'all', label: 'ALL' }];
+    uniqueSubjects.forEach(subject => {
+      const label = subject.charAt(0).toUpperCase() + subject.slice(1).replace('_', ' ');
+      tabs.push({ id: subject, label });
+    });
+    return tabs;
+  }, [currentJungle.chapters]);
+
   const filteredChapters = activeFilter === 'all' 
     ? currentJungle.chapters 
     : currentJungle.chapters.filter(ch => ch.subject === activeFilter);
 
-  // Calculate star rating (1-5) based on progress
   const getStarRating = (chapter: Chapter): number => {
     let stars = 0;
     if (chapter.theoryDone) stars += 2;
@@ -42,20 +41,18 @@ export const ChaptersGrid = ({ jungle, onSelectChapter }: ChaptersGridProps) => 
 
   return (
     <div className="glass-panel rounded-2xl border border-primary/20 overflow-hidden">
-      {/* Header */}
       <div className="flex items-center justify-center gap-3 p-4 border-b border-primary/20">
         <BookOpen className="w-6 h-6 text-primary" />
         <h2 className="font-game text-xl text-primary text-glow-purple">CHAPTERS LOG</h2>
       </div>
 
-      {/* Subject Filter Tabs */}
-      <div className="flex border-b border-primary/20">
+      <div className="flex border-b border-primary/20 overflow-x-auto">
         {subjectTabs.map((tab) => (
           <button
             key={tab.id}
             onClick={() => setActiveFilter(tab.id)}
             className={cn(
-              "flex-1 py-3 text-sm font-medium transition-colors",
+              "flex-1 py-3 text-sm font-medium transition-colors whitespace-nowrap px-3",
               activeFilter === tab.id 
                 ? "text-primary-foreground bg-primary/80" 
                 : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
@@ -64,12 +61,8 @@ export const ChaptersGrid = ({ jungle, onSelectChapter }: ChaptersGridProps) => 
             {tab.label}
           </button>
         ))}
-        <button className="px-4 py-3 text-muted-foreground hover:text-foreground">
-          +
-        </button>
       </div>
 
-      {/* Chapters Grid */}
       <div className="p-4 grid grid-cols-2 md:grid-cols-3 gap-4 max-h-96 overflow-y-auto">
         {filteredChapters.map((chapter, index) => {
           const state = getTreeState(chapter);
@@ -88,7 +81,6 @@ export const ChaptersGrid = ({ jungle, onSelectChapter }: ChaptersGridProps) => 
               )}
               onClick={() => onSelectChapter?.(chapter)}
             >
-              {/* Status Icon */}
               <div className="flex justify-end mb-2">
                 <span className={cn(
                   "text-sm",
@@ -101,12 +93,10 @@ export const ChaptersGrid = ({ jungle, onSelectChapter }: ChaptersGridProps) => 
                 </span>
               </div>
 
-              {/* Chapter Name */}
               <h4 className="font-medium text-sm text-center mb-3 line-clamp-2">
                 {index + 1}. {chapter.name}
               </h4>
 
-              {/* Star Rating */}
               <div className="flex justify-center gap-0.5 mb-3">
                 {[1, 2, 3, 4, 5].map((star) => (
                   <Star
@@ -119,7 +109,6 @@ export const ChaptersGrid = ({ jungle, onSelectChapter }: ChaptersGridProps) => 
                 ))}
               </div>
 
-              {/* View Button */}
               <Button 
                 variant="outline" 
                 size="sm" 
