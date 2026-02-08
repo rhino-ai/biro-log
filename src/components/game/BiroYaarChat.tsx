@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { useGameStore } from '@/store/gameStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -70,18 +71,32 @@ const SimpleMarkdown = ({ content }: { content: string }) => {
           .replace(/_(.*?)_/g, '<em>$1</em>')
           .replace(/`(.*?)`/g, '<code class="bg-secondary/50 px-1 rounded text-xs">$1</code>');
         
+        // Sanitize to prevent XSS
+        const sanitize = (html: string) => {
+          const doc = new DOMParser().parseFromString(html, 'text/html');
+          doc.querySelectorAll('script,iframe,object,embed,link,style').forEach(el => el.remove());
+          doc.querySelectorAll('*').forEach(el => {
+            for (const attr of Array.from(el.attributes)) {
+              if (attr.name.startsWith('on') || attr.value.includes('javascript:')) {
+                el.removeAttribute(attr.name);
+              }
+            }
+          });
+          return doc.body.innerHTML;
+        };
+        
         if (line.startsWith('### ')) return <h3 key={idx} className="font-bold text-sm mt-2">{line.slice(4)}</h3>;
         if (line.startsWith('## ')) return <h2 key={idx} className="font-bold text-base mt-2">{line.slice(3)}</h2>;
         if (line.startsWith('# ')) return <h1 key={idx} className="font-bold text-lg mt-2">{line.slice(2)}</h1>;
         if (line.startsWith('- ') || line.startsWith('* ')) {
-          return <div key={idx} className="flex gap-2"><span>•</span><span dangerouslySetInnerHTML={{ __html: processed.slice(2) }} /></div>;
+          return <div key={idx} className="flex gap-2"><span>•</span><span dangerouslySetInnerHTML={{ __html: sanitize(processed.slice(2)) }} /></div>;
         }
         const numberedMatch = line.match(/^(\d+)\.\s/);
         if (numberedMatch) {
-          return <div key={idx} className="flex gap-2"><span>{numberedMatch[1]}.</span><span dangerouslySetInnerHTML={{ __html: processed.slice(numberedMatch[0].length) }} /></div>;
+          return <div key={idx} className="flex gap-2"><span>{numberedMatch[1]}.</span><span dangerouslySetInnerHTML={{ __html: sanitize(processed.slice(numberedMatch[0].length)) }} /></div>;
         }
         if (line.trim() === '') return <div key={idx} className="h-1" />;
-        return <p key={idx} dangerouslySetInnerHTML={{ __html: processed }} />;
+        return <p key={idx} dangerouslySetInnerHTML={{ __html: sanitize(processed) }} />;
       })}
     </div>
   );
@@ -106,6 +121,8 @@ export const BiroYaarChat = () => {
   const playTTS = useCallback(async (text: string, messageId: string) => {
     setPlayingAudio(messageId);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
         {
@@ -113,7 +130,7 @@ export const BiroYaarChat = () => {
           headers: {
             'Content-Type': 'application/json',
             apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({ text: text.slice(0, 500) }),
         }
@@ -193,13 +210,15 @@ export const BiroYaarChat = () => {
     }));
 
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/biro-yaar-chat`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
             messages: apiMessages,
