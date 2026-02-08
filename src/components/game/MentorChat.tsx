@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { useGameStore } from '@/store/gameStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,6 +19,20 @@ import {
 
 const SimpleMarkdown = ({ content }: { content: string }) => {
   if (!content) return <span className="opacity-50">...</span>;
+  
+  const sanitize = (html: string) => {
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    doc.querySelectorAll('script,iframe,object,embed,link,style').forEach(el => el.remove());
+    doc.querySelectorAll('*').forEach(el => {
+      for (const attr of Array.from(el.attributes)) {
+        if (attr.name.startsWith('on') || attr.value.includes('javascript:')) {
+          el.removeAttribute(attr.name);
+        }
+      }
+    });
+    return doc.body.innerHTML;
+  };
+
   return (
     <div className="space-y-1">
       {content.split('\n').map((line, idx) => {
@@ -28,12 +43,12 @@ const SimpleMarkdown = ({ content }: { content: string }) => {
         if (line.startsWith('### ')) return <h3 key={idx} className="font-bold text-sm mt-2">{line.slice(4)}</h3>;
         if (line.startsWith('## ')) return <h2 key={idx} className="font-bold text-base mt-2">{line.slice(3)}</h2>;
         if (line.startsWith('- ') || line.startsWith('* ')) {
-          return <div key={idx} className="flex gap-2"><span>•</span><span dangerouslySetInnerHTML={{ __html: processed.slice(2) }} /></div>;
+          return <div key={idx} className="flex gap-2"><span>•</span><span dangerouslySetInnerHTML={{ __html: sanitize(processed.slice(2)) }} /></div>;
         }
         const numMatch = line.match(/^(\d+)\.\s/);
-        if (numMatch) return <div key={idx} className="flex gap-2"><span>{numMatch[1]}.</span><span dangerouslySetInnerHTML={{ __html: processed.slice(numMatch[0].length) }} /></div>;
+        if (numMatch) return <div key={idx} className="flex gap-2"><span>{numMatch[1]}.</span><span dangerouslySetInnerHTML={{ __html: sanitize(processed.slice(numMatch[0].length)) }} /></div>;
         if (line.trim() === '') return <div key={idx} className="h-1" />;
-        return <p key={idx} dangerouslySetInnerHTML={{ __html: processed }} />;
+        return <p key={idx} dangerouslySetInnerHTML={{ __html: sanitize(processed) }} />;
       })}
     </div>
   );
@@ -79,6 +94,8 @@ export const MentorChat = () => {
   const playTTS = useCallback(async (text: string, messageId: string) => {
     setPlayingAudio(messageId);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/elevenlabs-tts`,
         {
@@ -86,7 +103,7 @@ export const MentorChat = () => {
           headers: {
             'Content-Type': 'application/json',
             apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({ text: text.slice(0, 500) }),
         }
@@ -114,13 +131,15 @@ export const MentorChat = () => {
     const apiMessages = [...messages, { ...userMsg, id: 'temp' }].map(m => ({ role: m.role, content: m.content }));
 
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ai-mentor-chat`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({ messages: apiMessages, studyTrack, studentName: profile.name }),
         }

@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -23,37 +24,13 @@ const SYSTEM_PROMPT = `You are Biro-yaar (बीरो-यार), a friendly be
   * They ask to explain a concept in detail
   * They specifically ask for more information
 
-EXAMPLES OF GOOD RESPONSES:
-User: "Yaar padhai nahi ho rahi"
-You: "Arey same bhai 😅 kya scene hai?"
-
-User: "Physics samajh nahi aa rahi"  
-You: "Konsa topic? Bata specific"
-
-User: "Motivation de yaar"
-You: "Bhai tu kar sakta hai. Chal 10 min padh le bas 💪"
-
-User: "Bore ho raha hun"
-You: "Haha same! Break le, phir study. Refresh ho jayega"
-
-User: "Study plan banana hai for Physics"
-You: [Here give detailed 100-200 word response with actual plan]
-
-BAD RESPONSES (DON'T DO THIS):
-❌ "Main samajh sakta hoon ki tumhe mushkil ho rahi hai. Yeh bahut common problem hai students mein. Let me help you with some tips that might be useful for your situation..." (Too long, too formal)
-
-✅ "Arey bura lagta hai yaar. Kya hua exactly?"
-
 🚫 RULES:
 - Never do homework for them - give hints only
 - Don't be preachy or lecture them
 - Don't use formal Hindi or pure English
 - Don't give generic motivational speeches
 - Be real, be chill, be a friend
-
-When they're stressed: "Chill yaar, ek ek karke kar"
-When they succeed: "Maza aa gaya! 🔥"
-When they're lazy: "Chal uth ab. 5 minute hi padh le"`;
+- Use "main" NOT "maine" when saying "I" in Hindi`;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -61,6 +38,28 @@ serve(async (req) => {
   }
 
   try {
+    // Auth check
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      { global: { headers: { Authorization: authHeader } } }
+    );
+
+    const token = authHeader.replace("Bearer ", "");
+    const { data, error: authError } = await supabase.auth.getClaims(token);
+    if (authError || !data?.claims) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const { messages, studyTrack, studentName } = await req.json();
     
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -68,18 +67,17 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    // Enhance system prompt with student context
     let contextualPrompt = SYSTEM_PROMPT;
     if (studentName) {
       contextualPrompt += `\n\nStudent's name: ${studentName} (use occasionally)`;
     }
     if (studyTrack) {
-      const trackInfo = {
+      const trackInfo: Record<string, string> = {
         jee: "They're prepping for JEE. Know Physics, Chem, Maths well.",
         neet: "They're prepping for NEET. Know Physics, Chem, Bio well.",
         highschool: "They're in school. Help with all subjects."
       };
-      contextualPrompt += `\n\n${trackInfo[studyTrack as keyof typeof trackInfo] || ''}`;
+      contextualPrompt += `\n\n${trackInfo[studyTrack] || ''}`;
     }
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
@@ -125,7 +123,7 @@ serve(async (req) => {
   } catch (error) {
     console.error("Chat error:", error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
+      JSON.stringify({ error: "Something went wrong" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
