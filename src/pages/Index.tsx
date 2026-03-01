@@ -16,11 +16,15 @@ import { useNavigate, Link } from 'react-router-dom';
 import { Swords, Zap, MessageCircle, Users, Trophy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEffect, useState } from 'react';
+import { useDataSync } from '@/hooks/useDataSync';
 
 const Index = () => {
   const navigate = useNavigate();
   const { level, xp, coins, streak, jungles, backlogCount, calculateJungleHealth, checkDeadlinesAndUpdateBacklog, getOverdueTasks } = useGameStore();
   const [showMotivation, setShowMotivation] = useState(true);
+  
+  // Sync data with database
+  useDataSync();
 
   // Check deadlines on load
   useEffect(() => {
