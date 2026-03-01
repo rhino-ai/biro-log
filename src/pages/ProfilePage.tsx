@@ -29,8 +29,26 @@ const ProfilePage = () => {
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     updateProfile(editedProfile);
+    
+    // Also save directly to DB for immediate persistence
+    if (user) {
+      try {
+        await supabase.from('profiles').update({
+          name: editedProfile.name,
+          avatar: editedProfile.avatar,
+          dream_college: editedProfile.dreamCollege,
+          dream_college_image: editedProfile.dreamCollegeImage || null,
+          dream_marks_cbse: editedProfile.dreamMarks.cbse,
+          dream_marks_jee_main: editedProfile.dreamMarks.jeeMain,
+          dream_marks_jee_advanced: editedProfile.dreamMarks.jeeAdvanced,
+        }).eq('user_id', user.id);
+      } catch (err) {
+        console.error('Error saving profile to DB:', err);
+      }
+    }
+    
     setIsEditing(false);
     toast({
       title: 'Profile Updated! ✅',

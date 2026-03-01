@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useGameStore } from '@/store/gameStore';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Play, Pause, RotateCcw, Volume2, VolumeX, Settings } from 'lucide-react';
@@ -36,12 +37,15 @@ export const FocusTimer = ({ className }: FocusTimerProps) => {
   const [mode, setMode] = useState<'focus' | 'break'>('focus');
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [selectedSound, setSelectedSound] = useState(alarmSounds[0].id);
+  const [earnedCoins, setEarnedCoins] = useState(0);
   const [settings, setSettings] = useState({
     focusTime: 25,
     breakTime: 5,
   });
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const tickCounter = useRef(0);
+  const { addCoins, addXP } = useGameStore();
 
   useEffect(() => {
     let interval: NodeJS.Timeout;
@@ -49,9 +53,27 @@ export const FocusTimer = ({ className }: FocusTimerProps) => {
     if (isRunning && timeLeft > 0) {
       interval = setInterval(() => {
         setTimeLeft((prev) => prev - 1);
+        
+        // Award coins during focus mode: 1 coin per 30 seconds
+        if (mode === 'focus') {
+          tickCounter.current += 1;
+          if (tickCounter.current >= 30) {
+            tickCounter.current = 0;
+            addCoins(1);
+            addXP(2);
+            setEarnedCoins(prev => prev + 1);
+          }
+        }
       }, 1000);
     } else if (timeLeft === 0) {
-      // Timer completed
+      // Timer completed - bonus rewards for completing full session
+      if (mode === 'focus') {
+        const bonusCoins = Math.floor(settings.focusTime / 5);
+        const bonusXP = settings.focusTime;
+        addCoins(bonusCoins);
+        addXP(bonusXP);
+        setEarnedCoins(prev => prev + bonusCoins);
+      }
       playAlarm();
       if (mode === 'focus') {
         setMode('break');
@@ -61,10 +83,11 @@ export const FocusTimer = ({ className }: FocusTimerProps) => {
         setTimeLeft(settings.focusTime * 60);
       }
       setIsRunning(false);
+      tickCounter.current = 0;
     }
 
     return () => clearInterval(interval);
-  }, [isRunning, timeLeft, mode, settings]);
+  }, [isRunning, timeLeft, mode, settings, addCoins, addXP]);
 
   const playAlarm = () => {
     if (!soundEnabled) return;
@@ -80,6 +103,8 @@ export const FocusTimer = ({ className }: FocusTimerProps) => {
   const resetTimer = () => {
     setIsRunning(false);
     setTimeLeft(mode === 'focus' ? settings.focusTime * 60 : settings.breakTime * 60);
+    tickCounter.current = 0;
+    setEarnedCoins(0);
   };
 
   const switchMode = (newMode: 'focus' | 'break') => {
@@ -232,6 +257,11 @@ export const FocusTimer = ({ className }: FocusTimerProps) => {
           <div className="text-sm text-muted-foreground mt-1">
             {mode === 'focus' ? '🎯 Focus Time' : '☕ Break Time'}
           </div>
+          {earnedCoins > 0 && (
+            <div className="text-xs text-accent mt-1 font-game animate-pulse">
+              +{earnedCoins} 🪙 earned
+            </div>
+          )}
         </div>
       </div>
 
