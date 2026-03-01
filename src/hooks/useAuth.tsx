@@ -43,6 +43,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     let mounted = true;
 
+    // Safety timeout - never stay loading forever
+    const safetyTimeout = setTimeout(() => {
+      if (mounted) {
+        console.warn('Auth initialization timed out, forcing load complete');
+        setIsLoading(false);
+      }
+    }, 5000);
+
     // Get initial session first
     const initializeAuth = async () => {
       try {
@@ -59,8 +67,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setUser(session?.user ?? null);
           
           if (session?.user) {
-            const adminStatus = await checkAdminRole(session.user.id);
-            if (mounted) setIsAdmin(adminStatus);
+            try {
+              const adminStatus = await checkAdminRole(session.user.id);
+              if (mounted) setIsAdmin(adminStatus);
+            } catch {
+              // Don't block loading for admin check
+            }
           }
           
           setIsLoading(false);
@@ -97,6 +109,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     return () => {
       mounted = false;
+      clearTimeout(safetyTimeout);
       subscription.unsubscribe();
     };
   }, [checkAdminRole]);
