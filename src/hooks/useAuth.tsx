@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { User, Session } from '@supabase/supabase-js';
 
@@ -19,9 +19,21 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const loadingResolved = useRef(false);
+
+  const resolveLoading = useCallback(() => {
+    if (!loadingResolved.current) {
+      loadingResolved.current = true;
+      setIsLoading(false);
+      console.log('[Auth] Loading resolved, user:', user ? 'exists' : 'null');
+    }
+  }, []);
 
   const checkAdminRole = useCallback(async (userId: string) => {
     try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 3000);
+      
       const { data, error } = await supabase
         .from('user_roles')
         .select('role')
@@ -29,13 +41,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .eq('role', 'admin')
         .maybeSingle();
       
+      clearTimeout(timeout);
+      
       if (error) {
-        console.error('Error checking admin role:', error);
+        console.warn('[Auth] Admin check failed:', error.message);
         return false;
       }
       return !!data;
     } catch (err) {
-      console.error('Error in checkAdminRole:', err);
+      console.warn('[Auth] Admin check error (non-blocking):', err);
       return false;
     }
   }, []);
@@ -43,68 +57,100 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     let mounted = true;
 
-    // Safety timeout - never stay loading forever
+    // Hard safety timeout - ALWAYS exit loading after 4 seconds
     const safetyTimeout = setTimeout(() => {
-      if (mounted) {
-        console.warn('Auth initialization timed out, forcing load complete');
+      if (mounted && !loadingResolved.current) {
+        console.warn('[Auth] Safety timeout fired at 4s - forcing load complete');
+        loadingResolved.current = true;
         setIsLoading(false);
       }
-    }, 5000);
+    }, 4000);
 
-    // Get initial session first
     const initializeAuth = async () => {
+      console.log('[Auth] Starting initialization...');
+      
       try {
-        const { data: { session }, error } = await supabase.auth.getSession();
+        // Race getSession against a 3s timeout
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000));
         
-        if (error) {
-          console.error('Error getting session:', error);
-          if (mounted) setIsLoading(false);
+        const result = await Promise.race([sessionPromise, timeoutPromise]);
+        
+        if (!mounted) return;
+        
+        if (result === null) {
+          // Timeout - no session available
+          console.warn('[Auth] getSession timed out after 3s');
+          setUser(null);
+          setSession(null);
+          loadingResolved.current = true;
+          setIsLoading(false);
           return;
         }
 
+        const { data: { session }, error } = result;
+        
+        if (error) {
+          console.error('[Auth] getSession error:', error.message);
+          setUser(null);
+          setSession(null);
+          loadingResolved.current = true;
+          setIsLoading(false);
+          return;
+        }
+
+        console.log('[Auth] Session loaded:', session ? 'active' : 'none');
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        // Admin check is non-blocking
+        if (session?.user) {
+          checkAdminRole(session.user.id).then((adminStatus) => {
+            if (mounted) setIsAdmin(adminStatus);
+          }).catch(() => {});
+        }
+        
+        loadingResolved.current = true;
+        setIsLoading(false);
+      } catch (err) {
+        console.error('[Auth] Init error:', err);
         if (mounted) {
-          setSession(session);
-          setUser(session?.user ?? null);
-          
-          if (session?.user) {
-            try {
-              const adminStatus = await checkAdminRole(session.user.id);
-              if (mounted) setIsAdmin(adminStatus);
-            } catch {
-              // Don't block loading for admin check
-            }
-          }
-          
+          setUser(null);
+          setSession(null);
+          loadingResolved.current = true;
           setIsLoading(false);
         }
-      } catch (err) {
-        console.error('Error initializing auth:', err);
-        if (mounted) setIsLoading(false);
       }
     };
 
     initializeAuth();
 
-    // Set up auth state listener
+    // Auth state listener for subsequent changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
+      console.log('[Auth] State change:', event);
 
       setSession(session);
       setUser(session?.user ?? null);
       
       if (session?.user) {
-        // Use setTimeout to avoid Supabase deadlock
-        setTimeout(async () => {
+        // Fire-and-forget admin check
+        setTimeout(() => {
           if (mounted) {
-            const adminStatus = await checkAdminRole(session.user.id);
-            if (mounted) setIsAdmin(adminStatus);
+            checkAdminRole(session.user.id).then((adminStatus) => {
+              if (mounted) setIsAdmin(adminStatus);
+            }).catch(() => {});
           }
         }, 0);
       } else {
         setIsAdmin(false);
       }
       
-      setIsLoading(false);
+      // Always resolve loading on any auth event
+      if (!loadingResolved.current) {
+        loadingResolved.current = true;
+        setIsLoading(false);
+      }
     });
 
     return () => {
@@ -147,7 +193,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await supabase.auth.signOut();
       setIsAdmin(false);
     } catch (err) {
-      console.error('Error signing out:', err);
+      console.error('[Auth] Sign out error:', err);
     }
   };
 
