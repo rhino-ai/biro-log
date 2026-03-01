@@ -5,33 +5,39 @@ import { supabase } from '@/integrations/supabase/client';
 
 /**
  * Syncs gameStore data with the database.
- * - Loads profile data from DB on mount
- * - Saves profile/exam/progress changes back to DB on change
- * - Syncs chapter progress bidirectionally
+ * All operations are non-blocking with timeouts.
  */
 export const useDataSync = () => {
   const { user } = useAuth();
   const hasLoaded = useRef(false);
   const saveTimeout = useRef<NodeJS.Timeout | null>(null);
 
-  // Load profile data from DB
+  // Helper: run a promise-like with a timeout
+  const withTimeout = <T,>(promiseLike: PromiseLike<T>, ms: number, fallback: T): Promise<T> => {
+    return Promise.race([
+      Promise.resolve(promiseLike),
+      new Promise<T>((resolve) => setTimeout(() => resolve(fallback), ms)),
+    ]);
+  };
+
   const loadFromDB = useCallback(async (userId: string) => {
+    console.log('[DataSync] Loading profile for', userId);
     try {
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
+      const profileResult = await withTimeout(
+        supabase.from('profiles').select('*').eq('user_id', userId).maybeSingle(),
+        5000,
+        { data: null, error: { message: 'Profile load timeout' } as any, count: null, status: 408, statusText: 'Timeout' }
+      );
+
+      const { data: profile, error } = profileResult;
 
       if (error) {
-        console.error('Error loading profile:', error);
-        return;
+        console.warn('[DataSync] Profile load issue:', error.message);
+        return; // Non-blocking - app works with local data
       }
 
       if (profile) {
         const store = useGameStore.getState();
-        
-        // Update profile info
         store.updateProfile({
           name: profile.name || 'Student',
           avatar: profile.avatar || '👨‍🎓',
@@ -43,62 +49,53 @@ export const useDataSync = () => {
             jeeAdvanced: profile.dream_marks_jee_advanced || 180,
           },
         });
-
-        // Update exam dates
         store.updateExamDates({
           cbse: profile.exam_date_cbse || '2026-03-15',
           jeeMain: profile.exam_date_jee_main || '2026-01-20',
           jeeAdvanced: profile.exam_date_jee_advanced || '2026-05-25',
         });
-
-        // Update XP, level, coins, streak
         if (profile.xp != null) store.addXP(profile.xp - store.xp);
         if (profile.coins != null) store.addCoins(profile.coins - store.coins);
+        console.log('[DataSync] Profile loaded successfully');
       }
 
-      // Load chapter progress
-      const { data: chapterProgress } = await supabase
-        .from('user_chapter_progress')
-        .select('*')
-        .eq('user_id', userId);
+      // Load chapter progress (non-blocking)
+      const chapterResult = await withTimeout(
+        supabase.from('user_chapter_progress').select('*').eq('user_id', userId),
+        5000,
+        { data: null, error: { message: 'Chapter progress timeout' } as any, count: null, status: 408, statusText: 'Timeout' }
+      );
 
-      if (chapterProgress && chapterProgress.length > 0) {
+      if (chapterResult.data && chapterResult.data.length > 0) {
         const store = useGameStore.getState();
-        chapterProgress.forEach((cp) => {
-          // Update without triggering XP gains (direct state update)
-          const currentJungles = store.jungles;
-          const jungle = currentJungles.find(j => j.id === cp.jungle_id);
+        chapterResult.data.forEach((cp) => {
+          const jungle = store.jungles.find(j => j.id === cp.jungle_id);
           if (jungle) {
             const chapter = jungle.chapters.find(c => c.id === cp.chapter_id);
             if (chapter) {
-              // Only update if different to avoid loops
-              if (chapter.theoryDone !== (cp.theory_done ?? false)) {
+              if (chapter.theoryDone !== (cp.theory_done ?? false))
                 store.updateChapterProgress(cp.jungle_id, cp.chapter_id, 'theoryDone', cp.theory_done ?? false);
-              }
-              if (chapter.practiceDone !== (cp.practice_done ?? false)) {
+              if (chapter.practiceDone !== (cp.practice_done ?? false))
                 store.updateChapterProgress(cp.jungle_id, cp.chapter_id, 'practiceDone', cp.practice_done ?? false);
-              }
-              if (chapter.revisionDone !== (cp.revision_done ?? false)) {
+              if (chapter.revisionDone !== (cp.revision_done ?? false))
                 store.updateChapterProgress(cp.jungle_id, cp.chapter_id, 'revisionDone', cp.revision_done ?? false);
-              }
             }
           }
         });
+        console.log('[DataSync] Chapter progress loaded');
       }
     } catch (err) {
-      console.error('Error in loadFromDB:', err);
+      console.warn('[DataSync] loadFromDB error (non-blocking):', err);
     }
   }, []);
 
-  // Save profile data to DB
   const saveToDB = useCallback(async (userId: string) => {
     try {
       const store = useGameStore.getState();
       const { profile, examDates, xp, level, coins, streak, lastStudyDate } = store;
 
-      await supabase
-        .from('profiles')
-        .update({
+      await withTimeout(
+        supabase.from('profiles').update({
           name: profile.name,
           avatar: profile.avatar,
           dream_college: profile.dreamCollege,
@@ -109,48 +106,43 @@ export const useDataSync = () => {
           exam_date_cbse: examDates.cbse,
           exam_date_jee_main: examDates.jeeMain,
           exam_date_jee_advanced: examDates.jeeAdvanced,
-          xp,
-          level,
-          coins,
-          streak,
+          xp, level, coins, streak,
           last_study_date: lastStudyDate,
-        })
-        .eq('user_id', userId);
+        }).eq('user_id', userId),
+        5000,
+        null
+      );
     } catch (err) {
-      console.error('Error saving to DB:', err);
+      console.warn('[DataSync] Save error (non-blocking):', err);
     }
   }, []);
 
-  // Save chapter progress to DB
   const saveChapterProgress = useCallback(async (userId: string) => {
     try {
-      const store = useGameStore.getState();
-      const { jungles } = store;
-
+      const { jungles } = useGameStore.getState();
       for (const jungle of jungles) {
         for (const chapter of jungle.chapters) {
           if (chapter.theoryDone || chapter.practiceDone || chapter.revisionDone) {
-            await supabase
-              .from('user_chapter_progress')
-              .upsert({
+            await withTimeout(
+              supabase.from('user_chapter_progress').upsert({
                 user_id: userId,
                 jungle_id: jungle.id,
                 chapter_id: chapter.id,
                 theory_done: chapter.theoryDone,
                 practice_done: chapter.practiceDone,
                 revision_done: chapter.revisionDone,
-              }, {
-                onConflict: 'user_id,jungle_id,chapter_id',
-              });
+              }, { onConflict: 'user_id,jungle_id,chapter_id' }),
+              3000,
+              null
+            );
           }
         }
       }
     } catch (err) {
-      console.error('Error saving chapter progress:', err);
+      console.warn('[DataSync] Chapter save error (non-blocking):', err);
     }
   }, []);
 
-  // Debounced save
   const debouncedSave = useCallback((userId: string) => {
     if (saveTimeout.current) clearTimeout(saveTimeout.current);
     saveTimeout.current = setTimeout(() => {
@@ -159,7 +151,7 @@ export const useDataSync = () => {
     }, 2000);
   }, [saveToDB, saveChapterProgress]);
 
-  // Load on mount
+  // Load on mount - fire and forget
   useEffect(() => {
     if (user && !hasLoaded.current) {
       hasLoaded.current = true;
@@ -170,11 +162,9 @@ export const useDataSync = () => {
   // Subscribe to store changes and auto-save
   useEffect(() => {
     if (!user) return;
-
     const unsub = useGameStore.subscribe(() => {
       debouncedSave(user.id);
     });
-
     return () => {
       unsub();
       if (saveTimeout.current) clearTimeout(saveTimeout.current);
