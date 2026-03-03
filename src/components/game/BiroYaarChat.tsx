@@ -4,7 +4,8 @@ import { useGameStore } from '@/store/gameStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, Clock, ArrowLeft, AlertTriangle, Trash2, Smile, MoreVertical, Volume2, Loader2 } from 'lucide-react';
+import { Send, Clock, ArrowLeft, AlertTriangle, Trash2, Smile, MoreVertical, Volume2, Loader2, Paperclip } from 'lucide-react';
+import { ChatFileUpload, ChatFilePreview } from '@/components/game/ChatFileUpload';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
@@ -461,7 +462,11 @@ export const BiroYaarChat = () => {
       )}
 
       <div className="p-3 border-t border-white/10 bg-card/50 backdrop-blur-sm">
-        <div className="flex gap-2 max-w-lg mx-auto">
+        <div className="flex gap-2 max-w-lg mx-auto items-center">
+          <ChatFileUpload onFileUploaded={(url, type, name) => {
+            const fileMsg = type === 'image' ? `[Image: ${name}](${url})` : `[File: ${name}](${url})`;
+            addMessage({ role: 'user', content: fileMsg, timestamp: new Date() });
+          }} />
           <Input ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)} onKeyPress={handleKeyPress}
             placeholder={isLimitReached ? "Kal milte hain..." : "Type kar yaar..."}
             disabled={isLoading || isLimitReached} className="flex-1 bg-secondary/50 border-white/10" />
