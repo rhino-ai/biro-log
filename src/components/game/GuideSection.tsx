@@ -1,12 +1,7 @@
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Book, ChevronRight, ChevronDown, Zap, TreeDeciduous, Target, Swords, Award, Bell, Timer } from 'lucide-react';
+import { Book, Zap, TreeDeciduous, Target, Swords, Award, Bell, Timer, Users, Coins, Star } from 'lucide-react';
 import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
+  Accordion, AccordionContent, AccordionItem, AccordionTrigger,
 } from '@/components/ui/accordion';
 
 interface GuideSectionProps {
@@ -15,6 +10,38 @@ interface GuideSectionProps {
 
 const guideItems = [
   {
+    id: 'xp-rules',
+    icon: Star,
+    title: '⚡ XP, Level & Coin Rules (FIXED)',
+    color: 'text-yellow-400',
+    content: `**LEVEL SYSTEM:**
+- 100 XP = 1 Level (fixed)
+- Level = floor(Total XP / 100)
+
+**FOCUS TIMER REWARDS:**
+- 1 XP every 15 seconds of focus ⏱️
+- 1 Coin every 30 seconds of focus
+- Session Complete Bonus: +focusTime XP + focusTime/5 Coins
+
+**CHAPTER PROGRESS:**
+- Theory Complete: +20 XP, +5 Coins
+- Practice Complete: +30 XP, +10 Coins
+- Revision Complete: +50 XP, +15 Coins
+
+**TASK COMPLETION:**
+- Daily Task: +15 XP, +5 Coins
+- Weekly Task: +50 XP, +20 Coins
+- Monthly Task: +100 XP, +50 Coins
+- Custom Task: +10 XP, +3 Coins
+
+**RAID VICTORY:**
+- Base: +500 XP, +40 Coins
+- Per backlog cleared: +100 XP, +10 Coins
+
+**FRIEND INVITE:**
+- Invite accepted: +50 XP, +25 Coins 🎉`,
+  },
+  {
     id: 'jungle',
     icon: TreeDeciduous,
     title: 'Living Jungle System',
@@ -22,42 +49,22 @@ const guideItems = [
     content: `Your study progress grows a living jungle! 🌴
 
 **How Trees Grow:**
-- 🪵 Dry Wood → Start of chapter (0% done)
+- 🪵 Dry Wood → Start of chapter (0%)
 - 🌱 Growing → Theory completed
 - 🌳 Healthy → Theory + Practice done
-- 🌴 Flourishing → All (Theory + Practice + Revision) complete!
+- 🌴 Flourishing → All complete!
 
 **Animals Appear:**
-- More green = more wildlife
-- Birds 🦜 appear at 70%+ health
+- Birds 🦜 at 70%+ health
 - Monkeys 🐒 at 50%+
 - Full ecosystem at 100%!`,
-  },
-  {
-    id: 'xp',
-    icon: Zap,
-    title: 'XP & Leveling System',
-    color: 'text-yellow-400',
-    content: `Earn XP automatically by studying! ⚡
-
-**XP Rewards:**
-- Theory Complete: +20 XP, +5 Coins
-- Practice Complete: +30 XP, +10 Coins  
-- Revision Complete: +50 XP, +15 Coins
-- Daily Task: +15 XP
-- Weekly Task: +50 XP
-- Monthly Task: +100 XP
-
-**Levels:**
-- 100 XP = 1 Level
-- Higher levels unlock rewards!`,
   },
   {
     id: 'goals',
     icon: Target,
     title: 'Goals & Tasks',
     color: 'text-primary',
-    content: `Set your study goals and track progress! 🎯
+    content: `Set your study goals! 🎯
 
 **Task Types:**
 - 📅 Daily: Small, regular tasks
@@ -78,14 +85,14 @@ const guideItems = [
 
 **How Raids Work:**
 - Overdue tasks become backlogs
-- Backlogs summon the Raid Boss
-- Clear backlogs = Attack the boss
-- Defeat boss = Bonus rewards!
+- Each backlog = 100 Boss HP
+- Complete task = Deal 100 damage
+- Clear all = Victory + Bonus rewards!
 
-**Stay Alert:**
-- Raid mode is ALWAYS active
-- Complete tasks on time to avoid raids
-- Boss gets stronger with more backlogs!`,
+**Rewards:**
+- Victory: +500 XP base + 100 per task
+- Coins: +40 base + 10 per task
+- Skip tasks = Face BEIJJATI! 😈`,
   },
   {
     id: 'rewards',
@@ -100,69 +107,79 @@ const guideItems = [
 - Level 15: 🎒 Bag
 - Level 20: 🏆 Trophy
 - Level 25: 🥇 Medal
-- Level 30: 📜 Certificate
-
-Keep studying to unlock them all!`,
+- Level 30: 📜 Certificate`,
   },
   {
-    id: 'alarms',
-    icon: Bell,
-    title: 'Alarms & Reminders',
+    id: 'friends',
+    icon: Users,
+    title: 'Friends & Invites',
     color: 'text-blue-400',
-    content: `Never miss a study session! ⏰
+    content: `Connect with friends! 👥
 
-**Set Up Alarms:**
-- Choose time for each task
-- Select ringtone style
-- Get browser notifications
+**How to Add Friends:**
+- Share your unique Biro-log ID
+- Share invite link or QR code
+- Search by name or email
 
-**Focus Timer:**
-- Pomodoro-style timer
-- 25 min focus + 5 min break
-- Alarm sounds when done!`,
+**Invite Rewards:**
+- When someone joins via your link: +50 XP, +25 Coins
+- Chat with friends in real-time
+- Compare progress on leaderboard`,
+  },
+  {
+    id: 'mentor',
+    icon: Zap,
+    title: 'AI Mentor & Biro-yaar',
+    color: 'text-amber-400',
+    content: `Two AI companions! 🤖
+
+**Biro-yaar (Buddy):**
+- Your study friend, talks like WhatsApp
+- Upload images, PDFs for help
+- 3-hour daily chat limit
+
+**AI Mentor (Guide):**
+- Professional mentor for your track
+- Daily nightly check-ins
+- Gives tasks based on your progress
+- Pushes you towards your goals`,
   },
   {
     id: 'timer',
     icon: Timer,
     title: 'Focus Timer',
     color: 'text-green-400',
-    content: `Stay focused with the built-in timer! ⏱️
+    content: `Stay focused with rewards! ⏱️
 
-**How to Use:**
-- Click Play to start
-- 25 min focus sessions
-- 5 min breaks between
-- Customize times in settings
+**Earnings while focusing:**
+- 1 XP every 15 seconds
+- 1 Coin every 30 seconds
+- Bonus on session complete!
 
 **Tips:**
-- Disable distractions
-- Complete full sessions
-- Track your daily focus hours!`,
+- 25 min focus + 5 min break
+- Customize times in settings
+- Keep streaks for multipliers!`,
   },
 ];
 
 export const GuideSection = ({ className }: GuideSectionProps) => {
   return (
     <div className={cn("glass-panel rounded-2xl border border-primary/20 overflow-hidden", className)}>
-      {/* Header */}
       <div className="flex items-center gap-3 p-4 border-b border-primary/20">
         <Book className="w-6 h-6 text-primary" />
         <h2 className="font-game text-xl text-primary text-glow-purple">How Biro-log Works</h2>
       </div>
 
-      {/* Guide Content */}
       <div className="p-4">
         <Accordion type="single" collapsible className="space-y-2">
           {guideItems.map((item) => (
-            <AccordionItem 
-              key={item.id} 
-              value={item.id}
-              className="glass-panel rounded-xl border border-white/10 px-4"
-            >
+            <AccordionItem key={item.id} value={item.id}
+              className="glass-panel rounded-xl border border-white/10 px-4">
               <AccordionTrigger className="hover:no-underline py-4">
                 <div className="flex items-center gap-3">
                   <item.icon className={cn("w-5 h-5", item.color)} />
-                  <span className="font-medium">{item.title}</span>
+                  <span className="font-medium text-left">{item.title}</span>
                 </div>
               </AccordionTrigger>
               <AccordionContent className="pb-4">
@@ -175,14 +192,13 @@ export const GuideSection = ({ className }: GuideSectionProps) => {
         </Accordion>
       </div>
 
-      {/* Tip */}
       <div className="p-4 border-t border-primary/20 bg-accent/5">
         <div className="flex items-start gap-2">
           <span className="text-xl">💡</span>
           <div>
             <p className="text-sm font-medium text-accent">Pro Tip</p>
             <p className="text-xs text-muted-foreground">
-              Complete all three steps (Theory → Practice → Revision) for maximum XP!
+              Use Focus Timer while studying = XP + Coins automatically! Complete all three steps (Theory → Practice → Revision) for maximum rewards!
             </p>
           </div>
         </div>

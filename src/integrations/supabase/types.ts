@@ -202,6 +202,7 @@ export type Database = {
           exam_date_jee_advanced: string | null
           exam_date_jee_main: string | null
           id: string
+          invite_code: string | null
           last_study_date: string | null
           level: number | null
           name: string
@@ -226,6 +227,7 @@ export type Database = {
           exam_date_jee_advanced?: string | null
           exam_date_jee_main?: string | null
           id?: string
+          invite_code?: string | null
           last_study_date?: string | null
           level?: number | null
           name?: string
@@ -250,6 +252,7 @@ export type Database = {
           exam_date_jee_advanced?: string | null
           exam_date_jee_main?: string | null
           id?: string
+          invite_code?: string | null
           last_study_date?: string | null
           level?: number | null
           name?: string

@@ -11,8 +11,8 @@ export const useDataSync = () => {
   const { user } = useAuth();
   const hasLoaded = useRef(false);
   const saveTimeout = useRef<NodeJS.Timeout | null>(null);
+  const lastSaveHash = useRef('');
 
-  // Helper: run a promise-like with a timeout
   const withTimeout = <T,>(promiseLike: PromiseLike<T>, ms: number, fallback: T): Promise<T> => {
     return Promise.race([
       Promise.resolve(promiseLike),
@@ -33,7 +33,7 @@ export const useDataSync = () => {
 
       if (error) {
         console.warn('[DataSync] Profile load issue:', error.message);
-        return; // Non-blocking - app works with local data
+        return;
       }
 
       if (profile) {
@@ -54,12 +54,19 @@ export const useDataSync = () => {
           jeeMain: profile.exam_date_jee_main || '2026-01-20',
           jeeAdvanced: profile.exam_date_jee_advanced || '2026-05-25',
         });
-        if (profile.xp != null) store.addXP(profile.xp - store.xp);
-        if (profile.coins != null) store.addCoins(profile.coins - store.coins);
-        console.log('[DataSync] Profile loaded successfully');
+        // Set XP/coins/level from DB (absolute values)
+        const currentXP = store.xp;
+        const currentCoins = store.coins;
+        if (profile.xp != null && profile.xp !== currentXP) {
+          store.addXP(profile.xp - currentXP);
+        }
+        if (profile.coins != null && profile.coins !== currentCoins) {
+          store.addCoins(profile.coins - currentCoins);
+        }
+        console.log('[DataSync] Profile loaded: XP=', profile.xp, 'Coins=', profile.coins, 'Level=', profile.level);
       }
 
-      // Load chapter progress (non-blocking)
+      // Load chapter progress
       const chapterResult = await withTimeout(
         supabase.from('user_chapter_progress').select('*').eq('user_id', userId),
         5000,
@@ -93,6 +100,13 @@ export const useDataSync = () => {
     try {
       const store = useGameStore.getState();
       const { profile, examDates, xp, level, coins, streak, lastStudyDate } = store;
+
+      // Create hash to avoid redundant saves
+      const hash = JSON.stringify({ xp, level, coins, streak, name: profile.name });
+      if (hash === lastSaveHash.current) return;
+      lastSaveHash.current = hash;
+
+      console.log('[DataSync] Saving: XP=', xp, 'Coins=', coins, 'Level=', level);
 
       await withTimeout(
         supabase.from('profiles').update({
@@ -151,7 +165,7 @@ export const useDataSync = () => {
     }, 2000);
   }, [saveToDB, saveChapterProgress]);
 
-  // Load on mount - fire and forget
+  // Load on mount
   useEffect(() => {
     if (user && !hasLoaded.current) {
       hasLoaded.current = true;

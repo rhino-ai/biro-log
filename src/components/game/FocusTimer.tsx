@@ -4,20 +4,12 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Play, Pause, RotateCcw, Volume2, VolumeX, Settings } from 'lucide-react';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 
 interface FocusTimerProps {
@@ -31,20 +23,24 @@ const alarmSounds = [
   { id: 'success', name: '✅ Success', src: 'https://assets.mixkit.co/active_storage/sfx/2867/2867-preview.mp3' },
 ];
 
+// XP/Coin rules for focus timer
+// 1 XP per 15 seconds of focus
+// 1 Coin per 30 seconds of focus
+// Bonus: focusTime XP + focusTime/5 coins on session complete
+
 export const FocusTimer = ({ className }: FocusTimerProps) => {
-  const [timeLeft, setTimeLeft] = useState(25 * 60); // 25 minutes default
+  const [timeLeft, setTimeLeft] = useState(25 * 60);
   const [isRunning, setIsRunning] = useState(false);
   const [mode, setMode] = useState<'focus' | 'break'>('focus');
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [selectedSound, setSelectedSound] = useState(alarmSounds[0].id);
+  const [earnedXP, setEarnedXP] = useState(0);
   const [earnedCoins, setEarnedCoins] = useState(0);
-  const [settings, setSettings] = useState({
-    focusTime: 25,
-    breakTime: 5,
-  });
+  const [settings, setSettings] = useState({ focusTime: 25, breakTime: 5 });
   
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const tickCounter = useRef(0);
+  const xpTick = useRef(0);
+  const coinTick = useRef(0);
   const { addCoins, addXP } = useGameStore();
 
   useEffect(() => {
@@ -54,25 +50,33 @@ export const FocusTimer = ({ className }: FocusTimerProps) => {
       interval = setInterval(() => {
         setTimeLeft((prev) => prev - 1);
         
-        // Award coins during focus mode: 1 coin per 30 seconds
         if (mode === 'focus') {
-          tickCounter.current += 1;
-          if (tickCounter.current >= 30) {
-            tickCounter.current = 0;
+          // 1 XP per 15 seconds
+          xpTick.current += 1;
+          if (xpTick.current >= 15) {
+            xpTick.current = 0;
+            addXP(1);
+            setEarnedXP(prev => prev + 1);
+          }
+          
+          // 1 Coin per 30 seconds
+          coinTick.current += 1;
+          if (coinTick.current >= 30) {
+            coinTick.current = 0;
             addCoins(1);
-            addXP(2);
             setEarnedCoins(prev => prev + 1);
           }
         }
       }, 1000);
     } else if (timeLeft === 0) {
-      // Timer completed - bonus rewards for completing full session
+      // Session complete bonus
       if (mode === 'focus') {
         const bonusCoins = Math.floor(settings.focusTime / 5);
         const bonusXP = settings.focusTime;
         addCoins(bonusCoins);
         addXP(bonusXP);
         setEarnedCoins(prev => prev + bonusCoins);
+        setEarnedXP(prev => prev + bonusXP);
       }
       playAlarm();
       if (mode === 'focus') {
@@ -83,7 +87,8 @@ export const FocusTimer = ({ className }: FocusTimerProps) => {
         setTimeLeft(settings.focusTime * 60);
       }
       setIsRunning(false);
-      tickCounter.current = 0;
+      xpTick.current = 0;
+      coinTick.current = 0;
     }
 
     return () => clearInterval(interval);
@@ -103,7 +108,9 @@ export const FocusTimer = ({ className }: FocusTimerProps) => {
   const resetTimer = () => {
     setIsRunning(false);
     setTimeLeft(mode === 'focus' ? settings.focusTime * 60 : settings.breakTime * 60);
-    tickCounter.current = 0;
+    xpTick.current = 0;
+    coinTick.current = 0;
+    setEarnedXP(0);
     setEarnedCoins(0);
   };
 
@@ -125,25 +132,18 @@ export const FocusTimer = ({ className }: FocusTimerProps) => {
 
   return (
     <div className={cn("glass-panel rounded-2xl border border-primary/20 p-6", className)}>
-      {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2">
           <span className="text-2xl">⏱️</span>
           <h3 className="font-game text-lg text-primary">Focus Timer</h3>
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setSoundEnabled(!soundEnabled)}
-          >
+          <Button variant="ghost" size="icon" onClick={() => setSoundEnabled(!soundEnabled)}>
             {soundEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
           </Button>
           <Dialog>
             <DialogTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <Settings className="w-4 h-4" />
-              </Button>
+              <Button variant="ghost" size="icon"><Settings className="w-4 h-4" /></Button>
             </DialogTrigger>
             <DialogContent className="glass-panel border-primary/30">
               <DialogHeader>
@@ -152,48 +152,37 @@ export const FocusTimer = ({ className }: FocusTimerProps) => {
               <div className="space-y-4">
                 <div>
                   <Label>Focus Time (minutes)</Label>
-                  <Input
-                    type="number"
-                    value={settings.focusTime}
-                    onChange={(e) => setSettings({ ...settings, focusTime: parseInt(e.target.value) || 25 })}
-                    className="bg-secondary/50"
-                  />
+                  <Input type="number" value={settings.focusTime}
+                    onChange={(e) => setSettings({ ...settings, focusTime: parseInt(e.target.value) || 25 })} className="bg-secondary/50" />
                 </div>
                 <div>
                   <Label>Break Time (minutes)</Label>
-                  <Input
-                    type="number"
-                    value={settings.breakTime}
-                    onChange={(e) => setSettings({ ...settings, breakTime: parseInt(e.target.value) || 5 })}
-                    className="bg-secondary/50"
-                  />
+                  <Input type="number" value={settings.breakTime}
+                    onChange={(e) => setSettings({ ...settings, breakTime: parseInt(e.target.value) || 5 })} className="bg-secondary/50" />
                 </div>
                 <div>
                   <Label>Alarm Sound</Label>
                   <Select value={selectedSound} onValueChange={setSelectedSound}>
-                    <SelectTrigger className="bg-secondary/50">
-                      <SelectValue />
-                    </SelectTrigger>
+                    <SelectTrigger className="bg-secondary/50"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {alarmSounds.map((sound) => (
-                        <SelectItem key={sound.id} value={sound.id}>
-                          {sound.name}
-                        </SelectItem>
+                        <SelectItem key={sound.id} value={sound.id}>{sound.name}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    const sound = alarmSounds.find(s => s.id === selectedSound);
-                    if (sound) {
-                      new Audio(sound.src).play().catch(console.error);
-                    }
-                  }}
-                >
-                  🔊 Test Sound
-                </Button>
+                <Button variant="outline" onClick={() => {
+                  const sound = alarmSounds.find(s => s.id === selectedSound);
+                  if (sound) new Audio(sound.src).play().catch(console.error);
+                }}>🔊 Test Sound</Button>
+                
+                {/* XP Rules */}
+                <div className="glass-panel rounded-lg p-3 border border-accent/20 text-xs space-y-1">
+                  <h4 className="font-game text-accent text-sm">⚡ Focus Rewards</h4>
+                  <p>• 1 XP every 15 seconds of focus</p>
+                  <p>• 1 🪙 every 30 seconds of focus</p>
+                  <p>• Bonus: {settings.focusTime} XP + {Math.floor(settings.focusTime / 5)} 🪙 on session complete</p>
+                </div>
               </div>
             </DialogContent>
           </Dialog>
@@ -202,64 +191,30 @@ export const FocusTimer = ({ className }: FocusTimerProps) => {
 
       {/* Mode Toggle */}
       <div className="flex gap-2 mb-6">
-        <Button
-          variant={mode === 'focus' ? 'default' : 'outline'}
-          className={cn("flex-1", mode === 'focus' && "bg-primary")}
-          onClick={() => switchMode('focus')}
-        >
-          🎯 Focus
-        </Button>
-        <Button
-          variant={mode === 'break' ? 'default' : 'outline'}
-          className={cn("flex-1", mode === 'break' && "bg-accent")}
-          onClick={() => switchMode('break')}
-        >
-          ☕ Break
-        </Button>
+        <Button variant={mode === 'focus' ? 'default' : 'outline'} className={cn("flex-1", mode === 'focus' && "bg-primary")}
+          onClick={() => switchMode('focus')}>🎯 Focus</Button>
+        <Button variant={mode === 'break' ? 'default' : 'outline'} className={cn("flex-1", mode === 'break' && "bg-accent")}
+          onClick={() => switchMode('break')}>☕ Break</Button>
       </div>
 
       {/* Timer Display */}
       <div className="relative flex items-center justify-center mb-6">
         <svg className="w-48 h-48 -rotate-90">
-          <circle
-            cx="96"
-            cy="96"
-            r="88"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="8"
-            className="text-secondary"
-          />
-          <circle
-            cx="96"
-            cy="96"
-            r="88"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="8"
-            strokeDasharray={553}
-            strokeDashoffset={553 - (553 * progress) / 100}
-            className={cn(
-              "transition-all duration-1000",
-              mode === 'focus' ? 'text-primary' : 'text-accent'
-            )}
-            strokeLinecap="round"
-          />
+          <circle cx="96" cy="96" r="88" fill="none" stroke="currentColor" strokeWidth="8" className="text-secondary" />
+          <circle cx="96" cy="96" r="88" fill="none" stroke="currentColor" strokeWidth="8"
+            strokeDasharray={553} strokeDashoffset={553 - (553 * progress) / 100}
+            className={cn("transition-all duration-1000", mode === 'focus' ? 'text-primary' : 'text-accent')} strokeLinecap="round" />
         </svg>
         <div className="absolute text-center">
-          <div className={cn(
-            "font-game text-5xl",
-            mode === 'focus' ? 'text-primary' : 'text-accent',
-            isRunning && 'animate-pulse'
-          )}>
+          <div className={cn("font-game text-5xl", mode === 'focus' ? 'text-primary' : 'text-accent', isRunning && 'animate-pulse')}>
             {formatTime(timeLeft)}
           </div>
           <div className="text-sm text-muted-foreground mt-1">
             {mode === 'focus' ? '🎯 Focus Time' : '☕ Break Time'}
           </div>
-          {earnedCoins > 0 && (
+          {(earnedXP > 0 || earnedCoins > 0) && (
             <div className="text-xs text-accent mt-1 font-game animate-pulse">
-              +{earnedCoins} 🪙 earned
+              +{earnedXP} ⚡ +{earnedCoins} 🪙
             </div>
           )}
         </div>
@@ -267,29 +222,14 @@ export const FocusTimer = ({ className }: FocusTimerProps) => {
 
       {/* Controls */}
       <div className="flex justify-center gap-4">
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={resetTimer}
-          className="w-12 h-12"
-        >
+        <Button variant="outline" size="icon" onClick={resetTimer} className="w-12 h-12">
           <RotateCcw className="w-5 h-5" />
         </Button>
-        <Button
-          size="icon"
-          onClick={toggleTimer}
-          className={cn(
-            "w-16 h-16 rounded-full",
-            mode === 'focus' ? 'bg-primary glow-purple' : 'bg-accent'
-          )}
-        >
-          {isRunning ? (
-            <Pause className="w-8 h-8" />
-          ) : (
-            <Play className="w-8 h-8 ml-1" />
-          )}
+        <Button size="icon" onClick={toggleTimer}
+          className={cn("w-16 h-16 rounded-full", mode === 'focus' ? 'bg-primary glow-purple' : 'bg-accent')}>
+          {isRunning ? <Pause className="w-8 h-8" /> : <Play className="w-8 h-8 ml-1" />}
         </Button>
-        <div className="w-12 h-12" /> {/* Spacer for alignment */}
+        <div className="w-12 h-12" />
       </div>
     </div>
   );

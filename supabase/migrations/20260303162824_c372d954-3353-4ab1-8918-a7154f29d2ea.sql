@@ -1,0 +1,3 @@
+-- The previous migration already added unique_id, invite_code, storage bucket, and profile policies.
+-- Just need to fix what failed: skip the already-added realtime publication.
+-- Nothing to do - all needed changes were applied before the error line.
