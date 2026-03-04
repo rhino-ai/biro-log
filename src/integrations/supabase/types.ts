@@ -44,6 +44,33 @@ export type Database = {
         }
         Relationships: []
       }
+      app_feedback: {
+        Row: {
+          created_at: string
+          feature_request: string | null
+          id: string
+          rating: number
+          suggestion: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          feature_request?: string | null
+          id?: string
+          rating: number
+          suggestion?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          feature_request?: string | null
+          id?: string
+          rating?: number
+          suggestion?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       chat_groups: {
         Row: {
           created_at: string
@@ -122,6 +149,39 @@ export type Database = {
         }
         Relationships: []
       }
+      gamification_rules: {
+        Row: {
+          focus_coin_seconds: number
+          focus_xp_seconds: number
+          id: number
+          invite_coins: number
+          invite_xp: number
+          updated_at: string
+          updated_by: string | null
+          xp_per_level: number
+        }
+        Insert: {
+          focus_coin_seconds?: number
+          focus_xp_seconds?: number
+          id: number
+          invite_coins?: number
+          invite_xp?: number
+          updated_at?: string
+          updated_by?: string | null
+          xp_per_level?: number
+        }
+        Update: {
+          focus_coin_seconds?: number
+          focus_xp_seconds?: number
+          id?: number
+          invite_coins?: number
+          invite_xp?: number
+          updated_at?: string
+          updated_by?: string | null
+          xp_per_level?: number
+        }
+        Relationships: []
+      }
       group_members: {
         Row: {
           group_id: string
@@ -186,6 +246,36 @@ export type Database = {
           },
         ]
       }
+      mind_game_scores: {
+        Row: {
+          coins_earned: number
+          created_at: string
+          game_type: string
+          id: string
+          score: number
+          user_id: string
+          xp_earned: number
+        }
+        Insert: {
+          coins_earned?: number
+          created_at?: string
+          game_type: string
+          id?: string
+          score?: number
+          user_id: string
+          xp_earned?: number
+        }
+        Update: {
+          coins_earned?: number
+          created_at?: string
+          game_type?: string
+          id?: string
+          score?: number
+          user_id?: string
+          xp_earned?: number
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar: string | null
@@ -208,6 +298,7 @@ export type Database = {
           name: string
           phone: string | null
           streak: number | null
+          unique_id: string
           updated_at: string | null
           user_id: string
           xp: number | null
@@ -233,6 +324,7 @@ export type Database = {
           name?: string
           phone?: string | null
           streak?: number | null
+          unique_id: string
           updated_at?: string | null
           user_id: string
           xp?: number | null
@@ -258,6 +350,7 @@ export type Database = {
           name?: string
           phone?: string | null
           streak?: number | null
+          unique_id?: string
           updated_at?: string | null
           user_id?: string
           xp?: number | null
@@ -410,11 +503,19 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      generate_unique_code: {
+        Args: { _len: number; _prefix: string }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      verify_admin_step_codes: {
+        Args: { _step_one: string; _step_two: string }
         Returns: boolean
       }
     }

@@ -31,18 +31,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const checkAdminRole = useCallback(async (userId: string) => {
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 3000);
-      
-      const { data, error } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', userId)
-        .eq('role', 'admin')
-        .maybeSingle();
-      
-      clearTimeout(timeout);
-      
+      const { data, error } = await Promise.race([
+        supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', userId)
+          .eq('role', 'admin')
+          .maybeSingle(),
+        new Promise<{ data: null; error: { message: string } }>((resolve) =>
+          setTimeout(() => resolve({ data: null, error: { message: 'admin-role-timeout' } }), 3000),
+        ),
+      ]);
+
       if (error) {
         console.warn('[Auth] Admin check failed:', error.message);
         return false;
@@ -57,14 +57,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     let mounted = true;
 
-    // Hard safety timeout - ALWAYS exit loading after 4 seconds
+    // Hard safety timeout - ALWAYS exit loading after 5 seconds
     const safetyTimeout = setTimeout(() => {
       if (mounted && !loadingResolved.current) {
-        console.warn('[Auth] Safety timeout fired at 4s - forcing load complete');
+        console.warn('[Auth] Safety timeout fired at 5s - forcing load complete');
         loadingResolved.current = true;
         setIsLoading(false);
       }
-    }, 4000);
+    }, 5000);
 
     const initializeAuth = async () => {
       console.log('[Auth] Starting initialization...');

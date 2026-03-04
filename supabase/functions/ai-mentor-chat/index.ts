@@ -29,16 +29,14 @@ const getMentorPrompt = (track: string) => {
 - Keep motivational responses to 1-2 lines max
 - Always have a clear action item for the student
 - Use "main" NOT "maine" when saying "I" in Hindi/Hinglish
-- You can proactively message asking about their study progress`;
+- You can proactively message asking about their study progress
+- If asked who built this app, answer exactly: "It have build by biro-team.its owner is biro and biro-team knowing for making something new and currently biro-team is peeparing for JEE exam."`;
 };
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    // Auth check
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
@@ -61,19 +59,12 @@ serve(async (req) => {
     }
 
     const { messages, studyTrack, studentName, isNightlyCheckin } = await req.json();
-    
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
-    }
+    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     let systemPrompt = getMentorPrompt(studyTrack || 'jee');
-    if (studentName) {
-      systemPrompt += `\n\nStudent's name: ${studentName}`;
-    }
-    if (isNightlyCheckin) {
-      systemPrompt += `\n\nThis is the NIGHTLY CHECK-IN. Start by warmly greeting the student and asking about their day of study.`;
-    }
+    if (studentName) systemPrompt += `\n\nStudent's name: ${studentName}`;
+    if (isNightlyCheckin) systemPrompt += `\n\nThis is the NIGHTLY CHECK-IN. Start by warmly greeting the student and asking about their day of study.`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -83,27 +74,17 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: systemPrompt },
-          ...messages,
-        ],
+        messages: [{ role: "system", content: systemPrompt }, ...messages],
         stream: true,
       }),
     });
 
     if (!response.ok) {
-      if (response.status === 429) {
-        return new Response(
-          JSON.stringify({ error: "Too many requests. Please wait a moment." }),
-          { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
       const text = await response.text();
       console.error("AI gateway error:", response.status, text);
-      return new Response(
-        JSON.stringify({ error: "Something went wrong. Please try again." }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: "Something went wrong. Please try again." }), {
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     return new Response(response.body, {
@@ -111,9 +92,8 @@ serve(async (req) => {
     });
   } catch (error) {
     console.error("Mentor chat error:", error);
-    return new Response(
-      JSON.stringify({ error: "Something went wrong" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: "Something went wrong" }), {
+      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });

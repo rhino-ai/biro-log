@@ -18,6 +18,7 @@ import BiroYaarPage from "./pages/BiroYaarPage";
 import MentorPage from "./pages/MentorPage";
 import FriendsPage from "./pages/FriendsPage";
 import LeaderboardPage from "./pages/LeaderboardPage";
+import MindGamesPage from "./pages/MindGamesPage";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 
@@ -62,6 +63,7 @@ const AppRoutes = () => (
     <Route path="/mentor" element={<ProtectedRoute><MentorPage /></ProtectedRoute>} />
     <Route path="/friends" element={<ProtectedRoute><FriendsPage /></ProtectedRoute>} />
     <Route path="/leaderboard" element={<ProtectedRoute><LeaderboardPage /></ProtectedRoute>} />
+    <Route path="/mind-games" element={<ProtectedRoute><MindGamesPage /></ProtectedRoute>} />
     <Route path="*" element={<NotFound />} />
   </Routes>
 );
