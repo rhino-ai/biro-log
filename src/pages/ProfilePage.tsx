@@ -11,6 +11,7 @@ import { RewardsList } from '@/components/game/RewardsList';
 import { ExamDateEditor } from '@/components/game/ExamDateEditor';
 import { TrackSwitcher } from '@/components/game/TrackSwitcher';
 import { PWAInstallButton } from '@/components/game/PWAInstallButton';
+import { AppRatingSection } from '@/components/game/AppRatingSection';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
@@ -328,6 +329,10 @@ const ProfilePage = () => {
         {/* Rewards */}
         <div className="glass-panel rounded-2xl p-5 animate-fade-in border border-coins/20" style={{ animationDelay: '0.35s' }}>
           <RewardsList />
+        </div>
+
+        <div className="animate-fade-in" style={{ animationDelay: '0.4s' }}>
+          <AppRatingSection />
         </div>
       </main>
 

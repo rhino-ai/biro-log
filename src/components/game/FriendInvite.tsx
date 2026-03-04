@@ -1,25 +1,29 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
+import { useGameStore } from '@/store/gameStore';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { toast } from '@/hooks/use-toast';
-import { Copy, Share2, QrCode, Link2 } from 'lucide-react';
+import { Copy, Share2, Link2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import QRCode from 'qrcode';
 
 export const FriendInvite = () => {
   const { user } = useAuth();
+  const { addXP, addCoins } = useGameStore();
   const [uniqueId, setUniqueId] = useState('');
   const [inviteCode, setInviteCode] = useState('');
   const [friendId, setFriendId] = useState('');
   const [isAdding, setIsAdding] = useState(false);
+  const [qrDataUrl, setQrDataUrl] = useState('');
 
   useEffect(() => {
     if (!user) return;
     const loadProfile = async () => {
       const { data } = await supabase
         .from('profiles')
-        .select('*')
+        .select('unique_id, invite_code')
         .eq('user_id', user.id)
         .maybeSingle();
       if (data) {
@@ -27,13 +31,19 @@ export const FriendInvite = () => {
         setInviteCode((data as any).invite_code || '');
       }
     };
-    loadProfile();
+    void loadProfile();
   }, [user]);
 
   const inviteLink = `${window.location.origin}?invite=${inviteCode}`;
-  
-  const copyToClipboard = (text: string, label: string) => {
-    navigator.clipboard.writeText(text);
+
+  useEffect(() => {
+    if (!inviteCode) return;
+    void QRCode.toDataURL(inviteLink).then(setQrDataUrl).catch(() => setQrDataUrl(''));
+  }, [inviteCode, inviteLink]);
+
+  const copyToClipboard = async (text: string, label: string) => {
+    if (!text) return;
+    await navigator.clipboard.writeText(text);
     toast({ title: `${label} copied! 📋` });
   };
 
@@ -42,61 +52,57 @@ export const FriendInvite = () => {
       try {
         await navigator.share({
           title: 'Join Biro-log! 🌴',
-          text: `Hey! Join me on Biro-log for study gamification! Use my invite code: ${inviteCode}`,
+          text: `Join me on Biro-log! Invite code: ${inviteCode}`,
           url: inviteLink,
         });
-      } catch {}
+      } catch {
+        // user canceled
+      }
     } else {
-      copyToClipboard(inviteLink, 'Invite link');
+      await copyToClipboard(inviteLink, 'Invite link');
     }
   };
 
   const addFriendById = async () => {
     if (!friendId.trim() || !user) return;
     setIsAdding(true);
-    try {
-      // Search by name match since unique_id/invite_code aren't in types yet
-      const { data: results } = await supabase
-        .from('profiles')
-        .select('user_id, name')
-        .or(`name.ilike.%${friendId.trim()}%,email.ilike.%${friendId.trim()}%`)
-        .neq('user_id', user.id)
-        .limit(1);
-      const friendProfile = results?.[0] || null;
-      
-      if (!friendProfile) {
-        toast({ title: 'User not found', description: 'Check the ID and try again', variant: 'destructive' });
-        setIsAdding(false);
-        return;
-      }
 
-      if (friendProfile.user_id === user.id) {
-        toast({ title: "That's you! 😄", variant: 'destructive' });
-        setIsAdding(false);
-        return;
-      }
+    const query = friendId.trim();
+    const { data: results, error: searchError } = await supabase
+      .from('profiles')
+      .select('user_id, name')
+      .or(`unique_id.eq.${query},invite_code.eq.${query},email.ilike.%${query}%,name.ilike.%${query}%`)
+      .neq('user_id', user.id)
+      .limit(1);
 
-      const { error } = await supabase.from('contacts').insert({
-        user_id: user.id,
-        contact_user_id: friendProfile.user_id,
-      });
-
-      if (error) {
-        if (error.code === '23505') toast({ title: 'Already friends! ✅' });
-        else toast({ title: 'Error', description: error.message, variant: 'destructive' });
-      } else {
-        toast({ title: `Added ${friendProfile.name}! 🎉`, description: '+50 XP, +25 Coins for invite!' });
-      }
-      setFriendId('');
-    } catch (err: any) {
-      toast({ title: 'Error', description: err.message, variant: 'destructive' });
+    if (searchError || !results || results.length === 0) {
+      toast({ title: 'User not found', description: 'Check ID/code and try again', variant: 'destructive' });
+      setIsAdding(false);
+      return;
     }
+
+    const friend = results[0];
+
+    const { error } = await supabase.from('contacts').insert({
+      user_id: user.id,
+      contact_user_id: friend.user_id,
+    });
+
+    if (error) {
+      if (error.code === '23505') toast({ title: 'Already friends! ✅' });
+      else toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    } else {
+      addXP(50);
+      addCoins(25);
+      toast({ title: `Added ${friend.name}! +50 XP +25 Coins 🎉` });
+    }
+
+    setFriendId('');
     setIsAdding(false);
   };
 
   return (
     <div className="space-y-4">
-      {/* Your ID */}
       <div className="glass-panel rounded-xl p-4 border border-primary/20 space-y-3">
         <h3 className="font-game text-sm text-primary">Your Biro-log ID</h3>
         <div className="flex items-center gap-2">
@@ -107,9 +113,8 @@ export const FriendInvite = () => {
         </div>
       </div>
 
-      {/* Share Invite */}
       <div className="glass-panel rounded-xl p-4 border border-accent/20 space-y-3">
-        <h3 className="font-game text-sm text-accent">Invite Friends (+50 XP 🎉)</h3>
+        <h3 className="font-game text-sm text-accent">Invite Friends (+50 XP)</h3>
         <div className="flex gap-2">
           <Button onClick={shareInvite} className="flex-1 bg-accent gap-2">
             <Share2 className="w-4 h-4" /> Share Invite Link
@@ -117,21 +122,26 @@ export const FriendInvite = () => {
           <Button variant="outline" onClick={() => copyToClipboard(inviteLink, 'Link')}>
             <Link2 className="w-4 h-4" />
           </Button>
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button variant="outline">QR</Button>
+            </DialogTrigger>
+            <DialogContent className="glass-panel border-primary/30">
+              <DialogHeader><DialogTitle>Share QR Invite</DialogTitle></DialogHeader>
+              <div className="flex flex-col items-center gap-3">
+                {qrDataUrl ? <img src={qrDataUrl} alt="Invite QR" className="w-52 h-52 rounded-lg" /> : <p>Generating QR...</p>}
+                <p className="text-xs text-muted-foreground">Scan to join via your invite link</p>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
-        <p className="text-xs text-muted-foreground text-center">
-          Share this link on WhatsApp, Telegram, Reddit etc.
-        </p>
       </div>
 
-      {/* Add by ID */}
       <div className="glass-panel rounded-xl p-4 border border-white/10 space-y-3">
-        <h3 className="font-game text-sm">Add Friend by ID</h3>
+        <h3 className="font-game text-sm">Add Friend by ID / Invite Code</h3>
         <div className="flex gap-2">
-          <Input value={friendId} onChange={(e) => setFriendId(e.target.value)}
-            placeholder="Enter friend's ID or invite code" className="flex-1 bg-secondary/50" />
-          <Button onClick={addFriendById} disabled={!friendId.trim() || isAdding} className="bg-primary">
-            Add
-          </Button>
+          <Input value={friendId} onChange={(e) => setFriendId(e.target.value)} placeholder="Enter ID, invite code, name, or email" className="flex-1 bg-secondary/50" />
+          <Button onClick={addFriendById} disabled={!friendId.trim() || isAdding} className="bg-primary">Add</Button>
         </div>
       </div>
     </div>

@@ -11,14 +11,7 @@ interface ChatFileUploadProps {
   className?: string;
 }
 
-const ALLOWED_TYPES = {
-  'image/*': { icon: Image, label: 'Image', maxSize: 10 * 1024 * 1024 },
-  'video/*': { icon: Film, label: 'Video', maxSize: 50 * 1024 * 1024 },
-  'audio/*': { icon: Music, label: 'Audio', maxSize: 20 * 1024 * 1024 },
-  'application/pdf': { icon: FileText, label: 'PDF', maxSize: 20 * 1024 * 1024 },
-  'application/msword': { icon: FileText, label: 'Doc', maxSize: 20 * 1024 * 1024 },
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': { icon: FileText, label: 'Doc', maxSize: 20 * 1024 * 1024 },
-};
+const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
 export const ChatFileUpload = ({ onFileUploaded, className }: ChatFileUploadProps) => {
   const { user } = useAuth();
@@ -30,8 +23,8 @@ export const ChatFileUpload = ({ onFileUploaded, className }: ChatFileUploadProp
     const file = e.target.files?.[0];
     if (!file || !user) return;
 
-    if (file.size > 50 * 1024 * 1024) {
-      toast({ title: 'File too large', description: 'Max 50MB allowed', variant: 'destructive' });
+    if (file.size > MAX_FILE_SIZE) {
+      toast({ title: 'File too large', description: 'Max 20MB per file', variant: 'destructive' });
       return;
     }
 
@@ -39,25 +32,29 @@ export const ChatFileUpload = ({ onFileUploaded, className }: ChatFileUploadProp
     setShowMenu(false);
 
     try {
-      const ext = file.name.split('.').pop();
-      const path = `${user.id}/${Date.now()}.${ext}`;
-      
+      const ext = file.name.split('.').pop() || 'bin';
+      const path = `chat-uploads/${user.id}/${Date.now()}.${ext}`;
+
       const { error } = await supabase.storage
-        .from('chat-uploads')
-        .upload(path, file);
+        .from('avatars')
+        .upload(path, file, { upsert: false });
 
       if (error) throw error;
 
       const { data: urlData } = supabase.storage
-        .from('chat-uploads')
+        .from('avatars')
         .getPublicUrl(path);
 
-      const fileType = file.type.startsWith('image') ? 'image' 
-        : file.type.startsWith('video') ? 'video'
-        : file.type.startsWith('audio') ? 'audio' 
-        : 'document';
+      const fileType = file.type.startsWith('image')
+        ? 'image'
+        : file.type.startsWith('video')
+          ? 'video'
+          : file.type.startsWith('audio')
+            ? 'audio'
+            : 'document';
 
       onFileUploaded(urlData.publicUrl, fileType, file.name);
+      toast({ title: 'File uploaded ✅' });
     } catch (err: any) {
       toast({ title: 'Upload failed', description: err.message, variant: 'destructive' });
     } finally {
@@ -67,45 +64,32 @@ export const ChatFileUpload = ({ onFileUploaded, className }: ChatFileUploadProp
   };
 
   return (
-    <div className={cn("relative", className)}>
-      <input ref={fileRef} type="file" className="hidden"
+    <div className={cn('relative', className)}>
+      <input
+        ref={fileRef}
+        type="file"
+        className="hidden"
         accept="image/*,video/*,audio/*,.pdf,.doc,.docx"
-        onChange={handleFileSelect} />
-      
-      <Button variant="ghost" size="icon" onClick={() => isUploading ? null : setShowMenu(!showMenu)}
-        className="h-9 w-9" disabled={isUploading}>
+        onChange={handleFileSelect}
+      />
+
+      <Button variant="ghost" size="icon" onClick={() => !isUploading && setShowMenu(!showMenu)} className="h-9 w-9" disabled={isUploading}>
         {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}
       </Button>
 
       {showMenu && (
-        <div className="absolute bottom-12 left-0 glass-panel border border-white/20 rounded-xl p-2 space-y-1 min-w-[140px] shadow-xl z-10">
-          <button onClick={() => { fileRef.current?.setAttribute('accept', 'image/*'); fileRef.current?.click(); }}
-            className="flex items-center gap-2 w-full px-3 py-2 rounded-lg hover:bg-secondary/50 text-sm">
-            <Image className="w-4 h-4 text-green-400" /> Photo
-          </button>
-          <button onClick={() => { fileRef.current?.setAttribute('accept', 'video/*'); fileRef.current?.click(); }}
-            className="flex items-center gap-2 w-full px-3 py-2 rounded-lg hover:bg-secondary/50 text-sm">
-            <Film className="w-4 h-4 text-blue-400" /> Video
-          </button>
-          <button onClick={() => { fileRef.current?.setAttribute('accept', 'audio/*'); fileRef.current?.click(); }}
-            className="flex items-center gap-2 w-full px-3 py-2 rounded-lg hover:bg-secondary/50 text-sm">
-            <Music className="w-4 h-4 text-purple-400" /> Audio
-          </button>
-          <button onClick={() => { fileRef.current?.setAttribute('accept', '.pdf,.doc,.docx'); fileRef.current?.click(); }}
-            className="flex items-center gap-2 w-full px-3 py-2 rounded-lg hover:bg-secondary/50 text-sm">
-            <FileText className="w-4 h-4 text-amber-400" /> Document
-          </button>
-          <button onClick={() => setShowMenu(false)}
-            className="flex items-center gap-2 w-full px-3 py-2 rounded-lg hover:bg-secondary/50 text-sm text-muted-foreground">
-            <X className="w-4 h-4" /> Cancel
-          </button>
+        <div className="absolute bottom-12 left-0 glass-panel border border-white/20 rounded-xl p-2 space-y-1 min-w-[150px] shadow-xl z-10">
+          <button onClick={() => { fileRef.current?.setAttribute('accept', 'image/*'); fileRef.current?.click(); }} className="flex items-center gap-2 w-full px-3 py-2 rounded-lg hover:bg-secondary/50 text-sm"><Image className="w-4 h-4 text-primary" /> Photo</button>
+          <button onClick={() => { fileRef.current?.setAttribute('accept', 'video/*'); fileRef.current?.click(); }} className="flex items-center gap-2 w-full px-3 py-2 rounded-lg hover:bg-secondary/50 text-sm"><Film className="w-4 h-4 text-accent" /> Video</button>
+          <button onClick={() => { fileRef.current?.setAttribute('accept', 'audio/*'); fileRef.current?.click(); }} className="flex items-center gap-2 w-full px-3 py-2 rounded-lg hover:bg-secondary/50 text-sm"><Music className="w-4 h-4 text-muted-foreground" /> Audio</button>
+          <button onClick={() => { fileRef.current?.setAttribute('accept', '.pdf,.doc,.docx'); fileRef.current?.click(); }} className="flex items-center gap-2 w-full px-3 py-2 rounded-lg hover:bg-secondary/50 text-sm"><FileText className="w-4 h-4 text-primary" /> Document</button>
+          <button onClick={() => setShowMenu(false)} className="flex items-center gap-2 w-full px-3 py-2 rounded-lg hover:bg-secondary/50 text-sm text-muted-foreground"><X className="w-4 h-4" /> Cancel</button>
         </div>
       )}
     </div>
   );
 };
 
-// Render uploaded file in chat
 export const ChatFilePreview = ({ url, type, name }: { url: string; type: string; name: string }) => {
   if (type === 'image') {
     return <img src={url} alt={name} className="max-w-[250px] max-h-[200px] rounded-lg object-cover cursor-pointer" onClick={() => window.open(url, '_blank')} />;
@@ -117,9 +101,8 @@ export const ChatFilePreview = ({ url, type, name }: { url: string; type: string
     return <audio src={url} controls className="w-full max-w-[250px]" />;
   }
   return (
-    <a href={url} target="_blank" rel="noopener noreferrer"
-      className="flex items-center gap-2 bg-secondary/30 rounded-lg px-3 py-2 hover:bg-secondary/50 transition-colors">
-      <FileText className="w-5 h-5 text-amber-400" />
+    <a href={url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 bg-secondary/30 rounded-lg px-3 py-2 hover:bg-secondary/50 transition-colors">
+      <FileText className="w-5 h-5 text-primary" />
       <span className="text-sm truncate max-w-[180px]">{name}</span>
     </a>
   );
