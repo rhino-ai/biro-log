@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { useGameStore } from '@/store/gameStore';
+import { useGame } from '@/hooks/useGame';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -16,7 +16,7 @@ const defaultCollegeImages: Record<string, string> = {
 
 export const CollegeImageSection = () => {
   const { user } = useAuth();
-  const { profile, updateProfile } = useGameStore();
+  const { profile, updateProfile } = useGame();
   const [isUploading, setIsUploading] = useState(false);
   const [collegeImage, setCollegeImage] = useState<string | null>(profile.dreamCollegeImage || null);
   const fileInputRef = useRef<HTMLInputElement>(null);

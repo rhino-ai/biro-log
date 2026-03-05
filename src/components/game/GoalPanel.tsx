@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useGameStore } from '@/store/gameStore';
+import { useGame } from '@/hooks/useGame';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -36,7 +36,7 @@ const ringtones = [
 ];
 
 export const GoalPanel = () => {
-  const { tasks, addTask, toggleTask, deleteTask, jungles, checkDeadlinesAndUpdateBacklog } = useGameStore();
+  const { tasks, addTask, toggleTask, deleteTask, jungles, checkDeadlinesAndUpdateBacklog } = useGame();
   const [activeTab, setActiveTab] = useState<'daily' | 'weekly' | 'monthly'>('daily');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newGoal, setNewGoal] = useState({

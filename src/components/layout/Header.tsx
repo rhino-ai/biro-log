@@ -1,4 +1,4 @@
-import { useGameStore } from '@/store/gameStore';
+import { useGame } from '@/hooks/useGame';
 import { useAuth } from '@/hooks/useAuth';
 import { Avatar } from '@/components/game/Avatar';
 import { StreakBadge } from '@/components/game/StreakBadge';
@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 
 export const Header = () => {
-  const { coins, xp, level, backlogCount } = useGameStore();
+  const { coins, xp, level, backlogCount } = useGame();
   const { isAdmin, signOut, user } = useAuth();
   const navigate = useNavigate();
 

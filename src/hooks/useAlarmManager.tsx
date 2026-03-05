@@ -1,12 +1,13 @@
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { useGameStore } from '@/store/gameStore';
+import { getTrackData } from '@/store/gameStore';
 import { toast } from '@/hooks/use-toast';
 
 // Embedded audio data URIs for reliable alarm sounds
 const BEEP_SOUND = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1aW1ljcXOCioiGgn5+fnx6eHh5e36BhIeJiomIhoN/fnx6eXl6e32AhIeKjI2NjIuJhoN+e3l4eHl7fX+ChYiLjY6Ojo2LiYaDenh3d3h5e36Ag4aJjI6PkI+OjIqHg355d3Z3eHt9gIOGiYyOj5CQj42LiIV/e3h2dnh5fH+ChYiLjY+QkJCOjIqGgn15d3Z3eHt+gYOGiYuOj5CQj42LiIWAfXl3dnd5e36Bg4aJi42Oj4+OjYuIhYB8eXd2d3l7foCDhoiLjY6Pj46NjImGgn56d3Z3eXt+gIOFiIuNjo+Pjo2LiIWBfXp4dnd5e36AgIKFiIuNjo6OjYuJhoJ+e3l3dnh7fYCDhYiLjI2Ojo6NjImGg398enh3eHt9gIOFiIqMjY2NjYyKiISBfnx5d3h5e3+Bg4WIioqMjIyMi4mGhIJ+fHp4eHl7fX+Cg4WIiYuLi4uKiYeEgn58enl4eXt9gIGDhoiJioqLi4qIhoSCf3x6eXh5e32AgIKFh4iJioqKiYiGhIJ/fXt5eHl6fH+AgYOGh4iJiYmJiIeGg4F+fHt5eXp7fYB/gYKEhYaHh4eHh4eGhYOCf317eXl5ent9f4CCg4SFhYaGhoaGhYSEgoB+fHt6enp7fX5/gYKDhISFhYWFhYWEhIOBgH58e3p6ent8fX9/gYGCg4SEhISEhISEg4KBf357enp5ent8fX5/gYGCgoODg4ODg4ODgoGAfnx7enp6e3x9fn+AgYGCgoKCgoKCgoKBgH98e3p6enp7fH1+fn+AgIGBgYGBgYGBgYB/fnx7enp6e3x8fX5+f4CAgICAgICAgIB/fn18e3p6ent7fH1+fn9/gICAgICAgIB/fn18fHt7e3t7fH1+fn5/f39/f39/f39/fn19fHt7e3t7fHx9fn5+f39/f39/f35+fn19fHx7e3t8fHx9fX5+fn9/f39/fn5+fX19fHx8fHx8fH19fn5+fn5+fn5+fn19fX18fHx8fHx8fX19fn5+fn5+fn5+fX19fXx8fHx8fHx9fX19fn5+fn5+fn59fX19fHx8fHx8fH19fX5+fn5+fn5+fn19fX18fHx8fHx8fX19fn5+fn5+fn59fX19fXx8fHx8fHx9fX1+fn5+fn5+fn19fX19fHx8fHx8fH19fX5+fn5+fn5+fX19fX18fHx8fHx8fX19fn5+fn5+fn59fX19fXx8fHx8fHx9fX1+fn5+fn5+fn19fX19fHx8fHx8fH19fX5+fn5+fn5+fX19fX18fHx8fHx8fX19fn5+fn5+fn59fX19fXx8fHx8fHx9fX19fn5+fn5+fn59fX19fX18fHx8fH19fX1+fn5+fn5+fn19fX19fXx8fHx8fX19fX5+fn5+fn5+fX19fX19fHx8fHx9fX19fn5+fn5+fn59fX19fX18fHx8fH19fX1+fn5+fn5+fn19fX19fXx8fHx8fX19fX5+fn5+fn5+fX19fX19fHx8fHx9fX19fn5+fn5+fn5+fn19fX19fHx8fH19fX1+fn5+fn5+fn5+fX19fX18fHx8fX19fX5+fn5+fn5+fn59fX19fXx8fHx9fX19fn5+fn5+fn5+fn19fX19fX18fH19fX1+fn5+fn5+fn5+fX19fX19fHx8fX19fX5+fn5+fn5+fn59fX19fX19fH19fX1+fn5+fn5+fn5+fn19fX19fX18fX19fX5+fn5+fn5+fn5+fX19fX19fXx9fX19fn5+fn5+fn5+fn59fX19fX19fH19fX5+fn5+fn5+fn5+fn19fX19fX18fX19fn5+fn5+fn5+fn5+fX19fX19fX19fX1+fn5+fn5+fn5+fn59fX19fX19fX19fn5+fn5+fn5+fn5+fn19fX19fX19fX1+fn5+fn5+fn5+fn5+fX19fX19fX19fX5+fn5+fn5+fn5+fn59fX19fX19fX1+fn5+fn5+fn5+fn5+fn19fX19fX19fn5+fn5+fn5+fn5+fn5+fX19fX19fX1+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+fn5+';
 
 export const useAlarmManager = () => {
-  const tasks = useGameStore((state) => state.tasks);
+  const tasks = useGameStore((state) => getTrackData(state).tasks);
   const getOverdueTasks = useGameStore((state) => state.getOverdueTasks);
   const checkDeadlinesAndUpdateBacklog = useGameStore((state) => state.checkDeadlinesAndUpdateBacklog);
   const checkedAlarmsRef = useRef<Set<string>>(new Set());

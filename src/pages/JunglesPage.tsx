@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { useGameStore } from '@/store/gameStore';
+import { useGame } from '@/hooks/useGame';
 import { Header } from '@/components/layout/Header';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { JungleCard } from '@/components/game/JungleCard';
@@ -7,7 +7,7 @@ import { BackButton } from '@/components/layout/BackButton';
 
 const JunglesPage = () => {
   const navigate = useNavigate();
-  const { jungles, calculateJungleHealth } = useGameStore();
+  const { jungles, calculateJungleHealth } = useGame();
 
   // Sort jungles by health
   const sortedJungles = [...jungles].sort((a, b) => 

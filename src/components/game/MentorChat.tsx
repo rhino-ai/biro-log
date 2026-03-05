@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useGameStore } from '@/store/gameStore';
+import { useGame } from '@/hooks/useGame';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -65,7 +65,7 @@ const trackMentorNames: Record<string, { name: string; emoji: string; desc: stri
 
 export const MentorChat = () => {
   const navigate = useNavigate();
-  const { profile, studyTrack } = useGameStore();
+  const { profile, studyTrack } = useGame();
   const { messages, addMessage, updateMessage, deleteMessage, clearAll } = useMentorChat();
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);

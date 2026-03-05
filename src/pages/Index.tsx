@@ -1,4 +1,4 @@
-import { useGameStore } from '@/store/gameStore';
+import { useGame } from '@/hooks/useGame';
 import { Header } from '@/components/layout/Header';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { StatCard } from '@/components/game/StatCard';
@@ -20,7 +20,7 @@ import { useDataSync } from '@/hooks/useDataSync';
 
 const Index = () => {
   const navigate = useNavigate();
-  const { level, xp, coins, streak, jungles, backlogCount, calculateJungleHealth, checkDeadlinesAndUpdateBacklog, getOverdueTasks } = useGameStore();
+  const { level, xp, coins, streak, jungles, backlogCount, calculateJungleHealth, checkDeadlinesAndUpdateBacklog, getOverdueTasks } = useGame();
   const [showMotivation, setShowMotivation] = useState(true);
   
   // Sync data with database

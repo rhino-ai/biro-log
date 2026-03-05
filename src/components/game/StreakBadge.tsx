@@ -1,8 +1,8 @@
-import { useGameStore } from '@/store/gameStore';
+import { useGame } from '@/hooks/useGame';
 import { cn } from '@/lib/utils';
 
 export const StreakBadge = () => {
-  const { streak } = useGameStore();
+  const { streak } = useGame();
   
   const hasFireAura = streak >= 3;
   const has2xXP = streak >= 7;

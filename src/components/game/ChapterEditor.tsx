@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useGameStore } from '@/store/gameStore';
+import { useGame } from '@/hooks/useGame';
 import { Chapter, SubjectType, subjectIcons, subjectColors, createChapter } from '@/data/syllabus';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,7 +14,7 @@ interface ChapterEditorProps {
 }
 
 export const ChapterEditor = ({ jungleId }: ChapterEditorProps) => {
-  const { jungles, addChapter, updateChapterName, deleteChapter } = useGameStore();
+  const { jungles, addChapter, updateChapterName, deleteChapter } = useGame();
   const jungle = jungles.find((j) => j.id === jungleId);
   
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);

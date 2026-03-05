@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useGameStore } from '@/store/gameStore';
+import { useGame } from '@/hooks/useGame';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -105,7 +105,7 @@ const SimpleMarkdown = ({ content }: { content: string }) => {
 
 export const BiroYaarChat = () => {
   const navigate = useNavigate();
-  const { profile, studyTrack } = useGameStore();
+  const { profile, studyTrack } = useGame();
   const { messages, addMessage, updateMessage, deleteMessage, addReaction, clearAllMessages } = useChatStorage();
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);

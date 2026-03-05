@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useGameStore } from '@/store/gameStore';
+import { useGame } from '@/hooks/useGame';
 import { cn } from '@/lib/utils';
 import { X, AlertTriangle, Heart, Target, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -30,7 +30,7 @@ const pressureMessages = [
 ];
 
 export const MotivationMessage = ({ onClose }: MotivationMessageProps) => {
-  const { profile, backlogCount, streak, getOverdueTasks } = useGameStore();
+  const { profile, backlogCount, streak, getOverdueTasks } = useGame();
   const [isVisible, setIsVisible] = useState(true);
   const [message, setMessage] = useState('');
   const [isPressure, setIsPressure] = useState(false);

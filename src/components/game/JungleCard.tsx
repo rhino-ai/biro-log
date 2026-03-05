@@ -1,4 +1,4 @@
-import { useGameStore } from '@/store/gameStore';
+import { useGame } from '@/hooks/useGame';
 import { JungleData } from '@/data/syllabus';
 import { TreeIcon } from './TreeIcon';
 import { cn } from '@/lib/utils';
@@ -9,7 +9,7 @@ interface JungleCardProps {
 }
 
 export const JungleCard = ({ jungle, onClick }: JungleCardProps) => {
-  const { calculateJungleHealth, getTreeState, jungles } = useGameStore();
+  const { calculateJungleHealth, getTreeState, jungles } = useGame();
   
   const currentJungle = jungles.find(j => j.id === jungle.id) || jungle;
   const health = calculateJungleHealth(jungle.id);

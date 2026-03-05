@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useGameStore } from '@/store/gameStore';
+import { useGame } from '@/hooks/useGame';
 import { cn } from '@/lib/utils';
 import { Calendar, List, CheckCircle, Star, Zap } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isToday } from 'date-fns';
@@ -16,7 +16,7 @@ interface ActivityEntry {
 }
 
 export const ActivityLog = () => {
-  const { xp, coins, level, streak, tasks, testRecords } = useGameStore();
+  const { xp, coins, level, streak, tasks, testRecords } = useGame();
   const [activeTab, setActiveTab] = useState<'activity' | 'calendar'>('activity');
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [activities, setActivities] = useState<ActivityEntry[]>([]);

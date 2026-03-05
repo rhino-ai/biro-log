@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useGameStore } from '@/store/gameStore';
+import { useGame } from '@/hooks/useGame';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -29,7 +29,7 @@ import {
 import { Calendar as CalendarIcon } from 'lucide-react';
 
 export const TestTracker = () => {
-  const { testRecords, addTestRecord, deleteTestRecord } = useGameStore();
+  const { testRecords, addTestRecord, deleteTestRecord } = useGame();
   const [activeExam, setActiveExam] = useState<'cbse' | 'jee-main' | 'jee-advanced'>('cbse');
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newTest, setNewTest] = useState({

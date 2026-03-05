@@ -95,21 +95,6 @@ interface GameState {
   teacherSubjects: string[];
   otherCategory: OtherCategory | null;
   
-  // Computed getters for current track (for backwards compatibility)
-  profile: UserProfile;
-  xp: number;
-  level: number;
-  coins: number;
-  streak: number;
-  lastStudyDate: string | null;
-  examDates: ExamDates;
-  jungles: JungleData[];
-  tasks: Task[];
-  testRecords: TestRecord[];
-  raidHistory: RaidRecord[];
-  backlogCount: number;
-  raidActive: boolean;
-  
   // Actions
   updateChapterProgress: (jungleId: string, chapterId: string, field: 'theoryDone' | 'practiceDone' | 'revisionDone', value: boolean) => void;
   addXP: (amount: number) => void;
@@ -175,6 +160,11 @@ const createDefaultTrackData = (track: StudyTrack): TrackData => ({
   },
 });
 
+// Helper to get current track data from state (used outside store)
+export const getTrackData = (state: GameState): TrackData => {
+  return state.trackData[state.studyTrack];
+};
+
 export const useGameStore = create<GameState>()(
   persist(
     (set, get) => {
@@ -212,45 +202,6 @@ export const useGameStore = create<GameState>()(
         teacherSubjects: [],
         otherCategory: null,
 
-        // Getters that return current track's data
-        get profile() {
-          return getCurrentTrackData().profile;
-        },
-        get xp() {
-          return getCurrentTrackData().xp;
-        },
-        get level() {
-          return getCurrentTrackData().level;
-        },
-        get coins() {
-          return getCurrentTrackData().coins;
-        },
-        get streak() {
-          return getCurrentTrackData().streak;
-        },
-        get lastStudyDate() {
-          return getCurrentTrackData().lastStudyDate;
-        },
-        get examDates() {
-          return getCurrentTrackData().examDates;
-        },
-        get jungles() {
-          return getCurrentTrackData().jungles;
-        },
-        get tasks() {
-          return getCurrentTrackData().tasks;
-        },
-        get testRecords() {
-          return getCurrentTrackData().testRecords;
-        },
-        get raidHistory() {
-          return getCurrentTrackData().raidHistory;
-        },
-        get backlogCount() {
-          return getCurrentTrackData().backlogCount;
-        },
-        raidActive: true,
-
         updateChapterProgress: (jungleId, chapterId, field, value) => {
           const currentData = getCurrentTrackData();
           const newJungles = currentData.jungles.map((jungle) => {
@@ -267,16 +218,9 @@ export const useGameStore = create<GameState>()(
           let xpGain = 0;
           let coinGain = 0;
           if (value) {
-            if (field === 'theoryDone') {
-              xpGain = 20;
-              coinGain = 5;
-            } else if (field === 'practiceDone') {
-              xpGain = 30;
-              coinGain = 10;
-            } else if (field === 'revisionDone') {
-              xpGain = 50;
-              coinGain = 15;
-            }
+            if (field === 'theoryDone') { xpGain = 20; coinGain = 5; }
+            else if (field === 'practiceDone') { xpGain = 30; coinGain = 10; }
+            else if (field === 'revisionDone') { xpGain = 50; coinGain = 15; }
           }
 
           const newXP = currentData.xp + xpGain;
@@ -295,14 +239,14 @@ export const useGameStore = create<GameState>()(
 
         addXP: (amount) => {
           const currentData = getCurrentTrackData();
-          const newXP = currentData.xp + amount;
+          const newXP = Math.max(0, currentData.xp + amount);
           const newLevel = Math.floor(newXP / XP_PER_LEVEL);
           updateCurrentTrackData({ xp: newXP, level: newLevel });
         },
 
         addCoins: (amount) => {
           const currentData = getCurrentTrackData();
-          updateCurrentTrackData({ coins: currentData.coins + amount });
+          updateCurrentTrackData({ coins: Math.max(0, currentData.coins + amount) });
         },
 
         updateStreak: () => {
@@ -316,26 +260,16 @@ export const useGameStore = create<GameState>()(
           yesterday.setDate(yesterday.getDate() - 1);
           
           if (lastDate === yesterday.toDateString()) {
-            updateCurrentTrackData({ 
-              streak: currentData.streak + 1, 
-              lastStudyDate: today 
-            });
+            updateCurrentTrackData({ streak: currentData.streak + 1, lastStudyDate: today });
           } else {
-            updateCurrentTrackData({ 
-              streak: 1, 
-              lastStudyDate: today 
-            });
+            updateCurrentTrackData({ streak: 1, lastStudyDate: today });
           }
         },
 
         addTask: (task) => {
           const currentData = getCurrentTrackData();
           updateCurrentTrackData({
-            tasks: [...currentData.tasks, { 
-              ...task, 
-              id: crypto.randomUUID(),
-              createdAt: new Date().toISOString()
-            }],
+            tasks: [...currentData.tasks, { ...task, id: crypto.randomUUID(), createdAt: new Date().toISOString() }],
           });
         },
 
@@ -350,19 +284,10 @@ export const useGameStore = create<GameState>()(
           let xpGain = 0;
           let coinGain = 0;
           if (task && !wasCompleted) {
-            if (task.type === 'daily') {
-              xpGain = 15;
-              coinGain = 5;
-            } else if (task.type === 'weekly') {
-              xpGain = 50;
-              coinGain = 20;
-            } else if (task.type === 'monthly') {
-              xpGain = 100;
-              coinGain = 50;
-            } else {
-              xpGain = 10;
-              coinGain = 3;
-            }
+            if (task.type === 'daily') { xpGain = 15; coinGain = 5; }
+            else if (task.type === 'weekly') { xpGain = 50; coinGain = 20; }
+            else if (task.type === 'monthly') { xpGain = 100; coinGain = 50; }
+            else { xpGain = 10; coinGain = 3; }
           }
 
           const newXP = currentData.xp + xpGain;
@@ -380,47 +305,35 @@ export const useGameStore = create<GameState>()(
 
         deleteTask: (taskId) => {
           const currentData = getCurrentTrackData();
-          updateCurrentTrackData({
-            tasks: currentData.tasks.filter((task) => task.id !== taskId),
-          });
+          updateCurrentTrackData({ tasks: currentData.tasks.filter((task) => task.id !== taskId) });
           get().checkDeadlinesAndUpdateBacklog();
         },
 
         updateTask: (taskId, updates) => {
           const currentData = getCurrentTrackData();
           updateCurrentTrackData({
-            tasks: currentData.tasks.map((task) =>
-              task.id === taskId ? { ...task, ...updates } : task
-            ),
+            tasks: currentData.tasks.map((task) => task.id === taskId ? { ...task, ...updates } : task),
           });
         },
 
         updateProfile: (profile) => {
           const currentData = getCurrentTrackData();
-          updateCurrentTrackData({
-            profile: { ...currentData.profile, ...profile },
-          });
+          updateCurrentTrackData({ profile: { ...currentData.profile, ...profile } });
         },
 
         updateExamDates: (dates) => {
           const currentData = getCurrentTrackData();
-          updateCurrentTrackData({
-            examDates: { ...currentData.examDates, ...dates },
-          });
+          updateCurrentTrackData({ examDates: { ...currentData.examDates, ...dates } });
         },
 
         addTestRecord: (record) => {
           const currentData = getCurrentTrackData();
-          updateCurrentTrackData({
-            testRecords: [...currentData.testRecords, { ...record, id: crypto.randomUUID() }],
-          });
+          updateCurrentTrackData({ testRecords: [...currentData.testRecords, { ...record, id: crypto.randomUUID() }] });
         },
 
         deleteTestRecord: (id) => {
           const currentData = getCurrentTrackData();
-          updateCurrentTrackData({
-            testRecords: currentData.testRecords.filter((r) => r.id !== id),
-          });
+          updateCurrentTrackData({ testRecords: currentData.testRecords.filter((r) => r.id !== id) });
         },
 
         addRaidRecord: (record) => {
@@ -434,7 +347,6 @@ export const useGameStore = create<GameState>()(
           const currentData = getCurrentTrackData();
           const jungle = currentData.jungles.find((j) => j.id === jungleId);
           if (!jungle || jungle.chapters.length === 0) return 0;
-
           const totalProgress = jungle.chapters.reduce((acc, chapter) => {
             let progress = 0;
             if (chapter.theoryDone) progress += 33;
@@ -442,20 +354,13 @@ export const useGameStore = create<GameState>()(
             if (chapter.revisionDone) progress += 34;
             return acc + progress;
           }, 0);
-
           return Math.round(totalProgress / jungle.chapters.length);
         },
 
         getTreeState: (chapter) => {
-          if (!chapter.theoryDone && !chapter.practiceDone && !chapter.revisionDone) {
-            return 'dry';
-          }
-          if (chapter.theoryDone && !chapter.practiceDone) {
-            return 'growing';
-          }
-          if (chapter.theoryDone && chapter.practiceDone && !chapter.revisionDone) {
-            return 'healthy';
-          }
+          if (!chapter.theoryDone && !chapter.practiceDone && !chapter.revisionDone) return 'dry';
+          if (chapter.theoryDone && !chapter.practiceDone) return 'growing';
+          if (chapter.theoryDone && chapter.practiceDone && !chapter.revisionDone) return 'healthy';
           return 'flourishing';
         },
 
@@ -468,10 +373,7 @@ export const useGameStore = create<GameState>()(
 
         getUnlockedRewards: () => {
           const level = getCurrentTrackData().level;
-          return rewards.map((reward) => ({
-            ...reward,
-            unlocked: level >= reward.level,
-          }));
+          return rewards.map((reward) => ({ ...reward, unlocked: level >= reward.level }));
         },
 
         checkDeadlinesAndUpdateBacklog: () => {
@@ -483,7 +385,6 @@ export const useGameStore = create<GameState>()(
             const deadline = new Date(`${task.dueDate}T${task.dueTime || '23:59'}`);
             return deadline < now;
           });
-          
           updateCurrentTrackData({ backlogCount: overdueTasks.length });
         },
 
@@ -498,7 +399,6 @@ export const useGameStore = create<GameState>()(
           });
         },
 
-        // Track and chapter management
         setStudyTrack: (track: StudyTrack) => {
           set({ studyTrack: track, hasSelectedTrack: true });
         },
@@ -523,9 +423,7 @@ export const useGameStore = create<GameState>()(
           const currentData = getCurrentTrackData();
           updateCurrentTrackData({
             jungles: currentData.jungles.map((jungle) =>
-              jungle.id === jungleId
-                ? { ...jungle, chapters: [...jungle.chapters, chapter] }
-                : jungle
+              jungle.id === jungleId ? { ...jungle, chapters: [...jungle.chapters, chapter] } : jungle
             ),
           });
         },
@@ -535,12 +433,7 @@ export const useGameStore = create<GameState>()(
           updateCurrentTrackData({
             jungles: currentData.jungles.map((jungle) =>
               jungle.id === jungleId
-                ? {
-                    ...jungle,
-                    chapters: jungle.chapters.map((ch) =>
-                      ch.id === chapterId ? { ...ch, name: newName } : ch
-                    ),
-                  }
+                ? { ...jungle, chapters: jungle.chapters.map((ch) => ch.id === chapterId ? { ...ch, name: newName } : ch) }
                 : jungle
             ),
           });
@@ -550,9 +443,7 @@ export const useGameStore = create<GameState>()(
           const currentData = getCurrentTrackData();
           updateCurrentTrackData({
             jungles: currentData.jungles.map((jungle) =>
-              jungle.id === jungleId
-                ? { ...jungle, chapters: jungle.chapters.filter((ch) => ch.id !== chapterId) }
-                : jungle
+              jungle.id === jungleId ? { ...jungle, chapters: jungle.chapters.filter((ch) => ch.id !== chapterId) } : jungle
             ),
           });
         },
@@ -570,3 +461,18 @@ export const useGameStore = create<GameState>()(
     }
   )
 );
+
+// Selector hooks for current track data - USE THESE in components
+export const useTrackData = () => useGameStore((s) => s.trackData[s.studyTrack]);
+export const useXP = () => useGameStore((s) => s.trackData[s.studyTrack].xp);
+export const useLevel = () => useGameStore((s) => s.trackData[s.studyTrack].level);
+export const useCoins = () => useGameStore((s) => s.trackData[s.studyTrack].coins);
+export const useStreak = () => useGameStore((s) => s.trackData[s.studyTrack].streak);
+export const useProfile = () => useGameStore((s) => s.trackData[s.studyTrack].profile);
+export const useExamDates = () => useGameStore((s) => s.trackData[s.studyTrack].examDates);
+export const useJungles = () => useGameStore((s) => s.trackData[s.studyTrack].jungles);
+export const useTasks = () => useGameStore((s) => s.trackData[s.studyTrack].tasks);
+export const useTestRecords = () => useGameStore((s) => s.trackData[s.studyTrack].testRecords);
+export const useRaidHistory = () => useGameStore((s) => s.trackData[s.studyTrack].raidHistory);
+export const useBacklogCount = () => useGameStore((s) => s.trackData[s.studyTrack].backlogCount);
+export const useLastStudyDate = () => useGameStore((s) => s.trackData[s.studyTrack].lastStudyDate);

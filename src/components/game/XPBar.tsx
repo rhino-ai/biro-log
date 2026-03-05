@@ -1,7 +1,7 @@
-import { useGameStore } from '@/store/gameStore';
+import { useGame } from '@/hooks/useGame';
 
 export const XPBar = () => {
-  const { xp, level } = useGameStore();
+  const { xp, level } = useGame();
   const xpInCurrentLevel = xp % 100;
   const progressPercent = xpInCurrentLevel;
 

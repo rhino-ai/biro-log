@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useGameStore } from '@/store/gameStore';
+import { useGame } from '@/hooks/useGame';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Calendar, Edit2, Save, X } from 'lucide-react';
@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/popover';
 
 export const ExamDateEditor = () => {
-  const { examDates, updateExamDates } = useGameStore();
+  const { examDates, updateExamDates } = useGame();
   const [isEditing, setIsEditing] = useState(false);
   const [editedDates, setEditedDates] = useState(examDates);
 
