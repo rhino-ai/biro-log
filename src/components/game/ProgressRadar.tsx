@@ -1,4 +1,4 @@
-import { useGameStore } from '@/store/gameStore';
+import { useGame } from '@/hooks/useGame';
 import { cn } from '@/lib/utils';
 import { SubjectType, subjectIcons } from '@/data/syllabus';
 
@@ -7,7 +7,7 @@ interface ProgressRadarProps {
 }
 
 export const ProgressRadar = ({ jungleId }: ProgressRadarProps) => {
-  const { jungles } = useGameStore();
+  const { jungles } = useGame();
   const jungle = jungles.find(j => j.id === jungleId);
   
   if (!jungle || jungle.chapters.length === 0) return null;

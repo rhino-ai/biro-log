@@ -1,5 +1,5 @@
 import { Chapter, JungleData, subjectIcons, subjectColors } from '@/data/syllabus';
-import { useGameStore } from '@/store/gameStore';
+import { useGame } from '@/hooks/useGame';
 import { TreeIcon } from './TreeIcon';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
@@ -10,7 +10,7 @@ interface ChapterListProps {
 }
 
 export const ChapterList = ({ jungle, filterSubject = 'all' }: ChapterListProps) => {
-  const { jungles, updateChapterProgress, getTreeState } = useGameStore();
+  const { jungles, updateChapterProgress, getTreeState } = useGame();
   
   const currentJungle = jungles.find(j => j.id === jungle.id) || jungle;
   

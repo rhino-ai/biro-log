@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useGameStore } from '@/store/gameStore';
+import { useGame } from '@/hooks/useGame';
 import { X, Swords, Trophy, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -21,7 +21,7 @@ export const RaidBattle = ({ isOpen, onClose }: RaidBattleProps) => {
     addCoins,
     addRaidRecord,
     jungles 
-  } = useGameStore();
+  } = useGame();
   
   const overdueTasks = getOverdueTasks();
   const [completedInRaid, setCompletedInRaid] = useState<string[]>([]);

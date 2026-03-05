@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useGameStore } from '@/store/gameStore';
+import { useGame } from '@/hooks/useGame';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
@@ -16,7 +16,7 @@ const subjectIcons = {
 };
 
 export const DailyGoalWidget = ({ className }: DailyGoalWidgetProps) => {
-  const { xp } = useGameStore();
+  const { xp } = useGame();
   
   const [isEditing, setIsEditing] = useState(false);
   const [dailyGoals, setDailyGoals] = useState({

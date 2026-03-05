@@ -1,8 +1,8 @@
-import { useGameStore } from '@/store/gameStore';
+import { useGame } from '@/hooks/useGame';
 import { cn } from '@/lib/utils';
 
 export const RewardsList = () => {
-  const { getUnlockedRewards, level } = useGameStore();
+  const { getUnlockedRewards, level } = useGame();
   const rewards = getUnlockedRewards();
 
   return (

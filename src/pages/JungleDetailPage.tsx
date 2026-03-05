@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useGameStore } from '@/store/gameStore';
+import { useGame } from '@/hooks/useGame';
 import { Header } from '@/components/layout/Header';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { ChapterList } from '@/components/game/ChapterList';
@@ -20,7 +20,7 @@ type Subject = 'all' | 'physics' | 'chemistry' | 'mathematics' | 'biology' | 'sc
 const JungleDetailPage = () => {
   const { jungleId } = useParams();
   const navigate = useNavigate();
-  const { jungles, calculateJungleHealth } = useGameStore();
+  const { jungles, calculateJungleHealth } = useGame();
   const [activeSubject, setActiveSubject] = useState<Subject>('all');
   const [isEditorOpen, setIsEditorOpen] = useState(false);
 

@@ -23,7 +23,7 @@ const LeaderboardPage = () => {
   const [filter, setFilter] = useState<'xp' | 'streak' | 'level'>('xp');
   const [users, setUsers] = useState<LeaderboardUser[]>([]);
   const [loading, setLoading] = useState(true);
-  const { profile } = useGameStore();
+  const { profile } = useGame();
 
   useEffect(() => {
     const fetchLeaderboard = async () => {

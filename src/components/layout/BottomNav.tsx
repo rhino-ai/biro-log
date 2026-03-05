@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { useGameStore } from '@/store/gameStore';
+import { useGame } from '@/hooks/useGame';
 
 const navItems = [
   { path: '/', icon: '🏠', label: 'Home' },
@@ -12,7 +12,7 @@ const navItems = [
 
 export const BottomNav = () => {
   const location = useLocation();
-  const { backlogCount } = useGameStore();
+  const { backlogCount } = useGame();
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 glass-panel border-t border-white/10 pb-safe">

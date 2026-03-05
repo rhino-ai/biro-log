@@ -1,4 +1,4 @@
-import { useGameStore } from '@/store/gameStore';
+import { useGame } from '@/hooks/useGame';
 import { cn } from '@/lib/utils';
 
 interface AvatarProps {
@@ -7,7 +7,7 @@ interface AvatarProps {
 }
 
 export const Avatar = ({ size = 'md', showMood = true }: AvatarProps) => {
-  const { profile, backlogCount, streak, level } = useGameStore();
+  const { profile, backlogCount, streak, level } = useGame();
   
   const isHappy = streak >= 3 && backlogCount === 0;
   const isSad = backlogCount > 5;

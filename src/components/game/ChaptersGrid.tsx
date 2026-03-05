@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { useGameStore } from '@/store/gameStore';
+import { useGame } from '@/hooks/useGame';
 import { cn } from '@/lib/utils';
 import { JungleData, Chapter, subjectIcons } from '@/data/syllabus';
 import { Button } from '@/components/ui/button';
@@ -11,7 +11,7 @@ interface ChaptersGridProps {
 }
 
 export const ChaptersGrid = ({ jungle, onSelectChapter }: ChaptersGridProps) => {
-  const { getTreeState, jungles } = useGameStore();
+  const { getTreeState, jungles } = useGame();
   const [activeFilter, setActiveFilter] = useState<string>('all');
 
   const currentJungle = jungles.find(j => j.id === jungle.id) || jungle;
