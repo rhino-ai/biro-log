@@ -6,7 +6,7 @@ const navItems = [
   { path: '/', icon: '🏠', label: 'Home' },
   { path: '/jungles', icon: '🌴', label: 'Jungles' },
   { path: '/biro-yaar', icon: '🤝', label: 'Buddy' },
-  { path: '/mentor', icon: '🎓', label: 'Mentor' },
+  { path: '/raid', icon: '⚔️', label: 'Raid' },
   { path: '/tasks', icon: '✅', label: 'Tasks' },
 ];
 

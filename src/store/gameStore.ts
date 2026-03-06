@@ -162,7 +162,7 @@ const createDefaultTrackData = (track: StudyTrack): TrackData => ({
 
 // Helper to get current track data from state (used outside store)
 export const getTrackData = (state: GameState): TrackData => {
-  return state.trackData[state.studyTrack];
+  return state.trackData[state.studyTrack] || state.trackData.jee;
 };
 
 export const useGameStore = create<GameState>()(
