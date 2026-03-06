@@ -1,11 +1,8 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { useGameStore } from '@/store/gameStore';
+import { useGameStore, getTrackData } from '@/store/gameStore';
 import { supabase } from '@/integrations/supabase/client';
 
-/**
- * Syncs gameStore data with backend with hard timeouts and non-blocking behavior.
- */
 export const useDataSync = () => {
   const { user } = useAuth();
   const hasLoadedUserId = useRef<string | null>(null);
@@ -25,7 +22,6 @@ export const useDataSync = () => {
       4000,
       { data: null, error: null, count: null, status: 408, statusText: 'Timeout' } as any,
     );
-
     if (existing) return;
 
     const fallbackName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Student';
@@ -38,17 +34,10 @@ export const useDataSync = () => {
       4000,
       { error: { message: 'profile-create-timeout' } } as any,
     );
-
-    if (error) {
-      console.warn('[DataSync] Profile create issue (non-blocking):', error.message);
-    } else {
-      console.log('[DataSync] Created missing profile for user', userId);
-    }
+    if (error) console.warn('[DataSync] Profile create issue:', error.message);
   }, [user]);
 
   const loadFromDB = useCallback(async (userId: string) => {
-    console.log('[DataSync] Loading data for', userId);
-
     try {
       await ensureProfileExists(userId);
 
@@ -59,7 +48,6 @@ export const useDataSync = () => {
       );
 
       const { data: profile, error } = profileResult;
-
       if (error) {
         console.warn('[DataSync] Profile load issue:', error.message);
       } else if (profile) {
@@ -83,17 +71,11 @@ export const useDataSync = () => {
           jeeAdvanced: profile.exam_date_jee_advanced || '2026-05-25',
         });
 
-        const xpDiff = (profile.xp ?? 0) - store.xp;
-        const coinsDiff = (profile.coins ?? 0) - store.coins;
-
+        const td = getTrackData(store);
+        const xpDiff = (profile.xp ?? 0) - td.xp;
+        const coinsDiff = (profile.coins ?? 0) - td.coins;
         if (xpDiff !== 0) store.addXP(xpDiff);
         if (coinsDiff !== 0) store.addCoins(coinsDiff);
-
-        console.log('[DataSync] Loaded profile OK', {
-          xp: profile.xp,
-          coins: profile.coins,
-          level: profile.level,
-        });
       }
 
       const chapterResult = await withTimeout(
@@ -102,54 +84,36 @@ export const useDataSync = () => {
         { data: null, error: { message: 'Chapter progress timeout' } as any, count: null, status: 408, statusText: 'Timeout' },
       );
 
-      if (chapterResult.error) {
-        console.warn('[DataSync] Chapter load issue:', chapterResult.error.message);
-      }
-
       if (chapterResult.data && chapterResult.data.length > 0) {
         const store = useGameStore.getState();
+        const td = getTrackData(store);
         chapterResult.data.forEach((cp) => {
-          const jungle = store.jungles.find((j) => j.id === cp.jungle_id);
+          const jungle = td.jungles.find((j) => j.id === cp.jungle_id);
           const chapter = jungle?.chapters.find((c) => c.id === cp.chapter_id);
           if (!chapter) return;
-
-          if (chapter.theoryDone !== (cp.theory_done ?? false)) {
+          if (chapter.theoryDone !== (cp.theory_done ?? false))
             store.updateChapterProgress(cp.jungle_id, cp.chapter_id, 'theoryDone', cp.theory_done ?? false);
-          }
-          if (chapter.practiceDone !== (cp.practice_done ?? false)) {
+          if (chapter.practiceDone !== (cp.practice_done ?? false))
             store.updateChapterProgress(cp.jungle_id, cp.chapter_id, 'practiceDone', cp.practice_done ?? false);
-          }
-          if (chapter.revisionDone !== (cp.revision_done ?? false)) {
+          if (chapter.revisionDone !== (cp.revision_done ?? false))
             store.updateChapterProgress(cp.jungle_id, cp.chapter_id, 'revisionDone', cp.revision_done ?? false);
-          }
         });
-
-        console.log('[DataSync] Chapter progress loaded');
       }
     } catch (err) {
-      console.warn('[DataSync] loadFromDB error (non-blocking):', err);
+      console.warn('[DataSync] loadFromDB error:', err);
     }
   }, [ensureProfileExists]);
 
   const saveToDB = useCallback(async (userId: string) => {
     try {
       const store = useGameStore.getState();
-      const { profile, examDates, xp, level, coins, streak, lastStudyDate } = store;
+      const td = getTrackData(store);
+      if (!td) return;
+      const { profile, examDates, xp, level, coins, streak, lastStudyDate } = td;
 
-      const hash = JSON.stringify({
-        profile,
-        examDates,
-        xp,
-        level,
-        coins,
-        streak,
-        lastStudyDate,
-      });
-
+      const hash = JSON.stringify({ profile, examDates, xp, level, coins, streak, lastStudyDate });
       if (hash === lastSaveHash.current) return;
       lastSaveHash.current = hash;
-
-      console.log('[DataSync] Saving profile...', { xp, level, coins });
 
       const { error } = await withTimeout(
         supabase.from('profiles').upsert([{
@@ -164,54 +128,39 @@ export const useDataSync = () => {
           exam_date_cbse: examDates.cbse,
           exam_date_jee_main: examDates.jeeMain,
           exam_date_jee_advanced: examDates.jeeAdvanced,
-          xp,
-          level,
-          coins,
-          streak,
+          xp, level, coins, streak,
           last_study_date: lastStudyDate,
           email: user?.email ?? null,
         }] as any, { onConflict: 'user_id' }),
         5000,
         { error: { message: 'Save timeout' } } as any,
       );
-
-      if (error) {
-        console.warn('[DataSync] Save profile issue:', error.message);
-      }
+      if (error) console.warn('[DataSync] Save issue:', error.message);
     } catch (err) {
-      console.warn('[DataSync] Save error (non-blocking):', err);
+      console.warn('[DataSync] Save error:', err);
     }
   }, [user]);
 
   const saveChapterProgress = useCallback(async (userId: string) => {
     try {
-      const { jungles } = useGameStore.getState();
-      const rows = jungles.flatMap((jungle) =>
+      const td = getTrackData(useGameStore.getState());
+      if (!td) return;
+      const rows = td.jungles.flatMap((jungle) =>
         jungle.chapters
-          .filter((chapter) => chapter.theoryDone || chapter.practiceDone || chapter.revisionDone)
-          .map((chapter) => ({
-            user_id: userId,
-            jungle_id: jungle.id,
-            chapter_id: chapter.id,
-            theory_done: chapter.theoryDone,
-            practice_done: chapter.practiceDone,
-            revision_done: chapter.revisionDone,
+          .filter((ch) => ch.theoryDone || ch.practiceDone || ch.revisionDone)
+          .map((ch) => ({
+            user_id: userId, jungle_id: jungle.id, chapter_id: ch.id,
+            theory_done: ch.theoryDone, practice_done: ch.practiceDone, revision_done: ch.revisionDone,
           })),
       );
-
       if (rows.length === 0) return;
-
-      const { error } = await withTimeout(
+      await withTimeout(
         supabase.from('user_chapter_progress').upsert(rows, { onConflict: 'user_id,jungle_id,chapter_id' }),
         4000,
         { error: { message: 'Chapter save timeout' } } as any,
       );
-
-      if (error) {
-        console.warn('[DataSync] Chapter save issue:', error.message);
-      }
     } catch (err) {
-      console.warn('[DataSync] Chapter save error (non-blocking):', err);
+      console.warn('[DataSync] Chapter save error:', err);
     }
   }, []);
 
@@ -224,12 +173,7 @@ export const useDataSync = () => {
   }, [saveToDB, saveChapterProgress]);
 
   useEffect(() => {
-    if (!user) {
-      hasLoadedUserId.current = null;
-      lastSaveHash.current = '';
-      return;
-    }
-
+    if (!user) { hasLoadedUserId.current = null; lastSaveHash.current = ''; return; }
     if (hasLoadedUserId.current !== user.id) {
       hasLoadedUserId.current = user.id;
       void loadFromDB(user.id);
@@ -239,10 +183,6 @@ export const useDataSync = () => {
   useEffect(() => {
     if (!user) return;
     const unsub = useGameStore.subscribe(() => debouncedSave(user.id));
-
-    return () => {
-      unsub();
-      if (saveTimeout.current) clearTimeout(saveTimeout.current);
-    };
+    return () => { unsub(); if (saveTimeout.current) clearTimeout(saveTimeout.current); };
   }, [user, debouncedSave]);
 };

@@ -36,13 +36,13 @@ export const ChatFileUpload = ({ onFileUploaded, className }: ChatFileUploadProp
       const path = `chat-uploads/${user.id}/${Date.now()}.${ext}`;
 
       const { error } = await supabase.storage
-        .from('avatars')
+        .from('chat-uploads')
         .upload(path, file, { upsert: false });
 
       if (error) throw error;
 
       const { data: urlData } = supabase.storage
-        .from('avatars')
+        .from('chat-uploads')
         .getPublicUrl(path);
 
       const fileType = file.type.startsWith('image')
