@@ -13,7 +13,7 @@ import { MotivationMessage } from '@/components/game/MotivationMessage';
 import { CollegeImageSection } from '@/components/game/CollegeImageSection';
 import { PWAInstallButton } from '@/components/game/PWAInstallButton';
 import { useNavigate, Link } from 'react-router-dom';
-import { Swords, Zap, Users, Trophy, Brain } from 'lucide-react';
+import { Swords, Zap, Users, Trophy, Brain, Heart, Smartphone, BarChart3, Video, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEffect, useState } from 'react';
 import { useDataSync } from '@/hooks/useDataSync';
@@ -129,46 +129,26 @@ const Index = () => {
           </Link>
         </div>
 
-        {/* Quick Access: Friends & Leaderboard */}
-        <div className="grid grid-cols-3 gap-3 animate-fade-in" style={{ animationDelay: '0.23s' }}>
-          <Link 
-            to="/friends"
-            className="glass-panel rounded-xl p-3 border border-white/10 flex items-center gap-2 hover:border-primary/30 transition-colors"
-          >
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-              <Users className="w-4 h-4 text-primary-foreground" />
-            </div>
-            <div>
-              <h3 className="font-game text-xs">Friends</h3>
-              <p className="text-[10px] text-muted-foreground">Chat</p>
-            </div>
-          </Link>
-          
-          <Link 
-            to="/leaderboard"
-            className="glass-panel rounded-xl p-3 border border-white/10 flex items-center gap-2 hover:border-accent/30 transition-colors"
-          >
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-              <Trophy className="w-4 h-4 text-primary-foreground" />
-            </div>
-            <div>
-              <h3 className="font-game text-xs">Ranks</h3>
-              <p className="text-[10px] text-muted-foreground">Top</p>
-            </div>
-          </Link>
-
-          <Link 
-            to="/mind-games"
-            className="glass-panel rounded-xl p-3 border border-white/10 flex items-center gap-2 hover:border-primary/30 transition-colors"
-          >
-            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-              <Brain className="w-4 h-4 text-primary-foreground" />
-            </div>
-            <div>
-              <h3 className="font-game text-xs">Games</h3>
-              <p className="text-[10px] text-muted-foreground">Mind</p>
-            </div>
-          </Link>
+        {/* Quick Access Grid */}
+        <div className="grid grid-cols-4 gap-2 animate-fade-in" style={{ animationDelay: '0.23s' }}>
+          {[
+            { to: '/friends', icon: <Users className="w-4 h-4" />, label: 'Friends', color: 'from-blue-500 to-cyan-500' },
+            { to: '/leaderboard', icon: <Trophy className="w-4 h-4" />, label: 'Ranks', color: 'from-coins to-orange-500' },
+            { to: '/mind-games', icon: <Brain className="w-4 h-4" />, label: 'Brain Gym', color: 'from-primary to-accent' },
+            { to: '/wellness', icon: <Heart className="w-4 h-4" />, label: 'Wellness', color: 'from-pink-500 to-rose-500' },
+            { to: '/screen-time', icon: <Smartphone className="w-4 h-4" />, label: 'Digital', color: 'from-yellow-500 to-amber-500' },
+            { to: '/analytics', icon: <BarChart3 className="w-4 h-4" />, label: 'Analytics', color: 'from-green-500 to-emerald-500' },
+            { to: '/virtual-library', icon: <Video className="w-4 h-4" />, label: 'Library', color: 'from-indigo-500 to-violet-500' },
+            { to: '/raid', icon: <Swords className="w-4 h-4" />, label: 'Raid', color: 'from-raid to-red-600' },
+          ].map((item) => (
+            <Link key={item.to} to={item.to}
+              className="glass-panel rounded-xl p-2.5 border border-white/10 flex flex-col items-center gap-1.5 hover:border-primary/30 transition-colors">
+              <div className={cn('w-8 h-8 rounded-full bg-gradient-to-br flex items-center justify-center text-white', item.color)}>
+                {item.icon}
+              </div>
+              <span className="text-[10px] font-game">{item.label}</span>
+            </Link>
+          ))}
         </div>
 
         {/* PWA Install */}

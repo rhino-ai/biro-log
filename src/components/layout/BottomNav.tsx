@@ -4,10 +4,10 @@ import { useGame } from '@/hooks/useGame';
 
 const navItems = [
   { path: '/', icon: '🏠', label: 'Home' },
-  { path: '/jungles', icon: '🌴', label: 'Jungles' },
-  { path: '/biro-yaar', icon: '🤝', label: 'Buddy' },
-  { path: '/raid', icon: '⚔️', label: 'Raid' },
+  { path: '/mind-games', icon: '🧠', label: 'Games' },
+  { path: '/wellness', icon: '🧘', label: 'Wellness' },
   { path: '/tasks', icon: '✅', label: 'Tasks' },
+  { path: '/friends', icon: '💬', label: 'Social' },
 ];
 
 export const BottomNav = () => {
@@ -19,29 +19,20 @@ export const BottomNav = () => {
       <div className="flex justify-around items-center h-16 max-w-lg mx-auto">
         {navItems.map((item) => {
           const isActive = location.pathname === item.path;
-          const isRaid = item.path === '/raid';
           
           return (
             <Link
               key={item.path}
               to={item.path}
               className={cn(
-                'flex flex-col items-center gap-1 px-4 py-2 rounded-xl transition-all duration-300 relative',
+                'flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all duration-300 relative',
                 isActive
                   ? 'text-primary glow-purple scale-110'
                   : 'text-muted-foreground hover:text-foreground',
-                isRaid && backlogCount > 0 && 'text-raid animate-pulse'
               )}
             >
               <span className="text-xl">{item.icon}</span>
               <span className="text-[10px] font-medium uppercase tracking-wide">{item.label}</span>
-              
-              {/* Raid badge */}
-              {isRaid && backlogCount > 0 && (
-                <span className="absolute -top-1 -right-1 bg-raid text-white text-[8px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
-                  {backlogCount}
-                </span>
-              )}
             </Link>
           );
         })}
