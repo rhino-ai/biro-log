@@ -13,7 +13,7 @@ import { MotivationMessage } from '@/components/game/MotivationMessage';
 import { CollegeImageSection } from '@/components/game/CollegeImageSection';
 import { PWAInstallButton } from '@/components/game/PWAInstallButton';
 import { useNavigate, Link } from 'react-router-dom';
-import { Swords, Zap, Users, Trophy, Brain } from 'lucide-react';
+import { Swords, Zap, Users, Trophy, Brain, Heart, Smartphone, BarChart3, Video, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEffect, useState } from 'react';
 import { useDataSync } from '@/hooks/useDataSync';
