@@ -246,6 +246,60 @@ export type Database = {
           },
         ]
       }
+      mentor_conversations: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          role: string
+          study_track: string | null
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          role: string
+          study_track?: string | null
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          role?: string
+          study_track?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      mentor_daily_summaries: {
+        Row: {
+          created_at: string
+          id: string
+          metrics: Json | null
+          summary: string
+          summary_date: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          metrics?: Json | null
+          summary: string
+          summary_date?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          metrics?: Json | null
+          summary?: string
+          summary_date?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       mind_game_scores: {
         Row: {
           coins_earned: number
