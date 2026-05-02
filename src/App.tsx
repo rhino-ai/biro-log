@@ -23,6 +23,9 @@ import WellnessPage from "./pages/WellnessPage";
 import ScreenTimePage from "./pages/ScreenTimePage";
 import AnalyticsPage from "./pages/AnalyticsPage";
 import VirtualLibraryPage from "./pages/VirtualLibraryPage";
+import FeedbackPage from "./pages/FeedbackPage";
+import JournalPage from "./pages/JournalPage";
+import TrackersPage from "./pages/TrackersPage";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 
@@ -72,6 +75,9 @@ const AppRoutes = () => (
     <Route path="/screen-time" element={<ProtectedRoute><ScreenTimePage /></ProtectedRoute>} />
     <Route path="/analytics" element={<ProtectedRoute><AnalyticsPage /></ProtectedRoute>} />
     <Route path="/virtual-library" element={<ProtectedRoute><VirtualLibraryPage /></ProtectedRoute>} />
+    <Route path="/feedback" element={<ProtectedRoute><FeedbackPage /></ProtectedRoute>} />
+    <Route path="/journal" element={<ProtectedRoute><JournalPage /></ProtectedRoute>} />
+    <Route path="/trackers" element={<ProtectedRoute><TrackersPage /></ProtectedRoute>} />
     <Route path="*" element={<NotFound />} />
   </Routes>
 );
