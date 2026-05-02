@@ -44,6 +44,33 @@ export type Database = {
         }
         Relationships: []
       }
+      app_comments: {
+        Row: {
+          category: string
+          content: string
+          created_at: string
+          id: string
+          resolved: boolean | null
+          user_id: string
+        }
+        Insert: {
+          category?: string
+          content: string
+          created_at?: string
+          id?: string
+          resolved?: boolean | null
+          user_id: string
+        }
+        Update: {
+          category?: string
+          content?: string
+          created_at?: string
+          id?: string
+          resolved?: boolean | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       app_feedback: {
         Row: {
           created_at: string
@@ -149,6 +176,36 @@ export type Database = {
         }
         Relationships: []
       }
+      feature_ratings: {
+        Row: {
+          comment: string | null
+          created_at: string
+          feature_key: string
+          id: string
+          stars: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          comment?: string | null
+          created_at?: string
+          feature_key: string
+          id?: string
+          stars: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          comment?: string | null
+          created_at?: string
+          feature_key?: string
+          id?: string
+          stars?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       gamification_rules: {
         Row: {
           focus_coin_seconds: number
@@ -245,6 +302,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      journal_entries: {
+        Row: {
+          content: string
+          created_at: string
+          entry_date: string
+          id: string
+          mood: number | null
+          prompt: string | null
+          tags: string[] | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          entry_date?: string
+          id?: string
+          mood?: number | null
+          prompt?: string | null
+          tags?: string[] | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          entry_date?: string
+          id?: string
+          mood?: number | null
+          prompt?: string | null
+          tags?: string[] | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       mentor_conversations: {
         Row: {
@@ -449,6 +542,45 @@ export type Database = {
           physics_marks?: number | null
           scored_marks?: number
           test_name?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      tracker_sheets: {
+        Row: {
+          color: string | null
+          columns: Json
+          created_at: string
+          icon: string | null
+          id: string
+          name: string
+          position: number | null
+          rows: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          color?: string | null
+          columns?: Json
+          created_at?: string
+          icon?: string | null
+          id?: string
+          name: string
+          position?: number | null
+          rows?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          color?: string | null
+          columns?: Json
+          created_at?: string
+          icon?: string | null
+          id?: string
+          name?: string
+          position?: number | null
+          rows?: Json
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
