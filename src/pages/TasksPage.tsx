@@ -13,6 +13,7 @@ import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { HabitTemplates } from '@/components/game/HabitTemplates';
 
 const ringtones = [
   { id: 'default', name: '🔔 Default' },
@@ -106,6 +107,7 @@ const TasksPage = () => {
             </div>
           </DialogContent>
         </Dialog>
+        <HabitTemplates />
         <div className="space-y-3">
           <h2 className="font-game text-lg flex items-center gap-2"><span>📋</span> Pending ({pendingTasks.length})</h2>
           {pendingTasks.length === 0 ? (
