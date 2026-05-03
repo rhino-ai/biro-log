@@ -78,6 +78,35 @@ serve(async (req) => {
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     // Build long-term memory block from DB
+    // ---- TIME / HOLIDAY / DEADLINE AWARENESS ----
+    const now = new Date();
+    const istOffsetMs = 5.5 * 60 * 60 * 1000;
+    const istNow = new Date(now.getTime() + istOffsetMs);
+    const istHour = istNow.getUTCHours();
+    const istMin = istNow.getUTCMinutes();
+    const istDow = istNow.getUTCDay(); // 0=Sun
+    const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    // realistic productive window: until 23:00 IST
+    const minutesLeftToday = Math.max(0, (23 - istHour) * 60 - istMin);
+    const hoursLeftToday = (minutesLeftToday / 60).toFixed(1);
+    const isWeekend = istDow === 0 || istDow === 6;
+
+    const daysUntil = (d?: string | null) => {
+      if (!d) return null;
+      const t = new Date(d + "T00:00:00Z").getTime();
+      return Math.ceil((t - now.getTime()) / 86400000);
+    };
+    const sundaysUntil = (n: number | null) => {
+      if (n == null || n <= 0) return 0;
+      // Sundays in next n days starting tomorrow
+      let cnt = 0;
+      for (let i = 1; i <= n; i++) {
+        const d = new Date(now.getTime() + i * 86400000);
+        if (d.getUTCDay() === 0) cnt++;
+      }
+      return cnt;
+    };
+
     let memoryBlock = "(no memory yet — first conversation)";
     try {
       const [profileRes, summariesRes, testsRes, tasksRes, chaptersRes] = await Promise.all([
@@ -92,7 +121,21 @@ serve(async (req) => {
       const recentTests = (testsRes.data || []).map((t: any) => `  • ${t.date} ${t.test_name} (${t.exam_type}): ${t.scored_marks}/${t.max_marks} [P:${t.physics_marks} C:${t.chemistry_marks} M:${t.mathematics_marks}]`).join("\n");
       const taskList = (tasksRes.data || []).map((t: any) => `  • [${t.completed ? "✓" : " "}] ${t.title} (${t.type}${t.due_date ? `, due ${t.due_date}` : ""})`).join("\n");
       const chapters = (chaptersRes.data || []).map((c: any) => `  • ${c.jungle_id}/${c.chapter_id}: theory=${c.theory_done} practice=${c.practice_done} revision=${c.revision_done}`).join("\n");
-      memoryBlock = `## STUDENT PROFILE
+      const dJeeM = daysUntil(p?.exam_date_jee_main);
+      const dJeeA = daysUntil(p?.exam_date_jee_advanced);
+      const dCbse = daysUntil(p?.exam_date_cbse);
+      const primaryDays = (studyTrack === 'neet' || studyTrack === 'jee') ? dJeeM : dCbse;
+      const sundaysLeft = sundaysUntil(primaryDays);
+      const effectiveDays = primaryDays != null ? Math.max(0, primaryDays - sundaysLeft) : null;
+
+      memoryBlock = `## TIME CONTEXT (use this BEFORE making any plan)
+Now (IST): ${istNow.toISOString().slice(0,16).replace('T',' ')} — ${dayNames[istDow]}${isWeekend ? ' (WEEKEND)' : ''}
+Productive hours left TODAY: ~${hoursLeftToday}h (until 23:00 IST)
+Days till JEE Main: ${dJeeM ?? '-'} | JEE Adv: ${dJeeA ?? '-'} | CBSE: ${dCbse ?? '-'}
+Sundays/holidays in run-up to primary exam: ${sundaysLeft} (effective study days ≈ ${effectiveDays ?? '-'})
+RULE: Never assign work that exceeds remaining hours today. Treat Sundays as half-load revision days. If <30 days to exam, switch from new chapters to revision + PYQ only.
+
+## STUDENT PROFILE
 Name: ${p?.name || studentName}
 XP: ${p?.xp ?? 0} | Level: ${p?.level ?? 0} | Coins: ${p?.coins ?? 0} | Streak: ${p?.streak ?? 0} days
 Dream: ${p?.dream_college || "-"}

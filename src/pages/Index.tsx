@@ -13,7 +13,7 @@ import { MotivationMessage } from '@/components/game/MotivationMessage';
 import { CollegeImageSection } from '@/components/game/CollegeImageSection';
 import { PWAInstallButton } from '@/components/game/PWAInstallButton';
 import { useNavigate, Link } from 'react-router-dom';
-import { Swords, Zap, Users, Trophy, Brain, Heart, Smartphone, BarChart3, Video, BookOpen, Star, Table2, NotebookPen } from 'lucide-react';
+import { Swords, Zap, Users, Trophy, Brain, Heart, Smartphone, BarChart3, Video, BookOpen, Star, Table2, NotebookPen, Skull, RotateCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEffect, useState } from 'react';
 import { useDataSync } from '@/hooks/useDataSync';
@@ -143,6 +143,8 @@ const Index = () => {
             { to: '/trackers', icon: <Table2 className="w-4 h-4" />, label: 'Trackers', color: 'from-teal-500 to-cyan-500' },
             { to: '/journal', icon: <NotebookPen className="w-4 h-4" />, label: 'Journal', color: 'from-pink-500 to-rose-500' },
             { to: '/feedback', icon: <Star className="w-4 h-4" />, label: 'Rate/DM', color: 'from-amber-500 to-orange-500' },
+            { to: '/revision', icon: <RotateCw className="w-4 h-4" />, label: 'Revise', color: 'from-violet-500 to-fuchsia-500' },
+            { to: '/villain', icon: <Skull className="w-4 h-4" />, label: 'Villain', color: 'from-red-700 to-red-950' },
           ].map((item) => (
             <Link key={item.to} to={item.to}
               className="glass-panel rounded-xl p-2.5 border border-white/10 flex flex-col items-center gap-1.5 hover:border-primary/30 transition-colors">
