@@ -26,6 +26,8 @@ import VirtualLibraryPage from "./pages/VirtualLibraryPage";
 import FeedbackPage from "./pages/FeedbackPage";
 import JournalPage from "./pages/JournalPage";
 import TrackersPage from "./pages/TrackersPage";
+import VillainModePage from "./pages/VillainModePage";
+import RevisionSchedulerPage from "./pages/RevisionSchedulerPage";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 
@@ -78,6 +80,8 @@ const AppRoutes = () => (
     <Route path="/feedback" element={<ProtectedRoute><FeedbackPage /></ProtectedRoute>} />
     <Route path="/journal" element={<ProtectedRoute><JournalPage /></ProtectedRoute>} />
     <Route path="/trackers" element={<ProtectedRoute><TrackersPage /></ProtectedRoute>} />
+    <Route path="/villain" element={<ProtectedRoute><VillainModePage /></ProtectedRoute>} />
+    <Route path="/revision" element={<ProtectedRoute><RevisionSchedulerPage /></ProtectedRoute>} />
     <Route path="*" element={<NotFound />} />
   </Routes>
 );
