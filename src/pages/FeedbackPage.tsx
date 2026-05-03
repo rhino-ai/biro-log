@@ -111,11 +111,11 @@ const FeedbackPage = () => {
               Doubts, queries, advertising, partnership — DM or join the channel.
             </p>
             <div className="grid grid-cols-2 gap-2">
-              <a href="https://t.me/biro_1_a" target="_blank" rel="noreferrer"
+              <a href="https://t.me/biro1_a" target="_blank" rel="noreferrer"
                 className="glass-panel rounded-xl p-3 border border-blue-500/30 flex items-center justify-between hover:border-blue-500/60 transition-colors">
                 <div>
                   <p className="text-xs font-game">Direct DM</p>
-                  <p className="text-[10px] text-muted-foreground">@biro_1_a</p>
+                  <p className="text-[10px] text-muted-foreground">@biro1_a</p>
                 </div>
                 <ExternalLink className="w-4 h-4 text-blue-400" />
               </a>
