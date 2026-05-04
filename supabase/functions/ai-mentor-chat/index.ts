@@ -102,7 +102,7 @@ serve(async (req) => {
     }
     const userId = (data.claims as any).sub as string;
 
-    const { messages, studyTrack, studentName, isNightlyCheckin } = await req.json();
+    const { messages, studyTrack, studentName, isNightlyCheckin, attachments } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
@@ -194,6 +194,22 @@ ${chapters || "  (no chapter progress)"}`;
     let systemPrompt = getDronacharyaPrompt(studyTrack || 'jee', studentName || 'Student', memoryBlock);
     if (isNightlyCheckin) systemPrompt += `\n\n# NIGHTLY CHECK-IN MODE\nGreet warmly by name. Ask 1 specific question about today's study based on memory above. Then assign 1 thing for tomorrow morning.`;
 
+    // Multimodal: if the latest user message has attachments (image URLs), convert it to multimodal content.
+    const outMessages = [...messages];
+    if (attachments && Array.isArray(attachments) && attachments.length > 0) {
+      const lastIdx = outMessages.map((m: any) => m.role).lastIndexOf("user");
+      if (lastIdx !== -1) {
+        const orig = outMessages[lastIdx];
+        const parts: any[] = [];
+        if (orig.content && typeof orig.content === "string") parts.push({ type: "text", text: orig.content });
+        for (const a of attachments) {
+          if (a?.type === "image" && a?.url) parts.push({ type: "image_url", image_url: { url: a.url } });
+          else if (a?.url) parts.push({ type: "text", text: `[User attached ${a.type || "file"}: ${a.name || a.url} → ${a.url}]` });
+        }
+        outMessages[lastIdx] = { role: "user", content: parts };
+      }
+    }
+
     // Save the latest user message to long-term memory (fire and forget)
     const lastUserMsg = [...messages].reverse().find((m: any) => m.role === "user");
     if (lastUserMsg?.content) {
@@ -207,7 +223,7 @@ ${chapters || "  (no chapter progress)"}`;
       headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model: "google/gemini-3-flash-preview",
-        messages: [{ role: "system", content: systemPrompt }, ...messages],
+        messages: [{ role: "system", content: systemPrompt }, ...outMessages],
         stream: true,
       }),
     });
