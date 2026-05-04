@@ -135,18 +135,22 @@ serve(async (req) => {
 
     let memoryBlock = "(no memory yet — first conversation)";
     try {
-      const [profileRes, summariesRes, testsRes, tasksRes, chaptersRes] = await Promise.all([
+      const [profileRes, summariesRes, testsRes, tasksRes, chaptersRes, journalRes, recentChatsRes] = await Promise.all([
         supabase.from("profiles").select("name,xp,level,coins,streak,dream_college,exam_date_jee_main,exam_date_jee_advanced,exam_date_cbse,last_study_date").eq("user_id", userId).maybeSingle(),
         supabase.from("mentor_daily_summaries").select("summary_date,summary,metrics").eq("user_id", userId).order("summary_date", { ascending: false }).limit(7),
         supabase.from("test_records").select("test_name,date,scored_marks,max_marks,physics_marks,chemistry_marks,mathematics_marks,exam_type").eq("user_id", userId).order("date", { ascending: false }).limit(5),
         supabase.from("user_tasks").select("title,type,completed,due_date,due_time").eq("user_id", userId).order("created_at", { ascending: false }).limit(15),
         supabase.from("user_chapter_progress").select("jungle_id,chapter_id,theory_done,practice_done,revision_done,updated_at").eq("user_id", userId).order("updated_at", { ascending: false }).limit(15),
+        supabase.from("journal_entries").select("entry_date,mood,content,tags").eq("user_id", userId).order("entry_date", { ascending: false }).limit(7),
+        supabase.from("mentor_conversations").select("role,content,created_at").eq("user_id", userId).order("created_at", { ascending: false }).limit(20),
       ]);
       const p: any = profileRes.data;
       const summaries = (summariesRes.data || []).map((s: any) => `  • ${s.summary_date}: ${s.summary}`).join("\n");
       const recentTests = (testsRes.data || []).map((t: any) => `  • ${t.date} ${t.test_name} (${t.exam_type}): ${t.scored_marks}/${t.max_marks} [P:${t.physics_marks} C:${t.chemistry_marks} M:${t.mathematics_marks}]`).join("\n");
       const taskList = (tasksRes.data || []).map((t: any) => `  • [${t.completed ? "✓" : " "}] ${t.title} (${t.type}${t.due_date ? `, due ${t.due_date}` : ""})`).join("\n");
       const chapters = (chaptersRes.data || []).map((c: any) => `  • ${c.jungle_id}/${c.chapter_id}: theory=${c.theory_done} practice=${c.practice_done} revision=${c.revision_done}`).join("\n");
+      const journals = (journalRes.data || []).map((j: any) => `  • ${j.entry_date} mood=${j.mood ?? '-'}/10 [${(j.tags||[]).join(',')}]: ${String(j.content||'').slice(0,160)}`).join("\n");
+      const pastChats = (recentChatsRes.data || []).reverse().map((c: any) => `  • ${c.role}: ${String(c.content||'').slice(0,200)}`).join("\n");
       const dJeeM = daysUntil(p?.exam_date_jee_main);
       const dJeeA = daysUntil(p?.exam_date_jee_advanced);
       const dCbse = daysUntil(p?.exam_date_cbse);
@@ -179,6 +183,7 @@ ${taskList || "  (no active tasks)"}
 
 ## CHAPTER PROGRESS (recent)
 ${chapters || "  (no chapter progress)"}`;
+      memoryBlock += `\n\n## JOURNAL / MOOD (last 7 entries)\n${journals || "  (no journal entries)"}\n\n## RECENT CHAT HISTORY (last 20 messages — reference these to feel continuous)\n${pastChats || "  (no prior chats)"}`;
     } catch (memErr) {
       console.error("memory build failed:", memErr);
     }
