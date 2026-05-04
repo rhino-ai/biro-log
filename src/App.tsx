@@ -28,6 +28,7 @@ import JournalPage from "./pages/JournalPage";
 import TrackersPage from "./pages/TrackersPage";
 import VillainModePage from "./pages/VillainModePage";
 import RevisionSchedulerPage from "./pages/RevisionSchedulerPage";
+import MentorTimelinePage from "./pages/MentorTimelinePage";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 
@@ -82,6 +83,7 @@ const AppRoutes = () => (
     <Route path="/trackers" element={<ProtectedRoute><TrackersPage /></ProtectedRoute>} />
     <Route path="/villain" element={<ProtectedRoute><VillainModePage /></ProtectedRoute>} />
     <Route path="/revision" element={<ProtectedRoute><RevisionSchedulerPage /></ProtectedRoute>} />
+    <Route path="/mentor-timeline" element={<ProtectedRoute><MentorTimelinePage /></ProtectedRoute>} />
     <Route path="*" element={<NotFound />} />
   </Routes>
 );
