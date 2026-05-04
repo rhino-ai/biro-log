@@ -4,7 +4,7 @@ import { useGame } from '@/hooks/useGame';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, Clock, ArrowLeft, AlertTriangle, Trash2, Smile, MoreVertical, Volume2, Loader2, Paperclip } from 'lucide-react';
+import { Send, Clock, ArrowLeft, AlertTriangle, Trash2, Smile, MoreVertical, Volume2, Loader2, Paperclip, X } from 'lucide-react';
 import { ChatFileUpload, ChatFilePreview } from '@/components/game/ChatFileUpload';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
@@ -109,6 +109,7 @@ export const BiroYaarChat = () => {
   const { messages, addMessage, updateMessage, deleteMessage, addReaction, clearAllMessages } = useChatStorage();
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [pendingAttachments, setPendingAttachments] = useState<{url:string;type:string;name:string}[]>([]);
   const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
   const [remainingTime, setRemainingTime] = useState(DAILY_LIMIT_MS - getUsageData().usedMs);
   const [showClearDialog, setShowClearDialog] = useState(false);
@@ -193,15 +194,22 @@ export const BiroYaarChat = () => {
   const isLimitReached = remainingTime <= 0;
 
   const sendMessage = useCallback(async () => {
-    if (!input.trim() || isLoading || isLimitReached) return;
+    if ((!input.trim() && pendingAttachments.length === 0) || isLoading || isLimitReached) return;
+
+    const attachmentText = pendingAttachments.map(a =>
+      a.type === 'image' ? `![${a.name}](${a.url})` : `[${a.type}: ${a.name}](${a.url})`
+    ).join('\n');
+    const fullContent = [attachmentText, input.trim()].filter(Boolean).join('\n\n');
 
     const userMessage: Omit<ChatMessage, 'id'> = {
       role: 'user',
-      content: input.trim(),
+      content: fullContent,
       timestamp: new Date(),
     };
 
     addMessage(userMessage);
+    const sentAttachments = pendingAttachments;
+    setPendingAttachments([]);
     setInput('');
     setIsLoading(true);
 
@@ -225,6 +233,7 @@ export const BiroYaarChat = () => {
             messages: apiMessages,
             studyTrack,
             studentName: profile.name,
+            attachments: sentAttachments,
           }),
         }
       );
@@ -293,7 +302,28 @@ export const BiroYaarChat = () => {
       setCurrentAssistantId(null);
       inputRef.current?.focus();
     }
-  }, [input, isLoading, isLimitReached, messages, studyTrack, profile.name, addMessage, updateMessage]);
+  }, [input, isLoading, isLimitReached, messages, studyTrack, profile.name, addMessage, updateMessage, pendingAttachments]);
+
+  const renderMsg = (content: string) => {
+    const lines = content.split('\n');
+    const out: JSX.Element[] = [];
+    let textBuf: string[] = [];
+    const flush = () => {
+      if (textBuf.length) {
+        out.push(<SimpleMarkdown key={`t-${out.length}`} content={textBuf.join('\n')} />);
+        textBuf = [];
+      }
+    };
+    lines.forEach((line, i) => {
+      const img = line.match(/^!\[([^\]]*)\]\((https?:[^)]+)\)$/);
+      const file = line.match(/^\[(image|video|audio|document)[^\]]*\]\((https?:[^)]+)\)$/i);
+      if (img) { flush(); out.push(<ChatFilePreview key={`a-${i}`} url={img[2]} type="image" name={img[1]} />); }
+      else if (file) { flush(); out.push(<ChatFilePreview key={`a-${i}`} url={file[2]} type={file[1].toLowerCase()} name={file[1]} />); }
+      else textBuf.push(line);
+    });
+    flush();
+    return <div className="space-y-2">{out}</div>;
+  };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -378,7 +408,7 @@ export const BiroYaarChat = () => {
                     ? 'bg-accent text-accent-foreground rounded-br-sm'
                     : 'bg-card border border-white/10 rounded-bl-sm'
                 )}>
-                  <div className="text-sm"><SimpleMarkdown content={message.content} /></div>
+                  <div className="text-sm">{renderMsg(message.content)}</div>
                   <div className="flex items-center justify-end gap-1 mt-1">
                     {message.role === 'assistant' && message.content && (
                       <button onClick={() => playTTS(message.content, message.id)} className="opacity-40 hover:opacity-100 transition-opacity">
@@ -462,15 +492,25 @@ export const BiroYaarChat = () => {
       )}
 
       <div className="p-3 border-t border-white/10 bg-card/50 backdrop-blur-sm">
+        {pendingAttachments.length > 0 && (
+          <div className="flex gap-2 overflow-x-auto pb-2 max-w-lg mx-auto">
+            {pendingAttachments.map((a, i) => (
+              <div key={i} className="relative shrink-0">
+                <ChatFilePreview url={a.url} type={a.type} name={a.name} />
+                <button onClick={() => setPendingAttachments(prev => prev.filter((_, j) => j !== i))}
+                  className="absolute -top-1 -right-1 bg-raid rounded-full p-0.5"><X className="w-3 h-3" /></button>
+              </div>
+            ))}
+          </div>
+        )}
         <div className="flex gap-2 max-w-lg mx-auto items-center">
           <ChatFileUpload onFileUploaded={(url, type, name) => {
-            const fileMsg = type === 'image' ? `[Image: ${name}](${url})` : `[File: ${name}](${url})`;
-            addMessage({ role: 'user', content: fileMsg, timestamp: new Date() });
+            setPendingAttachments(prev => [...prev, { url, type, name }]);
           }} />
           <Input ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)} onKeyPress={handleKeyPress}
             placeholder={isLimitReached ? "Kal milte hain..." : "Type kar yaar..."}
             disabled={isLoading || isLimitReached} className="flex-1 bg-secondary/50 border-white/10" />
-          <Button onClick={sendMessage} disabled={!input.trim() || isLoading || isLimitReached}
+          <Button onClick={sendMessage} disabled={(!input.trim() && pendingAttachments.length === 0) || isLoading || isLimitReached}
             size="icon" className="bg-accent hover:bg-accent/90 shrink-0">
             <Send className="w-4 h-4" />
           </Button>
