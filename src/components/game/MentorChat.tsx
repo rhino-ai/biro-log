@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Send, ArrowLeft, Trash2, MoreVertical, GraduationCap, Volume2, Loader2, Paperclip } from 'lucide-react';
 import { ChatFileUpload, ChatFilePreview } from '@/components/game/ChatFileUpload';
+import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
@@ -69,6 +70,7 @@ export const MentorChat = () => {
   const { messages, addMessage, updateMessage, deleteMessage, clearAll } = useMentorChat();
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [pendingAttachments, setPendingAttachments] = useState<{url:string;type:string;name:string}[]>([]);
   const [showClearDialog, setShowClearDialog] = useState(false);
   const [playingAudio, setPlayingAudio] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -123,9 +125,15 @@ export const MentorChat = () => {
   }, []);
 
   const sendMessage = useCallback(async () => {
-    if (!input.trim() || isLoading) return;
-    const userMsg = { role: 'user' as const, content: input.trim(), timestamp: new Date() };
+    if ((!input.trim() && pendingAttachments.length === 0) || isLoading) return;
+    const attachmentText = pendingAttachments.map(a =>
+      a.type === 'image' ? `![${a.name}](${a.url})` : `[${a.type}: ${a.name}](${a.url})`
+    ).join('\n');
+    const fullContent = [attachmentText, input.trim()].filter(Boolean).join('\n\n');
+    const userMsg = { role: 'user' as const, content: fullContent, timestamp: new Date() };
     addMessage(userMsg);
+    const sentAttachments = pendingAttachments;
+    setPendingAttachments([]);
     setInput('');
     setIsLoading(true);
 
@@ -142,7 +150,7 @@ export const MentorChat = () => {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ messages: apiMessages, studyTrack, studentName: profile.name }),
+          body: JSON.stringify({ messages: apiMessages, studyTrack, studentName: profile.name, attachments: sentAttachments }),
         }
       );
 
@@ -181,7 +189,29 @@ export const MentorChat = () => {
       setIsLoading(false);
       inputRef.current?.focus();
     }
-  }, [input, isLoading, messages, studyTrack, profile.name, addMessage, updateMessage]);
+  }, [input, isLoading, messages, studyTrack, profile.name, addMessage, updateMessage, pendingAttachments]);
+
+  // Render message content with inline images/files (markdown ![](url) or [type: name](url))
+  const renderMsg = (content: string) => {
+    const lines = content.split('\n');
+    const out: JSX.Element[] = [];
+    let textBuf: string[] = [];
+    const flush = () => {
+      if (textBuf.length) {
+        out.push(<SimpleMarkdown key={`t-${out.length}`} content={textBuf.join('\n')} />);
+        textBuf = [];
+      }
+    };
+    lines.forEach((line, i) => {
+      const img = line.match(/^!\[([^\]]*)\]\((https?:[^)]+)\)$/);
+      const file = line.match(/^\[(image|video|audio|document)[^\]]*\]\((https?:[^)]+)\)$/i);
+      if (img) { flush(); out.push(<ChatFilePreview key={`a-${i}`} url={img[2]} type="image" name={img[1]} />); }
+      else if (file) { flush(); out.push(<ChatFilePreview key={`a-${i}`} url={file[2]} type={file[1].toLowerCase()} name={file[1]} />); }
+      else textBuf.push(line);
+    });
+    flush();
+    return <div className="space-y-2">{out}</div>;
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-background">
@@ -214,7 +244,7 @@ export const MentorChat = () => {
                 <div className={cn('rounded-2xl px-3 py-2 shadow-sm',
                   msg.role === 'user' ? 'bg-amber-500 text-white rounded-br-sm' : 'bg-card border border-amber-500/20 rounded-bl-sm'
                 )}>
-                  <div className="text-sm"><SimpleMarkdown content={msg.content} /></div>
+                  <div className="text-sm">{renderMsg(msg.content)}</div>
                   <div className="flex items-center justify-end gap-1 mt-1">
                     {msg.role === 'assistant' && msg.content && (
                       <button onClick={() => playTTS(msg.content, msg.id)} className="opacity-40 hover:opacity-100 transition-opacity">
@@ -252,10 +282,20 @@ export const MentorChat = () => {
 
       {/* Input */}
       <div className="p-3 border-t border-white/10 bg-card/50 backdrop-blur-sm">
+        {pendingAttachments.length > 0 && (
+          <div className="flex gap-2 overflow-x-auto pb-2 max-w-lg mx-auto">
+            {pendingAttachments.map((a, i) => (
+              <div key={i} className="relative shrink-0">
+                <ChatFilePreview url={a.url} type={a.type} name={a.name} />
+                <button onClick={() => setPendingAttachments(prev => prev.filter((_, j) => j !== i))}
+                  className="absolute -top-1 -right-1 bg-raid rounded-full p-0.5"><X className="w-3 h-3" /></button>
+              </div>
+            ))}
+          </div>
+        )}
         <div className="flex gap-2 max-w-lg mx-auto items-center">
           <ChatFileUpload onFileUploaded={(url, type, name) => {
-            const fileMsg = type === 'image' ? `[Image: ${name}](${url})` : `[File: ${name}](${url})`;
-            addMessage({ role: 'user', content: fileMsg, timestamp: new Date() });
+            setPendingAttachments(prev => [...prev, { url, type, name }]);
           }} />
           <Input ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
