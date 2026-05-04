@@ -12,8 +12,9 @@ import { DailyGoalWidget } from '@/components/game/DailyGoalWidget';
 import { MotivationMessage } from '@/components/game/MotivationMessage';
 import { CollegeImageSection } from '@/components/game/CollegeImageSection';
 import { PWAInstallButton } from '@/components/game/PWAInstallButton';
+import { NightlyCheckinBanner } from '@/components/game/NightlyCheckinBanner';
 import { useNavigate, Link } from 'react-router-dom';
-import { Swords, Zap, Users, Trophy, Brain, Heart, Smartphone, BarChart3, Video, BookOpen, Star, Table2, NotebookPen, Skull, RotateCw } from 'lucide-react';
+import { Swords, Zap, Users, Trophy, Brain, Heart, Smartphone, BarChart3, Video, BookOpen, Star, Table2, NotebookPen, Skull, RotateCw, Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEffect, useState } from 'react';
 import { useDataSync } from '@/hooks/useDataSync';
@@ -59,6 +60,9 @@ const Index = () => {
             <MotivationMessage onClose={() => setShowMotivation(false)} />
           </div>
         )}
+
+        {/* 10 PM Nightly Check-in */}
+        <NightlyCheckinBanner />
 
         {/* Dream College Image Section */}
         <div className="animate-fade-in" style={{ animationDelay: '0.1s' }}>
@@ -145,6 +149,7 @@ const Index = () => {
             { to: '/feedback', icon: <Star className="w-4 h-4" />, label: 'Rate/DM', color: 'from-amber-500 to-orange-500' },
             { to: '/revision', icon: <RotateCw className="w-4 h-4" />, label: 'Revise', color: 'from-violet-500 to-fuchsia-500' },
             { to: '/villain', icon: <Skull className="w-4 h-4" />, label: 'Villain', color: 'from-red-700 to-red-950' },
+            { to: '/mentor-timeline', icon: <Calendar className="w-4 h-4" />, label: 'Timeline', color: 'from-amber-500 to-orange-600' },
           ].map((item) => (
             <Link key={item.to} to={item.to}
               className="glass-panel rounded-xl p-2.5 border border-white/10 flex flex-col items-center gap-1.5 hover:border-primary/30 transition-colors">

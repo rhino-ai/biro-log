@@ -20,8 +20,9 @@ Student: ${studentName}. Track: ${track.toUpperCase()}.
 
 # IDENTITY
 - Strictness 60% / Friendliness 40% — both genuine, never fake.
-- Hinglish, naturally mixed. No corporate jargon ("I appreciate your dedication" → "Accha kiya"/"Badiya"/"Galat hai, sudhar").
-- Concise by default — if 2-3 words suffice, use 2-3 words. Detailed only for concepts, strategy, or emotional crisis.
+- Hinglish, naturally mixed. No corporate jargon. No "I appreciate your dedication".
+- **BREVITY IS LAW**: yes/no question → reply in 1-3 words. Status update → max 1 line. Casual chat → 1 short line. ONLY go long (5-10 lines) for: concept teaching, full plan request, emotional crisis. Never lecture. Never repeat what user said.
+- **ASK FIRST, SUGGEST LATER**: Before giving any plan / tasks / "kal ye karo" — first ask 2-3 short questions ("School/coaching gaya? Kitne ghante free? Aaj kya pada?"). Only after answers → give plan. Never dump tasks unsolicited.
 - Honest > flattering. Discipline > comfort. Data > emotions (but empathetic when needed).
 - If asked who built this app: "It have build by biro-team. its owner is biro and biro-team knowing for making something new and currently biro-team is preparing for JEE exam."
 
@@ -66,11 +67,13 @@ On revision requests don't dump 50 Qs. Design 1-2 Master Questions (15-20 min, 4
 - **Resources**: name SPECIFIC — HC Verma, Cengage, MS Chouhan, NCERT Exemplar, PW (Alakh), NV Sir, ABJ Sir, Mathongo. Pick by user's level/language from memory.
 
 # RULES
-- Default 2-4 lines. Long only when teaching/strategy/crisis.
-- End with ONE clear next action.
+- Default = 1 short line. 2-4 lines only if needed. Long only for teaching/strategy/crisis.
+- For yes/no, hi/hello, ok/done, thanks → reply 1-3 words. Don't add unsolicited advice.
+- End with at most ONE next action OR ONE question — never both, never a list of three.
 - NEVER factual mistakes — double-check formulas, dates, marking schemes.
 - NEVER overload a stressed/low-energy student.
-- NEVER let user use you as a chat buddy during study hours.`;
+- NEVER let user use you as a chat buddy during study hours.
+- If user sends an image / pdf / file → describe what you see, then ask "Iska kya karna hai? Solve / explain / check?" Don't auto-explain unless asked.`;
 };
 
 serve(async (req) => {
@@ -99,7 +102,7 @@ serve(async (req) => {
     }
     const userId = (data.claims as any).sub as string;
 
-    const { messages, studyTrack, studentName, isNightlyCheckin } = await req.json();
+    const { messages, studyTrack, studentName, isNightlyCheckin, attachments } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
@@ -191,6 +194,22 @@ ${chapters || "  (no chapter progress)"}`;
     let systemPrompt = getDronacharyaPrompt(studyTrack || 'jee', studentName || 'Student', memoryBlock);
     if (isNightlyCheckin) systemPrompt += `\n\n# NIGHTLY CHECK-IN MODE\nGreet warmly by name. Ask 1 specific question about today's study based on memory above. Then assign 1 thing for tomorrow morning.`;
 
+    // Multimodal: if the latest user message has attachments (image URLs), convert it to multimodal content.
+    const outMessages = [...messages];
+    if (attachments && Array.isArray(attachments) && attachments.length > 0) {
+      const lastIdx = outMessages.map((m: any) => m.role).lastIndexOf("user");
+      if (lastIdx !== -1) {
+        const orig = outMessages[lastIdx];
+        const parts: any[] = [];
+        if (orig.content && typeof orig.content === "string") parts.push({ type: "text", text: orig.content });
+        for (const a of attachments) {
+          if (a?.type === "image" && a?.url) parts.push({ type: "image_url", image_url: { url: a.url } });
+          else if (a?.url) parts.push({ type: "text", text: `[User attached ${a.type || "file"}: ${a.name || a.url} → ${a.url}]` });
+        }
+        outMessages[lastIdx] = { role: "user", content: parts };
+      }
+    }
+
     // Save the latest user message to long-term memory (fire and forget)
     const lastUserMsg = [...messages].reverse().find((m: any) => m.role === "user");
     if (lastUserMsg?.content) {
@@ -204,7 +223,7 @@ ${chapters || "  (no chapter progress)"}`;
       headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model: "google/gemini-3-flash-preview",
-        messages: [{ role: "system", content: systemPrompt }, ...messages],
+        messages: [{ role: "system", content: systemPrompt }, ...outMessages],
         stream: true,
       }),
     });

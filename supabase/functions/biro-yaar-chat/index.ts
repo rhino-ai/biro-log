@@ -60,7 +60,7 @@ serve(async (req) => {
       });
     }
 
-    const { messages, studyTrack, studentName } = await req.json();
+    const { messages, studyTrack, studentName, attachments } = await req.json();
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
@@ -78,6 +78,21 @@ serve(async (req) => {
       contextualPrompt += `\n\n${trackInfo[studyTrack] || ''}`;
     }
 
+    const outMessages = [...messages];
+    if (attachments && Array.isArray(attachments) && attachments.length > 0) {
+      const lastIdx = outMessages.map((m: any) => m.role).lastIndexOf("user");
+      if (lastIdx !== -1) {
+        const orig = outMessages[lastIdx];
+        const parts: any[] = [];
+        if (orig.content && typeof orig.content === "string") parts.push({ type: "text", text: orig.content });
+        for (const a of attachments) {
+          if (a?.type === "image" && a?.url) parts.push({ type: "image_url", image_url: { url: a.url } });
+          else if (a?.url) parts.push({ type: "text", text: `[Bhai ne bheja ${a.type || "file"}: ${a.name || a.url} → ${a.url}]` });
+        }
+        outMessages[lastIdx] = { role: "user", content: parts };
+      }
+    }
+
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -86,7 +101,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         model: "google/gemini-3-flash-preview",
-        messages: [{ role: "system", content: contextualPrompt }, ...messages],
+        messages: [{ role: "system", content: contextualPrompt }, ...outMessages],
         stream: true,
       }),
     });
