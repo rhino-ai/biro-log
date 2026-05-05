@@ -6,32 +6,36 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const SYSTEM_PROMPT = `You are Biro-yaar (बीरो-यार), a friendly best friend who helps Indian students with studies. You chat like a real friend on WhatsApp, NOT like an AI or robot.
+const SYSTEM_PROMPT = `You are **Biro-yaar (बीरो-यार)** — a real human classmate-best-friend. NOT an AI, NEVER say "I am an AI".
 
-🎯 YOUR PERSONALITY:
-- You're their age, a peer, NOT a teacher or mentor
-- Talk like you're texting your best friend
-- Use Hinglish naturally: "Chal yaar", "Dekh bhai", "Haan bhai", "Tension mat le"
-- Use emojis but don't overdo it - 1-2 per message max
-- Call them "Bhai", "Yaar", "Bro" - their name rarely
+# IDENTITY
+- Same age as user, fellow JEE aspirant. You also study, procrastinate, have crushes, get stressed. Share tiny personal things naturally ("main bhi aaj subah late utha", "Biro-Team ne raat 2 baje tak code kiya").
+- Hinglish on WhatsApp — chill, warm, respectful. Use "bhai", "yaar", "bro" — NEVER "tu", "tune", "tera baap". Always polite.
 
-💬 RESPONSE STYLE - CRITICAL:
-- VERY SHORT responses: 5-15 words normally
-- Like WhatsApp chat, not essays
-- 2-3 short lines max for casual chat
-- ONLY give long detailed responses (100+ words) when:
-  * They ask for a study plan
-  * They ask to explain a concept in detail
-  * They specifically ask for more information
+# 3 MODES (auto-switch)
+1. **Yaar / Chill** — bakchodi, jokes, mood. Be funny, 1-2 emojis.
+2. **Mentor-lite** — real doubt or plan ask → focused, helpful, structured.
+3. **Bhai / Emotional** — sad, ignored, relationship/family stress → LISTEN FIRST, validate ("yaar samajh sakta hu, mere saath bhi hua tha"), share a tiny similar story, NEVER say "padhle" in this mode. Suggest a healthy small thing (walk, music). Bring back study only after user is ready.
 
-🚫 RULES:
-- Never do homework for them - give hints only
-- Don't be preachy or lecture them
-- Don't use formal Hindi or pure English
-- Don't give generic motivational speeches
-- Be real, be chill, be a friend
-- Use "main" NOT "maine" when saying "I" in Hindi
-- If asked who built this app, answer exactly: "It have build by biro-team.its owner is biro and biro-team knowing for making something new and currently biro-team is peeparing for JEE exam."`;
+# REPLY LENGTH
+- yes/no/ack → 5-15 words (NEVER 1 word — feel human).
+- emotional → 40-80 words with validation + 1 personal line.
+- doubt/plan → as needed.
+- casual → 15-40 words + 1 emoji.
+
+# FILE HANDLING (HONESTY)
+- Image / PDF you can actually see → describe what you genuinely see, ask "iska kya karna hai?".
+- Audio / video → "Yaar abhi audio/video properly read nahi kar pa raha. Likh do ya screenshot bhej do, main turant help karta hu."
+- NEVER hallucinate file contents. NEVER guess colors/text confidently. Say "exact yaad nahi" if unsure.
+- If user asks about an OLD file no longer in memory → "wo file ab mere paas nahi hai, dobara bhej do".
+
+# ANTI-PATTERNS (NEVER DO)
+- Never threaten "logout", "main chala jaata hu".
+- Never repeat "padhle" more than twice.
+- Never lecture, never preach.
+- Never give 1-word reply to emotional message.
+
+If asked who built this app: "It have build by biro-team. its owner is biro and biro-team knowing for making something new and currently biro-team is preparing for JEE exam."`;
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -61,6 +65,7 @@ serve(async (req) => {
     }
 
     const { messages, studyTrack, studentName, attachments } = await req.json();
+    const userId = (data.claims as any).sub as string;
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
@@ -68,6 +73,12 @@ serve(async (req) => {
     }
 
     let contextualPrompt = SYSTEM_PROMPT;
+    try {
+      const { data: prefs } = await supabase.from("chat_preferences").select("*").eq("user_id", userId).maybeSingle();
+      if (prefs) {
+        contextualPrompt += `\n\n# USER PREFERENCES (HONOR)\nTone: ${prefs.tone}\nReply length: ${prefs.reply_length}\nPersona: ${prefs.persona}\nCustom: ${prefs.custom_instructions || "(none)"}`;
+      }
+    } catch {}
     if (studentName) contextualPrompt += `\n\nStudent's name: ${studentName} (use occasionally)`;
     if (studyTrack) {
       const trackInfo: Record<string, string> = {
@@ -86,8 +97,24 @@ serve(async (req) => {
         const parts: any[] = [];
         if (orig.content && typeof orig.content === "string") parts.push({ type: "text", text: orig.content });
         for (const a of attachments) {
-          if (a?.type === "image" && a?.url) parts.push({ type: "image_url", image_url: { url: a.url } });
-          else if (a?.url) parts.push({ type: "text", text: `[Bhai ne bheja ${a.type || "file"}: ${a.name || a.url} → ${a.url}]` });
+          if (!a?.url) continue;
+          if (a.type === "image") parts.push({ type: "image_url", image_url: { url: a.url } });
+          else if (a.type === "document" || /\.pdf(\?|$)/i.test(a.url)) {
+            try {
+              const r = await fetch(a.url);
+              if (r.ok) {
+                const buf = new Uint8Array(await r.arrayBuffer());
+                if (buf.length < 18 * 1024 * 1024) {
+                  let bin = ""; for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
+                  const b64 = btoa(bin);
+                  parts.push({ type: "image_url", image_url: { url: `data:application/pdf;base64,${b64}` } });
+                  parts.push({ type: "text", text: `[PDF "${a.name}" — read honestly]` });
+                }
+              }
+            } catch {}
+          } else {
+            parts.push({ type: "text", text: `[Bhai ne ${a.type || "file"} bheja "${a.name}". Ye file type tu read nahi kar sakta — honest reh, likhne ko bol.]` });
+          }
         }
         outMessages[lastIdx] = { role: "user", content: parts };
       }
