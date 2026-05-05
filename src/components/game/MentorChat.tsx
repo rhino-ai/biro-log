@@ -225,7 +225,7 @@ export const MentorChat = () => {
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center text-xl">{mentor.emoji}</div>
             <div>
               <h3 className="font-game text-sm flex items-center gap-1">{mentor.name} <span className="text-xs text-green-400">● online</span></h3>
-              <p className="text-[10px] text-muted-foreground">{mentor.desc} • Galti nahi karunga ✅</p>
+              <p className="text-[10px] text-muted-foreground">{mentor.desc} • Aap-tum, kabhi tu nahi 🙏</p>
             </div>
           </div>
         </div>
