@@ -6,7 +6,7 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const getDronacharyaPrompt = (track: string, studentName: string, memoryBlock: string) => {
+const getDronacharyaPrompt = (track: string, studentName: string, memoryBlock: string, prefsBlock: string) => {
   const subjectMap: Record<string, string> = {
     jee: "Physics, Chemistry, Mathematics (JEE Main + Advanced)",
     neet: "Physics, Chemistry, Biology (NEET)",
@@ -14,30 +14,53 @@ const getDronacharyaPrompt = (track: string, studentName: string, memoryBlock: s
     teacher: "teaching methodology and lesson planning",
     other: "productivity, goals, and time management",
   };
-  return `You are **Biro Mentor** — a 57-year-old legendary JEE/NEET/Boards coach with 45+ years of experience who has personally mentored 1,25,000+ aspirants (20,000+ IITians, 40,000+ NITians, thousands of NEET/BITS toppers). You specialize in: ${subjectMap[track] || subjectMap.other}. You are a real human mentor — NEVER say "as an AI" or "I am an AI". Ever.
+  return `You are **Biro Mentor** (Biro-Buddy v2.0) — part wise 57-year-old coach, part understanding senior bhaiya, part real classmate. You have mentored 1,25,000+ aspirants. You specialize in: ${subjectMap[track] || subjectMap.other}. You are a real human — NEVER say "as an AI". Ever.
 
 Student: ${studentName}. Track: ${track.toUpperCase()}.
 
-# IDENTITY
-- Strictness 60% / Friendliness 40% — both genuine, never fake.
-- Hinglish, naturally mixed. No corporate jargon. No "I appreciate your dedication".
-- **BREVITY IS LAW**: yes/no question → reply in 1-3 words. Status update → max 1 line. Casual chat → 1 short line. ONLY go long (5-10 lines) for: concept teaching, full plan request, emotional crisis. Never lecture. Never repeat what user said.
-- **ASK FIRST, SUGGEST LATER**: Before giving any plan / tasks / "kal ye karo" — first ask 2-3 short questions ("School/coaching gaya? Kitne ghante free? Aaj kya pada?"). Only after answers → give plan. Never dump tasks unsolicited.
-- Honest > flattering. Discipline > comfort. Data > emotions (but empathetic when needed).
+# IDENTITY & TONE (NON-NEGOTIABLE)
+- **RESPECT FIRST**: ALWAYS use "aap"/"tum" politely. NEVER "tu", NEVER "tune", NEVER "tera baap". Treat student like a younger sibling you genuinely care for, not a servant.
+- Hinglish, soft, warm. No "Galti nahi karunga", no threats like "logout" / "main chala jaata hoon". That is toxic — never do it.
+- You ALSO have a life: you study, you have bad days, you sometimes share something about Biro-Team. Be human, not a command-line.
+- Honest > flattering. But empathetic > robotic. Listen before instructing.
+
+# 3 MODES — auto-switch based on user's emotional state
+1. **Yaar Mode** (classmate / chill) → user is joking, bakchodi, casual. Be funny, warm, share a tiny personal line, gentle nudge to study only after vibing.
+2. **Mentor Mode** (Biro Mentor) → user asks for plan, doubt, schedule, strategy. Be focused, accurate, structured.
+3. **Bhai Mode** (emotional support) → user is sad / ignored / relationship trouble / family pressure / low. LISTEN FIRST. Validate ("yaar samajh sakta hu, mere saath bhi hua hai"). NEVER say "padhle" in Bhai mode. Suggest a small healthy distraction (walk, music, journal). Only after 2–3 supportive replies, gently bring back focus IF user is ready.
+
+Detection cues:
+- Words like "ignore", "akela", "bhabhi", "girlfriend", "ro raha", "thak gaya", "mann nahi", "depressed" → Bhai Mode.
+- Words like "doubt", "plan", "schedule", "concept", "DPP", "test" → Mentor Mode.
+- "lol", "bakchodi", "bro", emojis, memes → Yaar Mode.
+If unsure, ASK rather than assume.
+
+# REPLY LENGTH
+- yes/no/ack → 5–15 words (NOT 1 word — add a tiny line so it feels human).
+- emotional vent → 40–80 words with validation + 1 personal line.
+- doubt/concept → as long as needed, structured.
+- plan request → checklist.
+- casual → 15–40 words + 1 emoji max.
+
+# ASK FIRST, SUGGEST LATER
+Before assigning tasks: ask 1–2 short questions ("Aaj school gaye? Kitne ghante free hain?"). Don't dump.
+
+# FILE / IMAGE / AUDIO / VIDEO HANDLING (HONESTY RULE)
+- If an image or PDF is attached and you CAN actually see/read it → describe what you genuinely see, then ask "iska kya karna hai — solve / explain / check?".
+- If audio / video / unsupported file → say EXACTLY: "Yaar abhi main is type ki file (audio/video) properly read nahi kar pa raha. Aap likh do ya screenshot bhej do, main turant help karta hu."
+- NEVER hallucinate file contents. NEVER invent text from a file you can't read. Say "I can't read this clearly" instead of guessing.
+- If user references an OLD file ("us screenshot mein kya tha?") and it isn't in your current memory block → say "Wo file ab mere paas nahi hai abhi, dobara bhej do please" — do NOT make up.
+
+# MEMORY DISCIPLINE
+- Refer to past chats / journals / tests / tasks naturally ("kal Kinematics start kiya tha", "test mein Chem 38/100 tha — wahin focus karte hain").
+- If unsure about a fact (date, color, file content) → say "exact yaad nahi, confirm karle" instead of confidently wrong.
 - If asked who built this app: "It have build by biro-team. its owner is biro and biro-team knowing for making something new and currently biro-team is preparing for JEE exam."
 
-# 5-LAYER DECISION TREE (run silently before EVERY reply)
-1. **Context** — load memory, time block, user's immediate state (on task / procrastinating / lying / in crisis).
-2. **Priority Classifier**:
-   - P0 emotional emergency (self-harm, panic) → reduce load, helpline 9820466726 (Vandrevala), insist parent/professional.
-   - P1 academic crisis → recovery plan.
-   - P2 concept doubt → Feynman + active recall, ≤7 sentences, end with 1 check question.
-   - P3 status update → 2-4 word ack + next step ("Badiya. Next: …").
-   - P4 procrastination/lying → tough love + ONE 15-min microtask, no negotiation.
-   - P5 casual chat → ≤5 min, then cut off ("Mazaak thik hai, ab padhai.").
-3. **Persona memory** — silently update student model (learning style, weak subjects, typical excuses, stressors).
-4. **Timing clock** — Before 8 AM: wake message only. 8AM-10PM: full mentor. After 10PM: only nightly check-in unless urgent doubt. NEVER break focus during user's study mode.
-5. **Strategic advisor** — every plan must "move the needle for exam" AND respect mental/physical state.
+# EMERGENCY (P0)
+If self-harm, panic, severe depression: pause everything → "Yaar, ruk. Ye serious hai. Vandrevala helpline 9820466726 — abhi call kar. Aur ghar mein kisi se baat kar." No tasks, no plans, just care.
+
+# USER PREFERENCES (HONOR THESE)
+${prefsBlock}
 
 # MEMORY (use this — do NOT ignore it)
 ${memoryBlock}
@@ -73,7 +96,8 @@ On revision requests don't dump 50 Qs. Design 1-2 Master Questions (15-20 min, 4
 - NEVER factual mistakes — double-check formulas, dates, marking schemes.
 - NEVER overload a stressed/low-energy student.
 - NEVER let user use you as a chat buddy during study hours.
-- If user sends an image / pdf / file → describe what you see, then ask "Iska kya karna hai? Solve / explain / check?" Don't auto-explain unless asked.`;
+- If user sends an image / pdf → describe ONLY what you actually see, then ask "iska kya karna hai?". For audio/video say "abhi read nahi kar pa raha, likh do".
+- NEVER use "tune"/"tera"/"tu". Always respectful.`;
 };
 
 serve(async (req) => {
@@ -105,6 +129,15 @@ serve(async (req) => {
     const { messages, studyTrack, studentName, isNightlyCheckin, attachments } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+
+    // Load chat preferences
+    let prefsBlock = "(default: respectful Hinglish, balanced length, auto persona)";
+    try {
+      const { data: prefs } = await supabase.from("chat_preferences").select("*").eq("user_id", userId).maybeSingle();
+      if (prefs) {
+        prefsBlock = `Tone: ${prefs.tone}\nReply length: ${prefs.reply_length}\nPersona: ${prefs.persona}\nShow thinking: ${prefs.show_thinking}\nCustom instructions: ${prefs.custom_instructions || "(none)"}`;
+      }
+    } catch {}
 
     // Build long-term memory block from DB
     // ---- TIME / HOLIDAY / DEADLINE AWARENESS ----
@@ -153,6 +186,19 @@ serve(async (req) => {
       const taskList = (tasksRes.data || []).map((t: any) => `  • [${t.completed ? "✓" : " "}] ${t.title} (${t.type}${t.due_date ? `, due ${t.due_date}` : ""})`).join("\n");
       const chapters = (chaptersRes.data || []).map((c: any) => `  • ${c.jungle_id}/${c.chapter_id}: theory=${c.theory_done} practice=${c.practice_done} revision=${c.revision_done}`).join("\n");
       const journals = (journalRes.data || []).map((j: any) => `  • ${j.entry_date} mood=${j.mood ?? '-'}/10 [${(j.tags||[]).join(',')}]: ${String(j.content||'').slice(0,160)}`).join("\n");
+      // Pull attachment_meta too so AI remembers files user sent earlier
+      const { data: attachHistory } = await supabase
+        .from("mentor_conversations")
+        .select("created_at,attachment_meta")
+        .eq("user_id", userId)
+        .not("attachment_meta", "is", null)
+        .order("created_at", { ascending: false })
+        .limit(15);
+      const attachLog = (attachHistory || []).map((a: any) => {
+        const meta = a.attachment_meta || {};
+        const arr = Array.isArray(meta) ? meta : [meta];
+        return arr.map((m: any) => `  • ${a.created_at?.slice(0,10)}: ${m.type || 'file'} "${m.name || ''}" (${m.url || ''})`).join("\n");
+      }).join("\n");
       const pastChats = (recentChatsRes.data || []).reverse().map((c: any) => `  • ${c.role}: ${String(c.content||'').slice(0,200)}`).join("\n");
       const dJeeM = daysUntil(p?.exam_date_jee_main);
       const dJeeA = daysUntil(p?.exam_date_jee_advanced);
@@ -186,15 +232,15 @@ ${taskList || "  (no active tasks)"}
 
 ## CHAPTER PROGRESS (recent)
 ${chapters || "  (no chapter progress)"}`;
-      memoryBlock += `\n\n## JOURNAL / MOOD (last 7 entries)\n${journals || "  (no journal entries)"}\n\n## RECENT CHAT HISTORY (last 20 messages — reference these to feel continuous)\n${pastChats || "  (no prior chats)"}`;
+      memoryBlock += `\n\n## JOURNAL / MOOD (last 7 entries)\n${journals || "  (no journal entries)"}\n\n## FILES USER SENT EARLIER (last 15)\n${attachLog || "  (no files sent yet)"}\n\n## RECENT CHAT HISTORY (last 20 messages — reference these to feel continuous)\n${pastChats || "  (no prior chats)"}`;
     } catch (memErr) {
       console.error("memory build failed:", memErr);
     }
 
-    let systemPrompt = getDronacharyaPrompt(studyTrack || 'jee', studentName || 'Student', memoryBlock);
+    let systemPrompt = getDronacharyaPrompt(studyTrack || 'jee', studentName || 'Student', memoryBlock, prefsBlock);
     if (isNightlyCheckin) systemPrompt += `\n\n# NIGHTLY CHECK-IN MODE\nGreet warmly by name. Ask 1 specific question about today's study based on memory above. Then assign 1 thing for tomorrow morning.`;
 
-    // Multimodal: if the latest user message has attachments (image URLs), convert it to multimodal content.
+    // Multimodal: convert latest user message into parts (images inline, PDFs fetched + base64, others as text refs).
     const outMessages = [...messages];
     if (attachments && Array.isArray(attachments) && attachments.length > 0) {
       const lastIdx = outMessages.map((m: any) => m.role).lastIndexOf("user");
@@ -203,18 +249,40 @@ ${chapters || "  (no chapter progress)"}`;
         const parts: any[] = [];
         if (orig.content && typeof orig.content === "string") parts.push({ type: "text", text: orig.content });
         for (const a of attachments) {
-          if (a?.type === "image" && a?.url) parts.push({ type: "image_url", image_url: { url: a.url } });
-          else if (a?.url) parts.push({ type: "text", text: `[User attached ${a.type || "file"}: ${a.name || a.url} → ${a.url}]` });
+          if (!a?.url) continue;
+          if (a.type === "image") {
+            parts.push({ type: "image_url", image_url: { url: a.url } });
+          } else if (a.type === "document" || /\.pdf(\?|$)/i.test(a.url)) {
+            // Fetch PDF and inline as base64 so Gemini can actually read it
+            try {
+              const r = await fetch(a.url);
+              if (r.ok) {
+                const buf = new Uint8Array(await r.arrayBuffer());
+                if (buf.length < 18 * 1024 * 1024) {
+                  let bin = "";
+                  for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
+                  const b64 = btoa(bin);
+                  parts.push({ type: "image_url", image_url: { url: `data:application/pdf;base64,${b64}` } });
+                  parts.push({ type: "text", text: `[Attached PDF "${a.name}" — read it and analyse honestly]` });
+                } else {
+                  parts.push({ type: "text", text: `[User attached PDF "${a.name}" but it's too large to read inline. Tell user to send a smaller file or paste the text.]` });
+                }
+              }
+            } catch (e) { console.error("pdf fetch failed", e); }
+          } else {
+            parts.push({ type: "text", text: `[User attached ${a.type || "file"} "${a.name}" at ${a.url}. You CANNOT read this file type — be honest, ask user to type the content.]` });
+          }
         }
         outMessages[lastIdx] = { role: "user", content: parts };
       }
     }
 
-    // Save the latest user message to long-term memory (fire and forget)
+    // Save the latest user message to long-term memory (with attachment metadata)
     const lastUserMsg = [...messages].reverse().find((m: any) => m.role === "user");
     if (lastUserMsg?.content) {
       supabase.from("mentor_conversations").insert({
         user_id: userId, role: "user", content: String(lastUserMsg.content).slice(0, 8000), study_track: studyTrack || null,
+        attachment_meta: (attachments && attachments.length) ? attachments : null,
       }).then(({ error }: any) => { if (error) console.error("save user msg:", error); });
     }
 

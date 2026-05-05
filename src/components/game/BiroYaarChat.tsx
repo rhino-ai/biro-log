@@ -4,8 +4,9 @@ import { useGame } from '@/hooks/useGame';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, Clock, ArrowLeft, AlertTriangle, Trash2, Smile, MoreVertical, Volume2, Loader2, Paperclip, X } from 'lucide-react';
+import { Send, Clock, ArrowLeft, AlertTriangle, Trash2, Smile, MoreVertical, Volume2, Loader2, Paperclip, X, Settings2 } from 'lucide-react';
 import { ChatFileUpload, ChatFilePreview } from '@/components/game/ChatFileUpload';
+import { ChatPreferencesDialog } from '@/components/game/ChatPreferencesDialog';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
@@ -113,6 +114,7 @@ export const BiroYaarChat = () => {
   const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null);
   const [remainingTime, setRemainingTime] = useState(DAILY_LIMIT_MS - getUsageData().usedMs);
   const [showClearDialog, setShowClearDialog] = useState(false);
+  const [showPrefs, setShowPrefs] = useState(false);
   const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
   const [showReactionPicker, setShowReactionPicker] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -378,6 +380,7 @@ export const BiroYaarChat = () => {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="glass-panel">
+              <DropdownMenuItem onClick={() => setShowPrefs(true)}><Settings2 className="w-4 h-4 mr-2" />Chat Preferences</DropdownMenuItem>
               <DropdownMenuItem onClick={() => setShowClearDialog(true)} className="text-raid">
                 <Trash2 className="w-4 h-4 mr-2" />Clear All Chats
               </DropdownMenuItem>
@@ -385,6 +388,7 @@ export const BiroYaarChat = () => {
           </DropdownMenu>
         </div>
       </div>
+      <ChatPreferencesDialog open={showPrefs} onClose={() => setShowPrefs(false)} />
 
       {/* Chat Background */}
       <div className="absolute inset-0 top-14 bottom-16 opacity-5 pointer-events-none">

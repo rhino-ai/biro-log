@@ -4,8 +4,9 @@ import { useGame } from '@/hooks/useGame';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, ArrowLeft, Trash2, MoreVertical, GraduationCap, Volume2, Loader2, Paperclip } from 'lucide-react';
+import { Send, ArrowLeft, Trash2, MoreVertical, GraduationCap, Volume2, Loader2, Paperclip, Settings2 } from 'lucide-react';
 import { ChatFileUpload, ChatFilePreview } from '@/components/game/ChatFileUpload';
+import { ChatPreferencesDialog } from '@/components/game/ChatPreferencesDialog';
 import { X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
@@ -72,6 +73,7 @@ export const MentorChat = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [pendingAttachments, setPendingAttachments] = useState<{url:string;type:string;name:string}[]>([]);
   const [showClearDialog, setShowClearDialog] = useState(false);
+  const [showPrefs, setShowPrefs] = useState(false);
   const [playingAudio, setPlayingAudio] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -223,17 +225,19 @@ export const MentorChat = () => {
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center text-xl">{mentor.emoji}</div>
             <div>
               <h3 className="font-game text-sm flex items-center gap-1">{mentor.name} <span className="text-xs text-green-400">● online</span></h3>
-              <p className="text-[10px] text-muted-foreground">{mentor.desc} • Galti nahi karunga ✅</p>
+              <p className="text-[10px] text-muted-foreground">{mentor.desc} • Aap-tum, kabhi tu nahi 🙏</p>
             </div>
           </div>
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreVertical className="w-4 h-4" /></Button></DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="glass-panel">
+            <DropdownMenuItem onClick={() => setShowPrefs(true)}><Settings2 className="w-4 h-4 mr-2" />Chat Preferences</DropdownMenuItem>
             <DropdownMenuItem onClick={() => setShowClearDialog(true)} className="text-raid"><Trash2 className="w-4 h-4 mr-2" />Clear All</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+      <ChatPreferencesDialog open={showPrefs} onClose={() => setShowPrefs(false)} />
 
       {/* Messages */}
       <ScrollArea className="flex-1 p-4" ref={scrollRef}>

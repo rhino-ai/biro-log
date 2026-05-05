@@ -125,6 +125,42 @@ export type Database = {
         }
         Relationships: []
       }
+      chat_preferences: {
+        Row: {
+          created_at: string
+          custom_instructions: string | null
+          id: string
+          persona: string
+          reply_length: string
+          show_thinking: boolean
+          tone: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          custom_instructions?: string | null
+          id?: string
+          persona?: string
+          reply_length?: string
+          show_thinking?: boolean
+          tone?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          custom_instructions?: string | null
+          id?: string
+          persona?: string
+          reply_length?: string
+          show_thinking?: boolean
+          tone?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       contacts: {
         Row: {
           contact_user_id: string
@@ -341,6 +377,7 @@ export type Database = {
       }
       mentor_conversations: {
         Row: {
+          attachment_meta: Json | null
           content: string
           created_at: string
           id: string
@@ -349,6 +386,7 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          attachment_meta?: Json | null
           content: string
           created_at?: string
           id?: string
@@ -357,6 +395,7 @@ export type Database = {
           user_id: string
         }
         Update: {
+          attachment_meta?: Json | null
           content?: string
           created_at?: string
           id?: string
