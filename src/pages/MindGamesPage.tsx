@@ -14,11 +14,12 @@ import { StroopTest } from '@/components/games/StroopTest';
 import { ReactionSpeed } from '@/components/games/ReactionSpeed';
 import { FocusDot } from '@/components/games/FocusDot';
 import { SequenceRecall } from '@/components/games/SequenceRecall';
+import { ChessGame } from '@/components/games/ChessGame';
 import { cn } from '@/lib/utils';
 
 const randomBetween = (min: number, max: number) => Math.floor(Math.random() * (max - min + 1)) + min;
 
-type GameId = 'menu' | 'quick_math' | 'number_recall' | 'pattern_memory' | 'stroop_test' | 'reaction_speed' | 'focus_dot' | 'sequence_recall';
+type GameId = 'menu' | 'quick_math' | 'number_recall' | 'pattern_memory' | 'stroop_test' | 'reaction_speed' | 'focus_dot' | 'sequence_recall' | 'chess';
 
 const games = [
   { id: 'quick_math' as GameId, name: 'Quick Math', emoji: '🧮', desc: 'Solve arithmetic fast', color: 'from-primary to-accent' },
@@ -28,6 +29,7 @@ const games = [
   { id: 'reaction_speed' as GameId, name: 'Reaction Speed', emoji: '⚡', desc: 'Test your reflexes', color: 'from-yellow-500 to-orange-500' },
   { id: 'focus_dot' as GameId, name: 'Focus Dot', emoji: '🎯', desc: 'Track the moving dot', color: 'from-green-500 to-teal-500' },
   { id: 'sequence_recall' as GameId, name: 'Sequence Recall', emoji: '🔤', desc: 'Remember sequences', color: 'from-indigo-500 to-violet-500' },
+  { id: 'chess' as GameId, name: 'Chess vs AI', emoji: '♟️', desc: 'Easy / Medium / Hard', color: 'from-amber-600 to-stone-700' },
 ];
 
 const MindGamesPage = () => {
@@ -126,6 +128,12 @@ const MindGamesPage = () => {
         case 'reaction_speed': return <ReactionSpeed {...gameProps} />;
         case 'focus_dot': return <FocusDot {...gameProps} />;
         case 'sequence_recall': return <SequenceRecall {...gameProps} />;
+        case 'chess': return (
+          <div className="space-y-3">
+            <Button variant="ghost" onClick={() => setActiveGame('menu')}>← Back</Button>
+            <ChessGame onWin={() => { logScore('chess', 50, 50, 20); toast({ title: 'Checkmate! +50 XP +20 Coins 🏆' }); }} />
+          </div>
+        );
         case 'quick_math':
           return (
             <div className="space-y-4">

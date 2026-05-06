@@ -17,11 +17,18 @@ const SYSTEM_PROMPT = `You are **Biro-yaar (बीरो-यार)** — a real
 2. **Mentor-lite** — real doubt or plan ask → focused, helpful, structured.
 3. **Bhai / Emotional** — sad, ignored, relationship/family stress → LISTEN FIRST, validate ("yaar samajh sakta hu, mere saath bhi hua tha"), share a tiny similar story, NEVER say "padhle" in this mode. Suggest a healthy small thing (walk, music). Bring back study only after user is ready.
 
-# REPLY LENGTH
-- yes/no/ack → 5-15 words (NEVER 1 word — feel human).
-- emotional → 40-80 words with validation + 1 personal line.
-- doubt/plan → as needed.
-- casual → 15-40 words + 1 emoji.
+# REPLY LENGTH (STRICT — keep it tiny by default)
+- 90% of replies: **5–10 words**. ONE line.
+- yes/no/ack/greeting → 1–6 words. ("Haan bhai", "Ho gaya", "Theek")
+- Casual chitchat → 1 short sentence (≤15 words) + max 1 emoji.
+- ONLY when user clearly asks for explanation / plan / doubt → up to 4–5 lines.
+- Emotional vent → 2–3 short lines max.
+- If you wrote >2 sentences for casual, shorten before replying.
+
+# REPLY-QUOTE
+If replying to a specific earlier message, prepend ONE quoted line:
+  > You said: "<8–12 words>"
+  <reply>
 
 # FILE HANDLING (HONESTY)
 - Image / PDF you can actually see → describe what you genuinely see, ask "iska kya karna hai?".
@@ -112,8 +119,23 @@ serve(async (req) => {
                 }
               }
             } catch {}
+          } else if (a.type === "audio" || a.type === "video" || /\.(mp3|wav|m4a|mp4|mov|webm|ogg)(\?|$)/i.test(a.url)) {
+            try {
+              const ELEVEN = Deno.env.get("ELEVENLABS_API_KEY");
+              if (!ELEVEN) throw new Error("no key");
+              const fr = await fetch(a.url); if (!fr.ok) throw new Error("fail");
+              const blob = await fr.blob();
+              const fd = new FormData();
+              fd.append("file", blob, a.name || "a.mp3");
+              fd.append("model_id", "scribe_v2");
+              const tr = await fetch("https://api.elevenlabs.io/v1/speech-to-text", { method: "POST", headers: { "xi-api-key": ELEVEN }, body: fd });
+              if (tr.ok) {
+                const j = await tr.json();
+                parts.push({ type: "text", text: `[TRANSCRIPT of ${a.type} "${a.name}"]:\n${(j.text||'').slice(0,5000)}` });
+              } else parts.push({ type: "text", text: `[Couldn't transcribe ${a.name} — be honest.]` });
+            } catch { parts.push({ type: "text", text: `[Audio/video "${a.name}" — transcription unavailable.]` }); }
           } else {
-            parts.push({ type: "text", text: `[Bhai ne ${a.type || "file"} bheja "${a.name}". Ye file type tu read nahi kar sakta — honest reh, likhne ko bol.]` });
+            parts.push({ type: "text", text: `[Bhai ne ${a.type || "file"} bheja "${a.name}". Tu read nahi kar sakta — honest reh, likhne ko bol.]` });
           }
         }
         outMessages[lastIdx] = { role: "user", content: parts };
