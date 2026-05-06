@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { Plus, Trash2, Pencil, BarChart3, Save } from 'lucide-react';
+import { Plus, Trash2, Pencil, BarChart3, Save, Copy, ZoomIn, ZoomOut } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface Sheet {
@@ -46,6 +46,7 @@ const TrackersPage = () => {
   const [renaming, setRenaming] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [dirty, setDirty] = useState(false);
+  const [zoom, setZoom] = useState(100);
 
   const active = sheets.find(s => s.id === activeId);
 
@@ -105,6 +106,43 @@ const TrackersPage = () => {
     setSheets(prev => prev.map(s => s.id === id ? { ...s, name: renameValue.trim() } : s));
     await supabase.from('tracker_sheets').update({ name: renameValue.trim() }).eq('id', id).eq('user_id', user!.id);
     setRenaming(null);
+  };
+
+  const duplicateSheet = async () => {
+    if (!user || !active) return;
+    const clone = { ...active, name: `${active.name} Copy`, rows: active.rows.map(r => ({ ...r })), columns: active.columns.map(c => ({ ...c })) };
+    const { data, error } = await supabase.from('tracker_sheets').insert({
+      user_id: user.id, name: clone.name, icon: clone.icon, color: clone.color,
+      columns: clone.columns as any, rows: clone.rows as any, position: sheets.length,
+    }).select('id').single();
+    if (error) { toast({ title: 'Copy failed', description: error.message, variant: 'destructive' }); return; }
+    setSheets(s => [...s, { ...clone, id: data.id }]);
+    setActiveId(data.id);
+    toast({ title: 'Sheet copied with formulas ✅' });
+  };
+
+  const colName = (idx: number) => String.fromCharCode(65 + idx);
+  const formulaValue = (value: string | number, seen = new Set<string>()): number | string => {
+    if (typeof value !== 'string' || !value.startsWith('=') || !active) return value;
+    const cell = (ref: string) => {
+      const m = ref.match(/^([A-Z])([1-9]\d*)$/); if (!m) return 0;
+      const ci = m[1].charCodeAt(0) - 65, ri = Number(m[2]) - 1;
+      const key = active.columns[ci]?.key; if (!key || !active.rows[ri]) return 0;
+      const sig = `${ri}:${key}`; if (seen.has(sig)) return 0;
+      seen.add(sig);
+      const v = formulaValue(active.rows[ri][key] ?? 0, seen);
+      return Number(v) || 0;
+    };
+    let expr = value.slice(1).toUpperCase();
+    expr = expr.replace(/(SUM|AVG)\(([A-Z][1-9]\d*):([A-Z][1-9]\d*)\)/g, (_, fn, a, b) => {
+      const ac = a.charCodeAt(0) - 65, ar = Number(a.slice(1)) - 1, bc = b.charCodeAt(0) - 65, br = Number(b.slice(1)) - 1;
+      const vals: number[] = [];
+      for (let r = Math.min(ar, br); r <= Math.max(ar, br); r++) for (let c = Math.min(ac, bc); c <= Math.max(ac, bc); c++) vals.push(cell(`${colName(c)}${r + 1}`));
+      const sum = vals.reduce((x, y) => x + y, 0);
+      return String(fn === 'AVG' ? sum / Math.max(vals.length, 1) : sum);
+    }).replace(/[A-Z][1-9]\d*/g, ref => String(cell(ref)));
+    if (!/^[\d+\-*/().\s]+$/.test(expr)) return 'ERR';
+    try { return Math.round(Function(`"use strict";return (${expr})`)() * 100) / 100; } catch { return 'ERR'; }
   };
 
   // Auto-analysis
