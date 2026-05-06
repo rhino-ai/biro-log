@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Chess } from 'chess.js';
 import { Chessboard } from 'react-chessboard';
 import { Button } from '@/components/ui/button';
@@ -34,6 +34,16 @@ export const ChessGame = ({ onWin }: { onWin?: () => void }) => {
   const [game, setGame] = useState(new Chess());
   const [difficulty, setDifficulty] = useState<Difficulty>('easy');
   const [status, setStatus] = useState('Your move (White)');
+  const aiTimerRef = useRef<number | null>(null);
+
+  const clearAiTimer = useCallback(() => {
+    if (aiTimerRef.current) {
+      window.clearTimeout(aiTimerRef.current);
+      aiTimerRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => clearAiTimer, [clearAiTimer]);
 
   const refreshStatus = useCallback((g: Chess) => {
     if (g.isCheckmate()) { setStatus(g.turn() === 'w' ? '😞 Checkmate — AI wins' : '🏆 Checkmate — You win!'); if (g.turn() === 'b') onWin?.(); }
@@ -43,17 +53,20 @@ export const ChessGame = ({ onWin }: { onWin?: () => void }) => {
   }, [onWin]);
 
   const playAI = useCallback((g: Chess) => {
-    setTimeout(() => {
+    clearAiTimer();
+    aiTimerRef.current = window.setTimeout(() => {
+      aiTimerRef.current = null;
       const san = pickAIMove(g, difficulty);
       if (!san) { refreshStatus(g); return; }
       const g2 = new Chess(g.fen()); g2.move(san);
       setGame(g2); refreshStatus(g2);
     }, 350);
-  }, [difficulty, refreshStatus]);
+  }, [clearAiTimer, difficulty, refreshStatus]);
 
   const onDrop = useCallback((sourceSquare: string, targetSquare: string) => {
     if (!targetSquare) return false;
     const g2 = new Chess(game.fen());
+    if (g2.turn() !== 'w' || g2.isGameOver()) return false;
     try {
       const m = g2.move({ from: sourceSquare, to: targetSquare, promotion: 'q' });
       if (!m) return false;
@@ -63,7 +76,16 @@ export const ChessGame = ({ onWin }: { onWin?: () => void }) => {
     } catch { return false; }
   }, [game, playAI, refreshStatus]);
 
-  const reset = () => { const g = new Chess(); setGame(g); setStatus('Your move (White)'); };
+  const reset = () => { clearAiTimer(); const g = new Chess(); setGame(g); setStatus('Your move (White)'); };
+
+  const undo = () => {
+    clearAiTimer();
+    const g2 = new Chess(game.fen());
+    g2.undo();
+    if (g2.turn() === 'b') g2.undo();
+    setGame(g2);
+    refreshStatus(g2);
+  };
 
   return (
     <Card className="p-4 space-y-3">
@@ -80,7 +102,7 @@ export const ChessGame = ({ onWin }: { onWin?: () => void }) => {
       </div>
       <div className="flex justify-center gap-2">
         <Button size="sm" variant="outline" onClick={reset}>Reset</Button>
-        <Button size="sm" variant="outline" onClick={() => { const g2 = new Chess(game.fen()); g2.undo(); g2.undo(); setGame(g2); refreshStatus(g2); }}>Undo</Button>
+        <Button size="sm" variant="outline" onClick={undo}>Undo</Button>
       </div>
     </Card>
   );
