@@ -4,7 +4,7 @@ import { useGame } from '@/hooks/useGame';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, ArrowLeft, Trash2, MoreVertical, GraduationCap, Volume2, Loader2, Paperclip, Settings2 } from 'lucide-react';
+import { Send, ArrowLeft, Trash2, MoreVertical, GraduationCap, Volume2, Loader2, Paperclip, Settings2, Reply, X as XIcon } from 'lucide-react';
 import { ChatFileUpload, ChatFilePreview } from '@/components/game/ChatFileUpload';
 import { ChatPreferencesDialog } from '@/components/game/ChatPreferencesDialog';
 import { X } from 'lucide-react';
@@ -72,6 +72,7 @@ export const MentorChat = () => {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [pendingAttachments, setPendingAttachments] = useState<{url:string;type:string;name:string}[]>([]);
+  const [replyTo, setReplyTo] = useState<{ id: string; content: string; role: 'user' | 'assistant' } | null>(null);
   const [showClearDialog, setShowClearDialog] = useState(false);
   const [showPrefs, setShowPrefs] = useState(false);
   const [playingAudio, setPlayingAudio] = useState<string | null>(null);
@@ -132,10 +133,12 @@ export const MentorChat = () => {
       a.type === 'image' ? `![${a.name}](${a.url})` : `[${a.type}: ${a.name}](${a.url})`
     ).join('\n');
     const fullContent = [attachmentText, input.trim()].filter(Boolean).join('\n\n');
-    const userMsg = { role: 'user' as const, content: fullContent, timestamp: new Date() };
+    const quotedPrefix = replyTo ? `> You said: "${replyTo.content.replace(/\n/g,' ').slice(0, 90)}"\n\n` : '';
+    const userMsg = { role: 'user' as const, content: quotedPrefix + fullContent, timestamp: new Date() };
     addMessage(userMsg);
     const sentAttachments = pendingAttachments;
     setPendingAttachments([]);
+    setReplyTo(null);
     setInput('');
     setIsLoading(true);
 
@@ -244,12 +247,13 @@ export const MentorChat = () => {
         <div className="space-y-3 pb-4">
           {messages.map((msg) => (
             <div key={msg.id} className={cn('flex animate-fade-in', msg.role === 'user' ? 'justify-end' : 'justify-start')}>
-              <div className="group relative max-w-[85%]">
+              <div className="group relative max-w-[85%]" onDoubleClick={() => setReplyTo({ id: msg.id, content: msg.content, role: msg.role })}>
                 <div className={cn('rounded-2xl px-3 py-2 shadow-sm',
                   msg.role === 'user' ? 'bg-amber-500 text-white rounded-br-sm' : 'bg-card border border-amber-500/20 rounded-bl-sm'
                 )}>
                   <div className="text-sm">{renderMsg(msg.content)}</div>
                   <div className="flex items-center justify-end gap-1 mt-1">
+                    <button onClick={() => setReplyTo({ id: msg.id, content: msg.content, role: msg.role })} className="opacity-40 hover:opacity-100"><Reply className="w-3 h-3" /></button>
                     {msg.role === 'assistant' && msg.content && (
                       <button onClick={() => playTTS(msg.content, msg.id)} className="opacity-40 hover:opacity-100 transition-opacity">
                         {playingAudio === msg.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Volume2 className="w-3 h-3" />}
@@ -286,6 +290,13 @@ export const MentorChat = () => {
 
       {/* Input */}
       <div className="p-3 border-t border-white/10 bg-card/50 backdrop-blur-sm">
+        {replyTo && (
+          <div className="flex items-center gap-2 max-w-lg mx-auto mb-2 px-3 py-2 rounded-md bg-amber-500/10 border-l-2 border-amber-500">
+            <Reply className="w-3 h-3 text-amber-500 shrink-0" />
+            <div className="text-xs flex-1 truncate opacity-80">Replying to: {replyTo.content.slice(0, 80)}</div>
+            <button onClick={() => setReplyTo(null)}><XIcon className="w-3 h-3" /></button>
+          </div>
+        )}
         {pendingAttachments.length > 0 && (
           <div className="flex gap-2 overflow-x-auto pb-2 max-w-lg mx-auto">
             {pendingAttachments.map((a, i) => (
