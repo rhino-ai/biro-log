@@ -141,6 +141,8 @@ export const MentorChat = () => {
       localTime: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true }),
       timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Kolkata',
       strictReadMode: true,
+      screenTimeData: localStorage.getItem('biro-screen-time'),
+      biroUsageData: localStorage.getItem('biro-yaar-usage'),
     };
     setPendingAttachments([]);
     setReplyTo(null);
