@@ -248,10 +248,10 @@ const TrackersPage = () => {
                       <tr key={ri} className="border-t border-border/30">
                         {active.columns.map(col => (
                           <td key={col.key} className="px-1 py-0.5">
-                            <input value={String(row[col.key] ?? '')} type={col.type === 'number' ? 'number' : 'text'}
+                            <input value={String(row[col.key] ?? '')} type="text" inputMode={col.type === 'number' ? 'decimal' : 'text'}
                               onChange={e => updateActive(s => ({
                                 ...s,
-                                rows: s.rows.map((r, idx) => idx === ri ? { ...r, [col.key]: col.type === 'number' ? Number(e.target.value) : e.target.value } : r),
+                                rows: s.rows.map((r, idx) => idx === ri ? { ...r, [col.key]: (col.type === 'number' && !e.target.value.startsWith('=')) ? Number(e.target.value) : e.target.value } : r),
                               }))}
                               className="w-full bg-transparent px-1 py-0.5 outline-none focus:bg-primary/10 rounded" />
                             {typeof row[col.key] === 'string' && String(row[col.key]).startsWith('=') && (
