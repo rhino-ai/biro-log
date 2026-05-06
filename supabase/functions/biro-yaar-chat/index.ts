@@ -104,6 +104,18 @@ serve(async (req) => {
       };
       contextualPrompt += `\n\n${trackInfo[studyTrack] || ''}`;
     }
+    try {
+      const { data: recent } = await supabase
+        .from("mentor_conversations")
+        .select("role,content,created_at,attachment_meta")
+        .eq("user_id", userId)
+        .eq("study_track", "biro_yaar")
+        .order("created_at", { ascending: false })
+        .limit(20);
+      const chatMemory = (recent || []).reverse().map((m: any) => `• ${m.role}: ${String(m.content || '').slice(0,180)}`).join("\n");
+      const files = (recent || []).filter((m: any) => m.attachment_meta).map((m: any) => `• ${m.created_at?.slice(0,10)} ${JSON.stringify(m.attachment_meta).slice(0,220)}`).join("\n");
+      contextualPrompt += `\n\n# BACKEND MEMORY\nRecent chats:\n${chatMemory || "none"}\nFiles sent:\n${files || "none"}`;
+    } catch {}
 
     const outMessages = [...messages];
     if (attachments && Array.isArray(attachments) && attachments.length > 0) {
@@ -151,6 +163,17 @@ serve(async (req) => {
       }
     }
 
+    const lastUserMsg = [...messages].reverse().find((m: any) => m.role === "user");
+    if (lastUserMsg?.content) {
+      supabase.from("mentor_conversations").insert({
+        user_id: userId,
+        role: "user",
+        content: String(lastUserMsg.content).slice(0, 8000),
+        study_track: "biro_yaar",
+        attachment_meta: (attachments && attachments.length) ? attachments : null,
+      }).then(({ error }: any) => { if (error) console.error("save biro user msg:", error); });
+    }
+
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -172,7 +195,31 @@ serve(async (req) => {
       });
     }
 
-    return new Response(response.body, { headers: { ...corsHeaders, "Content-Type": "text/event-stream" } });
+    const [clientStream, captureStream] = response.body!.tee();
+    (async () => {
+      try {
+        const reader = captureStream.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+        let full = "";
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          let nl: number;
+          while ((nl = buffer.indexOf("\n")) !== -1) {
+            let line = buffer.slice(0, nl); buffer = buffer.slice(nl + 1);
+            if (line.endsWith("\r")) line = line.slice(0, -1);
+            if (!line.startsWith("data: ")) continue;
+            const json = line.slice(6).trim(); if (json === "[DONE]") continue;
+            try { const c = JSON.parse(json).choices?.[0]?.delta?.content; if (c) full += c; } catch {}
+          }
+        }
+        if (full.trim()) await supabase.from("mentor_conversations").insert({ user_id: userId, role: "assistant", content: full.slice(0, 12000), study_track: "biro_yaar" });
+      } catch (e) { console.error("biro capture error:", e); }
+    })();
+
+    return new Response(clientStream, { headers: { ...corsHeaders, "Content-Type": "text/event-stream" } });
   } catch (error) {
     console.error("Chat error:", error);
     return new Response(JSON.stringify({ error: "Something went wrong" }), {
