@@ -34,7 +34,8 @@ const extractVideoFrames = async (file: File) => {
     const frames: { blob: Blob; name: string }[] = [];
     for (const [idx, stamp] of stamps.entries()) {
       await new Promise<void>((resolve, reject) => {
-        video.onseeked = () => resolve();
+        const timer = window.setTimeout(() => resolve(), 900);
+        video.onseeked = () => { window.clearTimeout(timer); resolve(); };
         video.onerror = () => reject(new Error('Could not seek video'));
         video.currentTime = stamp;
       });
