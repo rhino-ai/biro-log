@@ -137,6 +137,11 @@ export const MentorChat = () => {
     const userMsg = { role: 'user' as const, content: quotedPrefix + fullContent, timestamp: new Date() };
     addMessage(userMsg);
     const sentAttachments = pendingAttachments;
+    const clientContext = {
+      localTime: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true }),
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Kolkata',
+      strictReadMode: true,
+    };
     setPendingAttachments([]);
     setReplyTo(null);
     setInput('');
@@ -155,7 +160,7 @@ export const MentorChat = () => {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${token}`,
           },
-          body: JSON.stringify({ messages: apiMessages, studyTrack, studentName: profile.name, attachments: sentAttachments }),
+          body: JSON.stringify({ messages: apiMessages, studyTrack, studentName: profile.name, attachments: sentAttachments, clientContext }),
         }
       );
 
@@ -315,7 +320,7 @@ export const MentorChat = () => {
           <Input ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
             placeholder="Ask your mentor..." disabled={isLoading} className="flex-1 bg-secondary/50 border-amber-500/20" />
-          <Button onClick={sendMessage} disabled={!input.trim() || isLoading} size="icon" className="bg-amber-500 hover:bg-amber-600 shrink-0">
+          <Button onClick={sendMessage} disabled={(!input.trim() && pendingAttachments.length === 0) || isLoading} size="icon" className="bg-amber-500 hover:bg-amber-600 shrink-0">
             <Send className="w-4 h-4" />
           </Button>
         </div>
