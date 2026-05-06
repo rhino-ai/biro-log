@@ -211,6 +211,11 @@ export const BiroYaarChat = () => {
 
     addMessage(userMessage);
     const sentAttachments = pendingAttachments;
+    const clientContext = {
+      localTime: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true }),
+      timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Kolkata',
+      strictReadMode: true,
+    };
     setPendingAttachments([]);
     setInput('');
     setIsLoading(true);
@@ -236,6 +241,7 @@ export const BiroYaarChat = () => {
             studyTrack,
             studentName: profile.name,
             attachments: sentAttachments,
+            clientContext,
           }),
         }
       );
