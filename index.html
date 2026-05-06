@@ -27,15 +27,20 @@
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <script>
-      if ('serviceWorker' in navigator && !location.hostname.includes('lovableproject.com')) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' })
-            .then(reg => {
-              reg.update();
-              console.log('SW registered:', reg.scope);
-            })
-            .catch(err => console.log('SW registration failed:', err));
-        });
+      if ('serviceWorker' in navigator) {
+        if (location.hostname.includes('lovableproject.com')) {
+          navigator.serviceWorker.getRegistrations().then(regs => regs.forEach(reg => reg.unregister()));
+          if ('caches' in window) caches.keys().then(keys => keys.forEach(key => caches.delete(key)));
+        } else {
+          window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' })
+              .then(reg => {
+                reg.update();
+                console.log('SW registered:', reg.scope);
+              })
+              .catch(err => console.log('SW registration failed:', err));
+          });
+        }
       }
     </script>
   </body>
