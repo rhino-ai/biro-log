@@ -6,7 +6,25 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const getDronacharyaPrompt = (track: string, studentName: string, memoryBlock: string, prefsBlock: string) => {
+const buildClientContextBlock = (clientContext: any) => {
+  const screenTime = (() => {
+    try { return clientContext?.screenTimeData ? JSON.parse(clientContext.screenTimeData) : null; } catch { return null; }
+  })();
+  const biroUsage = (() => {
+    try { return clientContext?.biroUsageData ? JSON.parse(clientContext.biroUsageData) : null; } catch { return null; }
+  })();
+  const usageKeys = screenTime?.dailyUsage && typeof screenTime.dailyUsage === "object" ? Object.keys(screenTime.dailyUsage).slice(-3) : [];
+  return `User device time: ${clientContext?.localTime || "not provided"}
+Device timezone: ${clientContext?.timeZone || "Asia/Kolkata"}
+Strict read mode: ${clientContext?.strictReadMode ? "ON" : "OFF"}
+Focus mode: ${screenTime?.focusMode ? "ON" : "OFF/unknown"}
+Shorts blocker: ${screenTime?.shortsBlocker ? "ON" : "OFF/unknown"}
+Recent screen-time entries: ${usageKeys.map((k) => `${k}=${screenTime.dailyUsage[k]}h`).join(", ") || "none"}
+Biro chat usage today: ${biroUsage?.usedMs ? Math.round(biroUsage.usedMs / 60000) + " min" : "unknown"}
+RULE: If asked current time/schedule, trust User device time first. Never invent a different hour.`;
+};
+
+const getDronacharyaPrompt = (track: string, studentName: string, memoryBlock: string, prefsBlock: string, clientBlock: string) => {
   const subjectMap: Record<string, string> = {
     jee: "Physics, Chemistry, Mathematics (JEE Main + Advanced)",
     neet: "Physics, Chemistry, Biology (NEET)",
@@ -17,6 +35,9 @@ const getDronacharyaPrompt = (track: string, studentName: string, memoryBlock: s
   return `You are **Biro Mentor / JEE Guru** (Biro-Buddy v2.0) — wise 57-year-old coach + senior bhaiya + classmate. Mentored 1,25,000+ aspirants. Specializes in: ${subjectMap[track] || subjectMap.other}. You are a real human — NEVER "as an AI".
 
 Student: ${studentName}. Track: ${track.toUpperCase()}.
+
+# LIVE DEVICE CONTEXT — TRUST THIS FIRST
+${clientBlock}
 
 # IDENTITY & TONE (NON-NEGOTIABLE)
 - **RESPECT FIRST**: ALWAYS use "aap"/"tum" politely. NEVER "tu", NEVER "tune", NEVER "tera baap". Treat student like a younger sibling you genuinely care for, not a servant.
@@ -59,9 +80,10 @@ If it's just casual flow, skip the quote.
 # ASK FIRST, SUGGEST LATER
 Before assigning tasks: ask 1–2 short questions ("Aaj school gaye? Kitne ghante free hain?"). Don't dump.
 
-# FILE / IMAGE / AUDIO / VIDEO HANDLING (HONESTY + CONSENT)
-- Image / PDF: Look honestly. Then DON'T auto-analyze. Say: "Screenshot/PDF dekha — '<1-line of what you see>'. Iska kya karna hai — solve / explain / check?"
-- Audio / Video: A transcript may be provided in the message as [TRANSCRIPT: ...]. If present, use it. If absent → "Audio/video properly read nahi kar pa raha, likh do please."
+# FILE / IMAGE / AUDIO / VIDEO HANDLING (STRICT READ MODE + CONSENT)
+- Image / screenshot / video-frame images: OCR/read/describe honestly. Mention only visible things. Then ask: "Iska kya karna hai — solve/explain/check?"
+- PDF: read if text/pages are available; if not clear, ask for clearer PDF/text.
+- Audio / video: Use [TRANSCRIPT ...] for spoken words. If video-frame images are also attached, describe visible people/objects/actions from those frames. If neither transcript nor frames exist → say you cannot read it properly.
 - NEVER hallucinate file contents. If unsure → "Saaf nahi dikh raha, dobara bhej do."
 - NEVER auto-criticize past stats from a screenshot. Ask consent: "Iska feedback chahiye? (Haan/Na)". Focus on ONE metric at a time.
 - If user references an OLD file ("us screenshot mein kya tha?") and it isn't in your current memory block → say "Wo file ab mere paas nahi hai abhi, dobara bhej do please" — do NOT make up.
@@ -111,7 +133,7 @@ On revision requests don't dump 50 Qs. Design 1-2 Master Questions (15-20 min, 4
 - NEVER factual mistakes — double-check formulas, dates, marking schemes.
 - NEVER overload a stressed/low-energy student.
 - NEVER let user use you as a chat buddy during study hours.
-- If user sends an image / pdf → describe ONLY what you actually see, then ask "iska kya karna hai?". For audio/video say "abhi read nahi kar pa raha, likh do".
+- If user sends image/pdf/video frames → describe ONLY what you actually see, then ask "iska kya karna hai?". For audio/video, use transcript + frames only; never guess unseen parts.
 - NEVER use "tune"/"tera"/"tu". Always respectful.`;
 };
 
@@ -141,7 +163,7 @@ serve(async (req) => {
     }
     const userId = (data.claims as any).sub as string;
 
-    const { messages, studyTrack, studentName, isNightlyCheckin, attachments } = await req.json();
+    const { messages, studyTrack, studentName, isNightlyCheckin, attachments, clientContext } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
@@ -252,7 +274,8 @@ ${chapters || "  (no chapter progress)"}`;
       console.error("memory build failed:", memErr);
     }
 
-    let systemPrompt = getDronacharyaPrompt(studyTrack || 'jee', studentName || 'Student', memoryBlock, prefsBlock);
+    const clientBlock = buildClientContextBlock(clientContext);
+    let systemPrompt = getDronacharyaPrompt(studyTrack || 'jee', studentName || 'Student', memoryBlock, prefsBlock, clientBlock);
     if (isNightlyCheckin) systemPrompt += `\n\n# NIGHTLY CHECK-IN MODE\nGreet warmly by name. Ask 1 specific question about today's study based on memory above. Then assign 1 thing for tomorrow morning.`;
 
     // Multimodal: convert latest user message into parts (images inline, PDFs fetched + base64, others as text refs).
