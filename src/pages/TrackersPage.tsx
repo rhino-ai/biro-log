@@ -228,12 +228,13 @@ const TrackersPage = () => {
             </CardHeader>
             <CardContent className="space-y-3">
               {/* Editable table */}
-              <div className="overflow-x-auto rounded-lg border border-border/50">
+              <div className="overflow-x-auto rounded-lg border border-border/50" style={{ fontSize: `${zoom}%` }}>
                 <table className="w-full text-xs">
                   <thead className="bg-secondary/40">
                     <tr>
                       {active.columns.map((col, i) => (
                         <th key={col.key} className="px-2 py-1 text-left">
+                          <span className="text-[10px] text-muted-foreground mr-1">{colName(i)}</span>
                           <input value={col.label}
                             onChange={e => updateActive(s => ({ ...s, columns: s.columns.map((c, idx) => idx === i ? { ...c, label: e.target.value } : c) }))}
                             className="bg-transparent w-full border-b border-transparent focus:border-primary outline-none font-game" />
@@ -253,6 +254,9 @@ const TrackersPage = () => {
                                 rows: s.rows.map((r, idx) => idx === ri ? { ...r, [col.key]: col.type === 'number' ? Number(e.target.value) : e.target.value } : r),
                               }))}
                               className="w-full bg-transparent px-1 py-0.5 outline-none focus:bg-primary/10 rounded" />
+                            {typeof row[col.key] === 'string' && String(row[col.key]).startsWith('=') && (
+                              <div className="text-[10px] text-primary px-1">= {String(formulaValue(row[col.key]))}</div>
+                            )}
                           </td>
                         ))}
                         <td className="text-center">
@@ -271,10 +275,13 @@ const TrackersPage = () => {
                 }))}><Plus className="w-3 h-3 mr-1" /> Row</Button>
                 <Button size="sm" variant="outline" onClick={() => {
                   const label = prompt('Column label?'); if (!label) return;
-                  const type = (prompt('Type? text/number', 'text') === 'number') ? 'number' : 'text';
+                  const type = (prompt('Type? text/number/formula', 'text') === 'number') ? 'number' : 'text';
                   const key = `c${Date.now()}`;
                   updateActive(s => ({ ...s, columns: [...s.columns, { key, label, type }] }));
                 }}><Plus className="w-3 h-3 mr-1" /> Column</Button>
+                <Button size="sm" variant="outline" onClick={duplicateSheet}><Copy className="w-3 h-3 mr-1" /> Copy</Button>
+                <Button size="sm" variant="outline" onClick={() => setZoom(z => Math.max(70, z - 10))}><ZoomOut className="w-3 h-3" /></Button>
+                <Button size="sm" variant="outline" onClick={() => setZoom(z => Math.min(150, z + 10))}><ZoomIn className="w-3 h-3" /></Button>
                 <Button size="sm" onClick={() => persist(active)} disabled={!dirty} className={cn(dirty && 'bg-primary glow-purple animate-pulse')}>
                   <Save className="w-3 h-3 mr-1" /> {dirty ? 'Save' : 'Saved'}
                 </Button>
