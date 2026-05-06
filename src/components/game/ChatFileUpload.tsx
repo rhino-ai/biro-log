@@ -13,6 +13,41 @@ interface ChatFileUploadProps {
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
 
+const extractVideoFrames = async (file: File) => {
+  const url = URL.createObjectURL(file);
+  try {
+    const video = document.createElement('video');
+    video.src = url;
+    video.muted = true;
+    video.playsInline = true;
+    await new Promise<void>((resolve, reject) => {
+      video.onloadedmetadata = () => resolve();
+      video.onerror = () => reject(new Error('Could not read video frames'));
+    });
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.min(960, video.videoWidth || 960);
+    canvas.height = Math.round(canvas.width * ((video.videoHeight || 540) / (video.videoWidth || 960)));
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return [];
+    const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 1;
+    const stamps = [0.1, 0.5, 0.9].map(p => Math.max(0, Math.min(duration - 0.05, duration * p)));
+    const frames: { blob: Blob; name: string }[] = [];
+    for (const [idx, stamp] of stamps.entries()) {
+      await new Promise<void>((resolve, reject) => {
+        video.onseeked = () => resolve();
+        video.onerror = () => reject(new Error('Could not seek video'));
+        video.currentTime = stamp;
+      });
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.82));
+      if (blob) frames.push({ blob, name: `${file.name} frame ${idx + 1}.jpg` });
+    }
+    return frames;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+};
+
 export const ChatFileUpload = ({ onFileUploaded, className }: ChatFileUploadProps) => {
   const { user } = useAuth();
   const [isUploading, setIsUploading] = useState(false);
@@ -54,6 +89,19 @@ export const ChatFileUpload = ({ onFileUploaded, className }: ChatFileUploadProp
             : 'document';
 
       onFileUploaded(urlData.publicUrl, fileType, file.name);
+      if (fileType === 'video') {
+        const frames = await extractVideoFrames(file).catch(() => []);
+        for (const frame of frames) {
+          const framePath = `chat-uploads/${user.id}/${Date.now()}-${frame.name.replace(/[^a-z0-9._-]/gi, '-')}`;
+          const { error: frameError } = await supabase.storage
+            .from('chat-uploads')
+            .upload(framePath, frame.blob, { contentType: 'image/jpeg', upsert: false });
+          if (!frameError) {
+            const { data: frameUrl } = supabase.storage.from('chat-uploads').getPublicUrl(framePath);
+            onFileUploaded(frameUrl.publicUrl, 'image', frame.name);
+          }
+        }
+      }
       toast({ title: 'File uploaded ✅' });
     } catch (err: any) {
       toast({ title: 'Upload failed', description: err.message, variant: 'destructive' });
@@ -69,7 +117,7 @@ export const ChatFileUpload = ({ onFileUploaded, className }: ChatFileUploadProp
         ref={fileRef}
         type="file"
         className="hidden"
-        accept="image/*,video/*,audio/*,.pdf,.doc,.docx"
+        accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt,.csv,.xls,.xlsx"
         onChange={handleFileSelect}
       />
 
@@ -82,7 +130,7 @@ export const ChatFileUpload = ({ onFileUploaded, className }: ChatFileUploadProp
           <button onClick={() => { fileRef.current?.setAttribute('accept', 'image/*'); fileRef.current?.click(); }} className="flex items-center gap-2 w-full px-3 py-2 rounded-lg hover:bg-secondary/50 text-sm"><Image className="w-4 h-4 text-primary" /> Photo</button>
           <button onClick={() => { fileRef.current?.setAttribute('accept', 'video/*'); fileRef.current?.click(); }} className="flex items-center gap-2 w-full px-3 py-2 rounded-lg hover:bg-secondary/50 text-sm"><Film className="w-4 h-4 text-accent" /> Video</button>
           <button onClick={() => { fileRef.current?.setAttribute('accept', 'audio/*'); fileRef.current?.click(); }} className="flex items-center gap-2 w-full px-3 py-2 rounded-lg hover:bg-secondary/50 text-sm"><Music className="w-4 h-4 text-muted-foreground" /> Audio</button>
-          <button onClick={() => { fileRef.current?.setAttribute('accept', '.pdf,.doc,.docx'); fileRef.current?.click(); }} className="flex items-center gap-2 w-full px-3 py-2 rounded-lg hover:bg-secondary/50 text-sm"><FileText className="w-4 h-4 text-primary" /> Document</button>
+          <button onClick={() => { fileRef.current?.setAttribute('accept', '.pdf,.doc,.docx,.txt,.csv,.xls,.xlsx'); fileRef.current?.click(); }} className="flex items-center gap-2 w-full px-3 py-2 rounded-lg hover:bg-secondary/50 text-sm"><FileText className="w-4 h-4 text-primary" /> Document</button>
           <button onClick={() => setShowMenu(false)} className="flex items-center gap-2 w-full px-3 py-2 rounded-lg hover:bg-secondary/50 text-sm text-muted-foreground"><X className="w-4 h-4" /> Cancel</button>
         </div>
       )}
