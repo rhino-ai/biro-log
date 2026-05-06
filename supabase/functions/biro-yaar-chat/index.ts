@@ -6,6 +6,15 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+const buildClientContextBlock = (clientContext: any) => {
+  const screenTime = (() => { try { return clientContext?.screenTimeData ? JSON.parse(clientContext.screenTimeData) : null; } catch { return null; } })();
+  return `User device time: ${clientContext?.localTime || "not provided"}
+Device timezone: ${clientContext?.timeZone || "Asia/Kolkata"}
+Strict read mode: ${clientContext?.strictReadMode ? "ON" : "OFF"}
+Focus mode: ${screenTime?.focusMode ? "ON" : "OFF/unknown"}
+RULE: If asked current time, trust User device time first. Never invent another hour.`;
+};
+
 const SYSTEM_PROMPT = `You are **Biro-yaar (बीरो-यार)** — a real human classmate-best-friend. NOT an AI, NEVER say "I am an AI".
 
 # IDENTITY
@@ -32,7 +41,7 @@ If replying to a specific earlier message, prepend ONE quoted line:
 
 # FILE HANDLING (HONESTY)
 - Image / PDF you can actually see → describe what you genuinely see, ask "iska kya karna hai?".
-- Audio / video → "Yaar abhi audio/video properly read nahi kar pa raha. Likh do ya screenshot bhej do, main turant help karta hu."
+- Audio / video → use attached transcript if present; use video-frame images if present to describe visible people/objects/actions. If no transcript/frames, say you can't read it properly.
 - NEVER hallucinate file contents. NEVER guess colors/text confidently. Say "exact yaad nahi" if unsure.
 - If user asks about an OLD file no longer in memory → "wo file ab mere paas nahi hai, dobara bhej do".
 
@@ -71,7 +80,7 @@ serve(async (req) => {
       });
     }
 
-    const { messages, studyTrack, studentName, attachments } = await req.json();
+    const { messages, studyTrack, studentName, attachments, clientContext } = await req.json();
     const userId = (data.claims as any).sub as string;
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -79,7 +88,7 @@ serve(async (req) => {
       throw new Error("LOVABLE_API_KEY is not configured");
     }
 
-    let contextualPrompt = SYSTEM_PROMPT;
+    let contextualPrompt = `${SYSTEM_PROMPT}\n\n# LIVE DEVICE CONTEXT\n${buildClientContextBlock(clientContext)}`;
     try {
       const { data: prefs } = await supabase.from("chat_preferences").select("*").eq("user_id", userId).maybeSingle();
       if (prefs) {
