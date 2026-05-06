@@ -51,7 +51,7 @@ export const ChessGame = ({ onWin }: { onWin?: () => void }) => {
     }, 350);
   }, [difficulty, refreshStatus]);
 
-  const onDrop = useCallback(({ sourceSquare, targetSquare }: any) => {
+  const onDrop = useCallback((sourceSquare: string, targetSquare: string) => {
     if (!targetSquare) return false;
     const g2 = new Chess(game.fen());
     try {
@@ -65,13 +65,6 @@ export const ChessGame = ({ onWin }: { onWin?: () => void }) => {
 
   const reset = () => { const g = new Chess(); setGame(g); setStatus('Your move (White)'); };
 
-  const options = useMemo(() => ({
-    position: game.fen(),
-    onPieceDrop: onDrop,
-    boardOrientation: 'white' as const,
-    id: 'biro-chess',
-  }), [game, onDrop]);
-
   return (
     <Card className="p-4 space-y-3">
       <div className="flex items-center justify-between flex-wrap gap-2">
@@ -83,7 +76,7 @@ export const ChessGame = ({ onWin }: { onWin?: () => void }) => {
         </div>
       </div>
       <div className="max-w-md mx-auto">
-        <Chessboard options={options} />
+        <Chessboard position={game.fen()} onPieceDrop={onDrop} boardOrientation="white" id="biro-chess" />
       </div>
       <div className="flex justify-center gap-2">
         <Button size="sm" variant="outline" onClick={reset}>Reset</Button>
