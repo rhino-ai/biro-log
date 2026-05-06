@@ -137,7 +137,7 @@ const TrackersPage = () => {
     expr = expr.replace(/(SUM|AVG)\(([A-Z][1-9]\d*):([A-Z][1-9]\d*)\)/g, (_, fn, a, b) => {
       const ac = a.charCodeAt(0) - 65, ar = Number(a.slice(1)) - 1, bc = b.charCodeAt(0) - 65, br = Number(b.slice(1)) - 1;
       const vals: number[] = [];
-      for (let r = Math.min(ar, br); r <= Math.max(ar, br); r++) for (let c = Math.min(ac, bc); c <= Math.max(ac, bc); c++) vals.push(cell(`${colName(c)}${r + 1}`));
+      for (let r = Math.min(ar, br); r <= Math.max(ar, br); r++) for (let c = Math.min(ac, bc); c <= Math.max(ac, bc); c++) vals.push(Number(cell(`${colName(c)}${r + 1}`)) || 0);
       const sum = vals.reduce((x, y) => x + y, 0);
       return String(fn === 'AVG' ? sum / Math.max(vals.length, 1) : sum);
     }).replace(/[A-Z][1-9]\d*/g, ref => String(cell(ref)));
