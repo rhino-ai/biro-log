@@ -284,6 +284,32 @@ ${chapters || "  (no chapter progress)"}`;
                 }
               }
             } catch (e) { console.error("pdf fetch failed", e); }
+          } else if (a.type === "audio" || a.type === "video" || /\.(mp3|wav|m4a|mp4|mov|webm|ogg)(\?|$)/i.test(a.url)) {
+            // Transcribe via ElevenLabs Scribe
+            try {
+              const ELEVEN = Deno.env.get("ELEVENLABS_API_KEY");
+              if (!ELEVEN) throw new Error("no ELEVENLABS_API_KEY");
+              const fileRes = await fetch(a.url);
+              if (!fileRes.ok) throw new Error("file fetch failed");
+              const blob = await fileRes.blob();
+              const fd = new FormData();
+              fd.append("file", blob, a.name || "audio.mp3");
+              fd.append("model_id", "scribe_v2");
+              fd.append("tag_audio_events", "true");
+              const tr = await fetch("https://api.elevenlabs.io/v1/speech-to-text", {
+                method: "POST", headers: { "xi-api-key": ELEVEN }, body: fd,
+              });
+              if (tr.ok) {
+                const j = await tr.json();
+                const text = (j.text || "").slice(0, 6000);
+                parts.push({ type: "text", text: `[TRANSCRIPT of ${a.type} "${a.name}"]:\n${text || '(empty)'}` });
+              } else {
+                parts.push({ type: "text", text: `[Could not transcribe ${a.type} "${a.name}". Tell user honestly.]` });
+              }
+            } catch (e) {
+              console.error("transcribe failed", e);
+              parts.push({ type: "text", text: `[Audio/video "${a.name}" — transcription unavailable. Be honest with user.]` });
+            }
           } else {
             parts.push({ type: "text", text: `[User attached ${a.type || "file"} "${a.name}" at ${a.url}. You CANNOT read this file type — be honest, ask user to type the content.]` });
           }
