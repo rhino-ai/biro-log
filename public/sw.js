@@ -1,4 +1,4 @@
-const CACHE_NAME = 'biro-log-v1';
+const CACHE_NAME = 'biro-log-v2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -31,10 +31,25 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Fetch event - serve from cache, fallback to network
+// Fetch event - keep app-shell fresh, never cache Vite/dev dependency chunks
 self.addEventListener('fetch', (event) => {
   // Skip non-GET requests
   if (event.request.method !== 'GET') return;
+
+  const url = new URL(event.request.url);
+
+  // Vite dependency chunks must never be served stale, or React can be duplicated.
+  if (
+    url.pathname.startsWith('/node_modules/.vite/') ||
+    url.pathname.startsWith('/@vite/') ||
+    url.pathname.startsWith('/@react-refresh') ||
+    url.pathname.startsWith('/src/') ||
+    event.request.destination === 'script' ||
+    event.request.destination === 'style'
+  ) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
   
   // Skip Supabase API requests (need fresh data)
   if (event.request.url.includes('supabase')) return;
@@ -43,40 +58,19 @@ self.addEventListener('fetch', (event) => {
   if (event.request.url.includes('mixkit.co')) return;
 
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      // Return cached version if available
-      if (cachedResponse) {
-        // Fetch fresh version in background
-        fetch(event.request).then((response) => {
-          if (response.ok) {
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(event.request, response);
-            });
-          }
-        }).catch(() => {});
-        return cachedResponse;
-      }
-
-      // Fetch from network
-      return fetch(event.request)
-        .then((response) => {
-          // Cache successful responses
-          if (response.ok && response.type === 'basic') {
-            const responseClone = response.clone();
-            caches.open(CACHE_NAME).then((cache) => {
-              cache.put(event.request, responseClone);
-            });
-          }
-          return response;
-        })
-        .catch(() => {
-          // Return offline page for navigation requests
-          if (event.request.mode === 'navigate') {
-            return caches.match('/');
-          }
-          return new Response('Offline', { status: 503 });
-        });
-    })
+    fetch(event.request)
+      .then((response) => {
+        if (response.ok && response.type === 'basic' && STATIC_ASSETS.includes(url.pathname)) {
+          const responseClone = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseClone));
+        }
+        return response;
+      })
+      .catch(() => caches.match(event.request).then((cachedResponse) => {
+        if (cachedResponse) return cachedResponse;
+        if (event.request.mode === 'navigate') return caches.match('/');
+        return new Response('Offline', { status: 503 });
+      }))
   );
 });
 
