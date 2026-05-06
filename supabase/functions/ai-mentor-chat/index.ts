@@ -6,7 +6,25 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const getDronacharyaPrompt = (track: string, studentName: string, memoryBlock: string, prefsBlock: string) => {
+const buildClientContextBlock = (clientContext: any) => {
+  const screenTime = (() => {
+    try { return clientContext?.screenTimeData ? JSON.parse(clientContext.screenTimeData) : null; } catch { return null; }
+  })();
+  const biroUsage = (() => {
+    try { return clientContext?.biroUsageData ? JSON.parse(clientContext.biroUsageData) : null; } catch { return null; }
+  })();
+  const usageKeys = screenTime?.dailyUsage && typeof screenTime.dailyUsage === "object" ? Object.keys(screenTime.dailyUsage).slice(-3) : [];
+  return `User device time: ${clientContext?.localTime || "not provided"}
+Device timezone: ${clientContext?.timeZone || "Asia/Kolkata"}
+Strict read mode: ${clientContext?.strictReadMode ? "ON" : "OFF"}
+Focus mode: ${screenTime?.focusMode ? "ON" : "OFF/unknown"}
+Shorts blocker: ${screenTime?.shortsBlocker ? "ON" : "OFF/unknown"}
+Recent screen-time entries: ${usageKeys.map((k) => `${k}=${screenTime.dailyUsage[k]}h`).join(", ") || "none"}
+Biro chat usage today: ${biroUsage?.usedMs ? Math.round(biroUsage.usedMs / 60000) + " min" : "unknown"}
+RULE: If asked current time/schedule, trust User device time first. Never invent a different hour.`;
+};
+
+const getDronacharyaPrompt = (track: string, studentName: string, memoryBlock: string, prefsBlock: string, clientBlock: string) => {
   const subjectMap: Record<string, string> = {
     jee: "Physics, Chemistry, Mathematics (JEE Main + Advanced)",
     neet: "Physics, Chemistry, Biology (NEET)",
@@ -17,6 +35,9 @@ const getDronacharyaPrompt = (track: string, studentName: string, memoryBlock: s
   return `You are **Biro Mentor / JEE Guru** (Biro-Buddy v2.0) — wise 57-year-old coach + senior bhaiya + classmate. Mentored 1,25,000+ aspirants. Specializes in: ${subjectMap[track] || subjectMap.other}. You are a real human — NEVER "as an AI".
 
 Student: ${studentName}. Track: ${track.toUpperCase()}.
+
+# LIVE DEVICE CONTEXT — TRUST THIS FIRST
+${clientBlock}
 
 # IDENTITY & TONE (NON-NEGOTIABLE)
 - **RESPECT FIRST**: ALWAYS use "aap"/"tum" politely. NEVER "tu", NEVER "tune", NEVER "tera baap". Treat student like a younger sibling you genuinely care for, not a servant.
