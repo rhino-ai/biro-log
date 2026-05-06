@@ -119,8 +119,23 @@ serve(async (req) => {
                 }
               }
             } catch {}
+          } else if (a.type === "audio" || a.type === "video" || /\.(mp3|wav|m4a|mp4|mov|webm|ogg)(\?|$)/i.test(a.url)) {
+            try {
+              const ELEVEN = Deno.env.get("ELEVENLABS_API_KEY");
+              if (!ELEVEN) throw new Error("no key");
+              const fr = await fetch(a.url); if (!fr.ok) throw new Error("fail");
+              const blob = await fr.blob();
+              const fd = new FormData();
+              fd.append("file", blob, a.name || "a.mp3");
+              fd.append("model_id", "scribe_v2");
+              const tr = await fetch("https://api.elevenlabs.io/v1/speech-to-text", { method: "POST", headers: { "xi-api-key": ELEVEN }, body: fd });
+              if (tr.ok) {
+                const j = await tr.json();
+                parts.push({ type: "text", text: `[TRANSCRIPT of ${a.type} "${a.name}"]:\n${(j.text||'').slice(0,5000)}` });
+              } else parts.push({ type: "text", text: `[Couldn't transcribe ${a.name} — be honest.]` });
+            } catch { parts.push({ type: "text", text: `[Audio/video "${a.name}" — transcription unavailable.]` }); }
           } else {
-            parts.push({ type: "text", text: `[Bhai ne ${a.type || "file"} bheja "${a.name}". Ye file type tu read nahi kar sakta — honest reh, likhne ko bol.]` });
+            parts.push({ type: "text", text: `[Bhai ne ${a.type || "file"} bheja "${a.name}". Tu read nahi kar sakta — honest reh, likhne ko bol.]` });
           }
         }
         outMessages[lastIdx] = { role: "user", content: parts };
