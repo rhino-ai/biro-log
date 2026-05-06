@@ -162,7 +162,7 @@ serve(async (req) => {
     }
     const userId = (data.claims as any).sub as string;
 
-    const { messages, studyTrack, studentName, isNightlyCheckin, attachments } = await req.json();
+    const { messages, studyTrack, studentName, isNightlyCheckin, attachments, clientContext } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
@@ -273,7 +273,8 @@ ${chapters || "  (no chapter progress)"}`;
       console.error("memory build failed:", memErr);
     }
 
-    let systemPrompt = getDronacharyaPrompt(studyTrack || 'jee', studentName || 'Student', memoryBlock, prefsBlock);
+    const clientBlock = buildClientContextBlock(clientContext);
+    let systemPrompt = getDronacharyaPrompt(studyTrack || 'jee', studentName || 'Student', memoryBlock, prefsBlock, clientBlock);
     if (isNightlyCheckin) systemPrompt += `\n\n# NIGHTLY CHECK-IN MODE\nGreet warmly by name. Ask 1 specific question about today's study based on memory above. Then assign 1 thing for tomorrow morning.`;
 
     // Multimodal: convert latest user message into parts (images inline, PDFs fetched + base64, others as text refs).
