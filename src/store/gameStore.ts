@@ -128,7 +128,10 @@ interface GameState {
   deleteChapter: (jungleId: string, chapterId: string) => void;
 }
 
-const XP_PER_LEVEL = 100;
+// Realistic XP curve: Level = floor(0.5 * sqrt(XP))
+// Level 1 = 4 XP, Level 5 = 100 XP, Level 10 = 400 XP, Level 50 = 10000 XP
+const calculateLevel = (xp: number) => Math.floor(0.5 * Math.sqrt(xp));
+const calculateXPForLevel = (level: number) => Math.ceil(Math.pow(level / 0.5, 2));
 
 // Create default track data
 const createDefaultTrackData = (track: StudyTrack): TrackData => ({
@@ -224,7 +227,7 @@ export const useGameStore = create<GameState>()(
           }
 
           const newXP = currentData.xp + xpGain;
-          const newLevel = Math.floor(newXP / XP_PER_LEVEL);
+          const newLevel = calculateLevel(newXP);
           const newCoins = currentData.coins + coinGain;
 
           updateCurrentTrackData({
@@ -240,7 +243,7 @@ export const useGameStore = create<GameState>()(
         addXP: (amount) => {
           const currentData = getCurrentTrackData();
           const newXP = Math.max(0, currentData.xp + amount);
-          const newLevel = Math.floor(newXP / XP_PER_LEVEL);
+          const newLevel = calculateLevel(newXP);
           updateCurrentTrackData({ xp: newXP, level: newLevel });
         },
 
@@ -291,7 +294,7 @@ export const useGameStore = create<GameState>()(
           }
 
           const newXP = currentData.xp + xpGain;
-          const newLevel = Math.floor(newXP / XP_PER_LEVEL);
+          const newLevel = calculateLevel(newXP);
 
           updateCurrentTrackData({
             tasks: newTasks,
@@ -368,7 +371,8 @@ export const useGameStore = create<GameState>()(
 
         getXPForNextLevel: () => {
           const currentData = getCurrentTrackData();
-          return (currentData.level + 1) * XP_PER_LEVEL - currentData.xp;
+          const nextLevelXP = calculateXPForLevel(currentData.level + 1);
+          return nextLevelXP - currentData.xp;
         },
 
         getUnlockedRewards: () => {
