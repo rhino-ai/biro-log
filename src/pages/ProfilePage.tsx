@@ -84,8 +84,12 @@ const ProfilePage = () => {
       const fileName = `${user.id}/avatar.${fileExt}`;
       const { error: uploadError } = await supabase.storage.from('avatars').upload(fileName, file, { upsert: true });
       if (uploadError) throw uploadError;
-      const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(fileName);
-      setEditedProfile({ ...editedProfile, avatar: publicUrl });
+      // Bucket is private — use a long-lived signed URL so only authorised users can read.
+      const { data: signed, error: signErr } = await supabase.storage
+        .from('avatars')
+        .createSignedUrl(fileName, 60 * 60 * 24 * 365);
+      if (signErr || !signed?.signedUrl) throw signErr || new Error('Could not sign avatar URL');
+      setEditedProfile({ ...editedProfile, avatar: signed.signedUrl });
       toast({ title: 'Image Uploaded! 📸' });
     } catch (error: any) {
       toast({ title: 'Upload Failed', description: error.message, variant: 'destructive' });

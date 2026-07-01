@@ -212,6 +212,27 @@ export type Database = {
         }
         Relationships: []
       }
+      edge_rate_limit_log: {
+        Row: {
+          created_at: string
+          endpoint: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          endpoint: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          endpoint?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       feature_ratings: {
         Row: {
           comment: string | null
@@ -737,10 +758,6 @@ export type Database = {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
-        Returns: boolean
-      }
-      verify_admin_step_codes: {
-        Args: { _step_one: string; _step_two: string }
         Returns: boolean
       }
     }

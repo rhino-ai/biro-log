@@ -1,5 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { isAllowedAttachmentUrl, fetchWithSizeCap, checkRateLimit, genericErrorFor, maybeCleanupRateLimit } from "../_shared/security.ts";
+
+const MAX_PDF_BYTES = 18 * 1024 * 1024;   // 18 MB
+const MAX_MEDIA_BYTES = 25 * 1024 * 1024; // 25 MB for audio/video
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -163,9 +167,23 @@ serve(async (req) => {
     }
     const userId = (data.claims as any).sub as string;
 
+    // Rate limit: 20 messages / minute per user.
+    maybeCleanupRateLimit(supabase);
+    const rl = await checkRateLimit(supabase, userId, "ai-mentor-chat", 20, 60);
+    if (!rl.allowed) {
+      return new Response(JSON.stringify({ error: "Too many requests. Please slow down." }), {
+        status: 429, headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": String(rl.retryAfter ?? 60) },
+      });
+    }
+
     const { messages, studyTrack, studentName, isNightlyCheckin, attachments, clientContext } = await req.json();
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+    if (!LOVABLE_API_KEY) {
+      console.error("mentor_config_missing");
+      return new Response(JSON.stringify({ error: "Service temporarily unavailable" }), {
+        status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     // Load chat preferences
     let prefsBlock = "(default: respectful Hinglish, balanced length, auto persona)";
@@ -288,33 +306,32 @@ ${chapters || "  (no chapter progress)"}`;
         if (orig.content && typeof orig.content === "string") parts.push({ type: "text", text: orig.content });
         for (const a of attachments) {
           if (!a?.url) continue;
+          if (!isAllowedAttachmentUrl(a.url)) {
+            parts.push({ type: "text", text: `[Attachment "${a.name}" rejected: only files uploaded to our storage are supported.]` });
+            continue;
+          }
           if (a.type === "image") {
             parts.push({ type: "image_url", image_url: { url: a.url } });
           } else if (a.type === "document" || /\.pdf(\?|$)/i.test(a.url)) {
             // Fetch PDF and inline as base64 so Gemini can actually read it
             try {
-              const r = await fetch(a.url);
-              if (r.ok) {
-                const buf = new Uint8Array(await r.arrayBuffer());
-                if (buf.length < 18 * 1024 * 1024) {
-                  let bin = "";
-                  for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
-                  const b64 = btoa(bin);
-                  parts.push({ type: "image_url", image_url: { url: `data:application/pdf;base64,${b64}` } });
-                  parts.push({ type: "text", text: `[Attached PDF "${a.name}" — read it and analyse honestly]` });
-                } else {
-                  parts.push({ type: "text", text: `[User attached PDF "${a.name}" but it's too large to read inline. Tell user to send a smaller file or paste the text.]` });
-                }
-              }
-            } catch (e) { console.error("pdf fetch failed", e); }
+              const buf = await fetchWithSizeCap(a.url, MAX_PDF_BYTES);
+              let bin = "";
+              for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
+              const b64 = btoa(bin);
+              parts.push({ type: "image_url", image_url: { url: `data:application/pdf;base64,${b64}` } });
+              parts.push({ type: "text", text: `[Attached PDF "${a.name}" — read it and analyse honestly]` });
+            } catch (e) {
+              console.error("pdf fetch failed", (e as Error)?.message);
+              parts.push({ type: "text", text: `[PDF "${a.name}" could not be read (too large or unavailable). Ask user for smaller file.]` });
+            }
           } else if (a.type === "audio" || a.type === "video" || /\.(mp3|wav|m4a|mp4|mov|webm|ogg)(\?|$)/i.test(a.url)) {
             // Transcribe via ElevenLabs Scribe
             try {
               const ELEVEN = Deno.env.get("ELEVENLABS_API_KEY");
               if (!ELEVEN) throw new Error("no ELEVENLABS_API_KEY");
-              const fileRes = await fetch(a.url);
-              if (!fileRes.ok) throw new Error("file fetch failed");
-              const blob = await fileRes.blob();
+              const buf = await fetchWithSizeCap(a.url, MAX_MEDIA_BYTES);
+              const blob = new Blob([buf]);
               const fd = new FormData();
               fd.append("file", blob, a.name || "audio.mp3");
               fd.append("model_id", "scribe_v2");
@@ -330,7 +347,7 @@ ${chapters || "  (no chapter progress)"}`;
                 parts.push({ type: "text", text: `[Could not transcribe ${a.type} "${a.name}". Tell user honestly.]` });
               }
             } catch (e) {
-              console.error("transcribe failed", e);
+              console.error("transcribe failed", (e as Error)?.message);
               parts.push({ type: "text", text: `[Audio/video "${a.name}" — transcription unavailable. Be honest with user.]` });
             }
           } else {
@@ -361,20 +378,22 @@ ${chapters || "  (no chapter progress)"}`;
     });
 
     if (!response.ok) {
+      const errorId = crypto.randomUUID();
+      const text = await response.text().catch(() => "");
+      console.error(`[${errorId}] AI gateway error`, response.status, text);
       if (response.status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit reached. Try again in a minute." }), {
+        return new Response(JSON.stringify({ error: "Too many requests. Please wait." }), {
           status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       if (response.status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted. Add credits in Workspace settings." }), {
+        return new Response(JSON.stringify({ error: "AI credits exhausted. Please try again later.", errorId }), {
           status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      const text = await response.text();
-      console.error("AI gateway error:", response.status, text);
-      return new Response(JSON.stringify({ error: "Something went wrong. Please try again." }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      const g = genericErrorFor(response.status);
+      return new Response(JSON.stringify({ error: g.message, errorId }), {
+        status: g.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -416,8 +435,9 @@ ${chapters || "  (no chapter progress)"}`;
       headers: { ...corsHeaders, "Content-Type": "text/event-stream" },
     });
   } catch (error) {
-    console.error("Mentor chat error:", error);
-    return new Response(JSON.stringify({ error: "Something went wrong" }), {
+    const errorId = crypto.randomUUID();
+    console.error(`[${errorId}] Mentor chat error`, error);
+    return new Response(JSON.stringify({ error: "Service temporarily unavailable", errorId }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

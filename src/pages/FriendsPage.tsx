@@ -105,11 +105,14 @@ const FriendsPage = () => {
 
   const handleSearch = useCallback(async (query: string) => {
     setSearchQuery(query);
-    if (query.length < 2) { setSearchResults([]); return; }
+    const trimmed = query.trim();
+    if (trimmed.length < 3) { setSearchResults([]); return; }
+    // Escape PostgREST wildcard characters so users can't enumerate via `%` or `_`.
+    const escaped = trimmed.replace(/[%_\\]/g, (c) => `\\${c}`);
     setIsSearching(true);
     const { data } = await supabase.from('profiles')
       .select('user_id, name, avatar, email, xp, level')
-      .or(`email.ilike.%${query}%,name.ilike.%${query}%`)
+      .or(`email.ilike.%${escaped}%,name.ilike.%${escaped}%,unique_id.ilike.%${escaped}%`)
       .neq('user_id', user?.id || '').limit(10);
     setSearchResults(data || []);
     setIsSearching(false);

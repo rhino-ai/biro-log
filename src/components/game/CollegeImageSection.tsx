@@ -71,12 +71,13 @@ export const CollegeImageSection = () => {
 
         if (uploadError) throw uploadError;
 
-        const { data: { publicUrl } } = supabase.storage
+        const { data: signed, error: signErr } = await supabase.storage
           .from('avatars')
-          .getPublicUrl(fileName);
+          .createSignedUrl(fileName, 60 * 60 * 24 * 365);
+        if (signErr || !signed?.signedUrl) throw signErr || new Error('Could not sign college image URL');
 
-        setCollegeImage(publicUrl);
-        updateProfile({ dreamCollegeImage: publicUrl });
+        setCollegeImage(signed.signedUrl);
+        updateProfile({ dreamCollegeImage: signed.signedUrl });
         
         toast({
           title: 'College Image Uploaded! 🏫',

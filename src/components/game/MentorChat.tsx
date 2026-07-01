@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { useMentorChat } from '@/hooks/useMentorChat';
+import DOMPurify from 'dompurify';
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
@@ -23,18 +24,12 @@ import {
 const SimpleMarkdown = ({ content }: { content: string }) => {
   if (!content) return <span className="opacity-50">...</span>;
   
-  const sanitize = (html: string) => {
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-    doc.querySelectorAll('script,iframe,object,embed,link,style').forEach(el => el.remove());
-    doc.querySelectorAll('*').forEach(el => {
-      for (const attr of Array.from(el.attributes)) {
-        if (attr.name.startsWith('on') || attr.value.includes('javascript:')) {
-          el.removeAttribute(attr.name);
-        }
-      }
-    });
-    return doc.body.innerHTML;
-  };
+  // Use DOMPurify (battle-tested) instead of a homegrown allowlist.
+  const sanitize = (html: string) => DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: ['strong', 'em', 'code', 'br', 'span'],
+    ALLOWED_ATTR: ['class'],
+    FORBID_ATTR: ['style', 'onerror', 'onclick', 'onload'],
+  });
 
   return (
     <div className="space-y-1">

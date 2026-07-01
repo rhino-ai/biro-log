@@ -8,35 +8,20 @@ export interface ChatMessage {
   reactions?: string[];
 }
 
+// Chat history was previously persisted to localStorage, which leaked
+// potentially sensitive conversation content on shared devices and to any
+// third-party script running in the page. We now keep messages in memory only
+// and proactively clear any stale data left in browser storage.
 const CHAT_STORAGE_KEY = 'biro-yaar-chats';
+const LEGACY_KEYS = [CHAT_STORAGE_KEY, 'biro-yaar-messages', 'mentor-chat-history'];
 
 export const useChatStorage = () => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
 
-  // Load messages from localStorage on mount
+  // Purge any legacy plaintext chat history on mount.
   useEffect(() => {
-    const stored = localStorage.getItem(CHAT_STORAGE_KEY);
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        const messagesWithDates = parsed.map((m: any) => ({
-          ...m,
-          timestamp: new Date(m.timestamp),
-        }));
-        setMessages(messagesWithDates);
-      } catch {
-        // Invalid data, start fresh
-        setMessages([]);
-      }
-    }
+    try { LEGACY_KEYS.forEach((k) => localStorage.removeItem(k)); } catch {}
   }, []);
-
-  // Save messages to localStorage whenever they change
-  useEffect(() => {
-    if (messages.length > 0) {
-      localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(messages));
-    }
-  }, [messages]);
 
   const addMessage = useCallback((message: Omit<ChatMessage, 'id'>) => {
     const newMessage: ChatMessage = {
@@ -55,16 +40,11 @@ export const useChatStorage = () => {
 
   const deleteMessage = useCallback((id: string) => {
     setMessages(prev => prev.filter(m => m.id !== id));
-    // Update localStorage
-    const remaining = messages.filter(m => m.id !== id);
-    if (remaining.length === 0) {
-      localStorage.removeItem(CHAT_STORAGE_KEY);
-    }
-  }, [messages]);
+  }, []);
 
   const clearAllMessages = useCallback(() => {
     setMessages([]);
-    localStorage.removeItem(CHAT_STORAGE_KEY);
+    try { LEGACY_KEYS.forEach((k) => localStorage.removeItem(k)); } catch {}
   }, []);
 
   const addReaction = useCallback((messageId: string, emoji: string) => {
