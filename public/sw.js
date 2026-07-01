@@ -38,6 +38,16 @@ self.addEventListener('fetch', (event) => {
 
   const url = new URL(event.request.url);
 
+  // Never intercept OAuth flows — they must always hit the network
+  if (
+    url.pathname.startsWith('/~oauth') ||
+    url.hostname.includes('oauth.lovable.app') ||
+    url.hostname.includes('accounts.google.com') ||
+    url.hostname.includes('appleid.apple.com')
+  ) {
+    return;
+  }
+
   // Vite dependency chunks must never be served stale, or React can be duplicated.
   if (
     url.pathname.startsWith('/node_modules/.vite/') ||

@@ -14,7 +14,7 @@ import { lovable } from '@/integrations/lovable/index';
 
 const AuthPage = () => {
   const navigate = useNavigate();
-  const { signIn, signUp, user } = useAuth();
+  const { signIn, signUp, user, enterGuestMode } = useAuth();
   const { hasSelectedTrack } = useGameStore();
   const [isLoading, setIsLoading] = useState(false);
   const [showTrackSelection, setShowTrackSelection] = useState(false);
@@ -75,7 +75,16 @@ const AuthPage = () => {
     navigate('/');
   };
 
-  if (showTrackSelection) return <TrackSelection />;
+  const handleGuestMode = () => {
+    enterGuestMode();
+    if (!hasSelectedTrack) {
+      setShowTrackSelection(true);
+    } else {
+      navigate('/');
+    }
+  };
+
+  if (showTrackSelection) return <TrackSelection onComplete={handleTrackComplete} />;
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
@@ -166,6 +175,16 @@ const AuthPage = () => {
         <p className="text-center text-xs text-muted-foreground animate-fade-in" style={{ animationDelay: '0.2s' }}>
           By signing up, you agree to grow your jungle 🌳
         </p>
+
+        <div className="text-center animate-fade-in" style={{ animationDelay: '0.25s' }}>
+          <Button
+            variant="ghost"
+            onClick={handleGuestMode}
+            className="text-muted-foreground hover:text-foreground text-sm"
+          >
+            Continue as Guest 👤 (data saved on this device only)
+          </Button>
+        </div>
       </div>
     </div>
   );
