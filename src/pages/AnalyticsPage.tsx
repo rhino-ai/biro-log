@@ -55,7 +55,7 @@ const AnalyticsPage = () => {
       // 2. Get Gemini API Key
       let apiKey = import.meta.env.VITE_GEMINI_API_KEY;
       if (user) {
-        const { data } = await supabase.from('user_secrets').select('gemini_api_key').eq('user_id', user.id).maybeSingle();
+        const { data } = await (supabase as any).from('user_secrets').select('gemini_api_key').eq('user_id', user.id).maybeSingle();
         if (data?.gemini_api_key) apiKey = data.gemini_api_key;
       }
 

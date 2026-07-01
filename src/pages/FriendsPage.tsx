@@ -10,7 +10,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Users, MessageCircle, Plus, Search, UserPlus, Send, ArrowLeft, Video, Globe, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase as _supabase } from '@/integrations/supabase/client';
+const supabase = _supabase as any;
 import { useAuth } from '@/hooks/useAuth';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
