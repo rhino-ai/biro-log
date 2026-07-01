@@ -1,20 +1,82 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Header } from '@/components/layout/Header';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { BackButton } from '@/components/layout/BackButton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Video, Users, Monitor, Copy, ExternalLink } from 'lucide-react';
+import { Video, Users, Monitor, Copy, ExternalLink, Timer, BookOpen } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { useGame } from '@/hooks/useGame';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
+import { ScrollArea } from '@/components/ui/scroll-area';
+
+interface RoomUser {
+  id: string;
+  name: string;
+  avatar: string;
+  joinedAt: number;
+}
 
 const VirtualLibraryPage = () => {
+  const { user } = useAuth();
   const { profile } = useGame();
   const [meetingId, setMeetingId] = useState('');
   const [isInRoom, setIsInRoom] = useState(false);
   const [roomName, setRoomName] = useState('');
+  const [roomUsers, setRoomUsers] = useState<RoomUser[]>([]);
+  const [studyTime, setStudyTime] = useState(0);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isInRoom) {
+      interval = setInterval(() => setStudyTime(prev => prev + 1), 60000); // add 1 min every 60s
+    } else {
+      setStudyTime(0);
+    }
+    return () => clearInterval(interval);
+  }, [isInRoom]);
+
+  useEffect(() => {
+    if (!isInRoom || !roomName || !user) return;
+    
+    const channel = supabase.channel(`study-room-${roomName}`, {
+      config: { presence: { key: user.id } }
+    });
+
+    channel.on('presence', { event: 'sync' }, () => {
+      const state = channel.presenceState();
+      const users: RoomUser[] = [];
+      for (const id in state) {
+        // We get the first object since presence states are arrays
+        const pres = state[id][0] as any;
+        if (pres) {
+          users.push({
+            id,
+            name: pres.name,
+            avatar: pres.avatar,
+            joinedAt: pres.joinedAt
+          });
+        }
+      }
+      setRoomUsers(users);
+    }).subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') {
+        await channel.track({
+          name: profile.name,
+          avatar: profile.avatar,
+          joinedAt: Date.now()
+        });
+      }
+    });
+
+    return () => {
+      channel.untrack();
+      supabase.removeChannel(channel);
+    };
+  }, [isInRoom, roomName, user, profile.name, profile.avatar]);
 
   const generateId = () => {
     const id = `BIRO-${Math.random().toString(36).substring(2, 6).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
@@ -45,47 +107,50 @@ const VirtualLibraryPage = () => {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-xs bg-accent/20 text-accent px-2 py-1 rounded-full">🔒 E2E Encrypted</span>
+            <span className="text-xs bg-accent/20 text-accent px-2 py-1 rounded-full flex items-center gap-1">
+              <Users className="w-3 h-3" /> {roomUsers.length}
+            </span>
           </div>
         </div>
 
-        <div className="flex-1 flex items-center justify-center bg-secondary/10">
-          <div className="text-center space-y-4 max-w-sm px-4">
-            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary to-accent mx-auto flex items-center justify-center text-4xl">
-              {profile.avatar}
+        <div className="flex-1 bg-secondary/10 flex flex-col">
+          <div className="p-4 text-center">
+            <h3 className="font-game text-xl text-primary mb-1">Study Timer</h3>
+            <div className="text-4xl font-mono font-bold tracking-wider text-glow-purple">
+              {Math.floor(studyTime / 60).toString().padStart(2, '0')}:
+              {(studyTime % 60).toString().padStart(2, '0')}
             </div>
-            <h3 className="font-game text-lg">{profile.name}'s Study Room</h3>
-            <p className="text-sm text-muted-foreground">
-              Video calling requires WebRTC peer-to-peer connection.
-              Share your Meeting ID with friends to study together!
-            </p>
-            <div className="glass-panel rounded-xl p-4 border border-primary/20 space-y-3">
-              <p className="text-xs text-muted-foreground">Meeting ID</p>
-              <div className="flex gap-2">
-                <Input value={roomName} readOnly className="bg-secondary/50 font-game text-center" />
-                <Button size="icon" variant="outline" onClick={() => { navigator.clipboard.writeText(roomName); toast({ title: 'Copied!' }); }}>
-                  <Copy className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              <div className="glass-panel rounded-xl p-3 text-center border border-primary/20">
-                <Video className="w-5 h-5 mx-auto mb-1 text-primary" />
-                <span className="text-[10px]">Camera</span>
-              </div>
-              <div className="glass-panel rounded-xl p-3 text-center border border-accent/20">
-                <Monitor className="w-5 h-5 mx-auto mb-1 text-accent" />
-                <span className="text-[10px]">Screen Share</span>
-              </div>
-              <div className="glass-panel rounded-xl p-3 text-center border border-coins/20">
-                <Users className="w-5 h-5 mx-auto mb-1 text-coins" />
-                <span className="text-[10px]">Invite</span>
-              </div>
-            </div>
-            <p className="text-[10px] text-muted-foreground">
-              🔒 All calls are end-to-end encrypted. No data is stored.
-            </p>
+            <p className="text-xs text-muted-foreground mt-2">min : sec</p>
           </div>
+
+          <div className="px-4 pb-2 flex justify-between items-center text-sm font-medium">
+            <span>Members Present ({roomUsers.length})</span>
+            <Button variant="ghost" size="sm" onClick={copyId} className="h-8 gap-1 text-xs">
+              <Copy className="w-3 h-3" /> Copy ID
+            </Button>
+          </div>
+
+          <ScrollArea className="flex-1 px-4">
+            <div className="grid grid-cols-2 gap-3 pb-6">
+              {roomUsers.map((ru) => (
+                <div key={ru.id} className={cn(
+                  "glass-panel p-3 rounded-2xl flex flex-col items-center gap-2 border",
+                  ru.id === user?.id ? "border-primary/50" : "border-white/10"
+                )}>
+                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-2xl relative">
+                    {ru.avatar}
+                    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-background"></div>
+                  </div>
+                  <div className="text-center w-full">
+                    <p className="text-xs font-semibold truncate">{ru.name}</p>
+                    <p className="text-[10px] text-muted-foreground mt-0.5">
+                      {Math.floor((Date.now() - ru.joinedAt) / 60000)}m studying
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
         </div>
       </div>
     );

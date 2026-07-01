@@ -14,7 +14,7 @@ import { CollegeImageSection } from '@/components/game/CollegeImageSection';
 import { PWAInstallButton } from '@/components/game/PWAInstallButton';
 import { NightlyCheckinBanner } from '@/components/game/NightlyCheckinBanner';
 import { useNavigate, Link } from 'react-router-dom';
-import { Swords, Zap, Users, Trophy, Brain, Heart, Smartphone, BarChart3, Video, BookOpen, Star, Table2, NotebookPen, Skull, RotateCw, Calendar } from 'lucide-react';
+import { Swords, Zap, Users, Trophy, Brain, Heart, Smartphone, BarChart3, Video, BookOpen, Star, Table2, NotebookPen, Skull, RotateCw, Calendar, Flame } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEffect, useState } from 'react';
 import { useDataSync } from '@/hooks/useDataSync';
@@ -150,6 +150,7 @@ const Index = () => {
             { to: '/revision', icon: <RotateCw className="w-4 h-4" />, label: 'Revise', color: 'from-violet-500 to-fuchsia-500' },
             { to: '/villain', icon: <Skull className="w-4 h-4" />, label: 'Villain', color: 'from-red-700 to-red-950' },
             { to: '/mentor-timeline', icon: <Calendar className="w-4 h-4" />, label: 'Timeline', color: 'from-amber-500 to-orange-600' },
+            { to: '/hot-question', icon: <Flame className="w-4 h-4" />, label: 'Hot Qs', color: 'from-orange-500 to-red-500' },
           ].map((item) => (
             <Link key={item.to} to={item.to}
               className="glass-panel rounded-xl p-2.5 border border-white/10 flex flex-col items-center gap-1.5 hover:border-primary/30 transition-colors">

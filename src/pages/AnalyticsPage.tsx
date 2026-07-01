@@ -3,11 +3,98 @@ import { Header } from '@/components/layout/Header';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { BackButton } from '@/components/layout/BackButton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
 import { useGame } from '@/hooks/useGame';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { Loader2, Table, Sparkles, TrendingUp } from 'lucide-react';
+import { ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 
 const AnalyticsPage = () => {
+  const { user } = useAuth();
   const { xp, level, coins, streak, jungles, tasks, testRecords, calculateJungleHealth } = useGame();
+  
+  // Google Sheets state
+  const [sheetUrl, setSheetUrl] = useState('');
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState<{
+    summary: string;
+    chartType: 'bar' | 'line';
+    chartData: any[];
+    dataLabel: string;
+  } | null>(null);
+
+  const handleAnalyzeSheet = async () => {
+    if (!sheetUrl.trim()) {
+      toast({ title: 'Enter a valid link', description: 'Please provide a public Google Sheet URL', variant: 'destructive' });
+      return;
+    }
+
+    const sheetIdMatch = sheetUrl.match(/[-\w]{25,}/);
+    if (!sheetIdMatch) {
+      toast({ title: 'Invalid URL', description: 'Could not find Sheet ID in the URL', variant: 'destructive' });
+      return;
+    }
+
+    const sheetId = sheetIdMatch[0];
+    setIsAnalyzing(true);
+    setAnalysisResult(null);
+
+    try {
+      // 1. Fetch CSV
+      const csvResponse = await fetch(`https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`);
+      if (!csvResponse.ok) {
+        throw new Error('Could not read sheet. Ensure it is set to "Anyone with the link can view".');
+      }
+      const csvText = await csvResponse.text();
+      const rows = csvText.split('\n').slice(0, 50).join('\n'); // limit to first 50 rows
+
+      // 2. Get Gemini API Key
+      let apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+      if (user) {
+        const { data } = await supabase.from('user_secrets').select('gemini_api_key').eq('user_id', user.id).maybeSingle();
+        if (data?.gemini_api_key) apiKey = data.gemini_api_key;
+      }
+
+      if (!apiKey) {
+        throw new Error('No Gemini API Key found. Please add it in your Profile settings.');
+      }
+
+      // 3. Call Gemini AI
+      const prompt = `Analyze this CSV data from a student's tracking sheet:\n\n${rows}\n\nReturn ONLY a JSON object (no markdown, no backticks) in this exact format:
+{
+  "summary": "2-3 short sentences giving motivational feedback or study insights based on the numbers.",
+  "chartType": "bar",
+  "dataLabel": "Score / Time",
+  "chartData": [
+    { "name": "Item 1", "value": 85 },
+    { "name": "Item 2", "value": 90 }
+  ]
+}
+Choose "bar" or "line" for chartType. Max 10 items in chartData. Parse numbers cleanly.`;
+
+      const aiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+      });
+
+      const aiJson = await aiRes.json();
+      const rawText = aiJson.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      const cleanJson = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+      const parsed = JSON.parse(cleanJson);
+
+      setAnalysisResult(parsed);
+      toast({ title: 'Sheet Analyzed! 📈', description: 'AI generated insights & charts.' });
+    } catch (err: any) {
+      toast({ title: 'Analysis Failed', description: err.message || 'Error processing sheet', variant: 'destructive' });
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
 
   // Subject health
   const subjectHealth = useMemo(() => {
@@ -139,6 +226,69 @@ const AnalyticsPage = () => {
             <p className="text-[10px] text-muted-foreground text-center mt-3 italic">
               "How many squares do you have left? Use them wisely."
             </p>
+          </CardContent>
+        </Card>
+
+        {/* Google Sheets AI Analysis */}
+        <Card className="glass-panel border-accent/40 bg-gradient-to-br from-accent/5 to-primary/5">
+          <CardHeader>
+            <CardTitle className="text-sm font-game flex items-center gap-2 text-accent">
+              <Table className="w-4 h-4" /> Google Sheets AI Analysis
+            </CardTitle>
+            <p className="text-[10px] text-muted-foreground">
+              Paste a public Google Sheet URL (mock tests, habit logs, expenses) for Gemini AI charting.
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex gap-2">
+              <Input
+                placeholder="https://docs.google.com/spreadsheets/d/..."
+                value={sheetUrl}
+                onChange={(e) => setSheetUrl(e.target.value)}
+                className="bg-secondary/50 text-xs"
+              />
+              <Button
+                onClick={handleAnalyzeSheet}
+                disabled={isAnalyzing || !sheetUrl.trim()}
+                className="bg-accent shrink-0 gap-1.5"
+              >
+                {isAnalyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                Analyze
+              </Button>
+            </div>
+
+            {analysisResult && (
+              <div className="space-y-4 pt-2 border-t border-white/10 animate-fade-in">
+                <div className="bg-card/50 p-3 rounded-xl border border-white/10">
+                  <p className="text-xs font-semibold flex items-center gap-1.5 text-primary mb-1">
+                    <TrendingUp className="w-3.5 h-3.5" /> AI Insight
+                  </p>
+                  <p className="text-xs text-muted-foreground leading-relaxed">{analysisResult.summary}</p>
+                </div>
+
+                <div className="h-48 w-full pt-2">
+                  <ResponsiveContainer width="100%" height="100%">
+                    {analysisResult.chartType === 'line' ? (
+                      <LineChart data={analysisResult.chartData}>
+                        <XAxis dataKey="name" stroke="#888888" fontSize={10} />
+                        <YAxis stroke="#888888" fontSize={10} />
+                        <Tooltip contentStyle={{ backgroundColor: '#1f1f23', border: '1px solid #333', borderRadius: '8px', fontSize: '12px' }} />
+                        <Legend />
+                        <Line type="monotone" dataKey="value" name={analysisResult.dataLabel || 'Value'} stroke="#8b5cf6" strokeWidth={2} dot={{ r: 4 }} />
+                      </LineChart>
+                    ) : (
+                      <BarChart data={analysisResult.chartData}>
+                        <XAxis dataKey="name" stroke="#888888" fontSize={10} />
+                        <YAxis stroke="#888888" fontSize={10} />
+                        <Tooltip contentStyle={{ backgroundColor: '#1f1f23', border: '1px solid #333', borderRadius: '8px', fontSize: '12px' }} />
+                        <Legend />
+                        <Bar dataKey="value" name={analysisResult.dataLabel || 'Value'} fill="#06b6d4" radius={[4, 4, 0, 0]} />
+                      </BarChart>
+                    )}
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </main>

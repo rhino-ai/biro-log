@@ -16,53 +16,91 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from '@/components/ui/dialog';
 
-interface Contact {
+interface ChatRoom {
   id: string;
-  contact_user_id: string;
-  nickname: string | null;
-  profile?: { name: string; avatar: string | null; email: string | null; xp?: number; level?: number };
+  name: string | null;
+  is_group: boolean;
+  participants: { user_id: string; profile?: { name: string; avatar: string | null; level?: number; xp?: number } }[];
+  otherParticipant?: { name: string; avatar: string | null; level?: number; xp?: number; user_id: string }; // Derived for 1-on-1
 }
 
-interface DirectMessage {
+interface ChatMessage {
   id: string;
+  room_id: string;
   sender_id: string;
-  receiver_id: string;
   content: string;
   created_at: string;
+  sender_profile?: { name: string; avatar: string | null };
 }
 
 const FriendsPage = () => {
   const { user } = useAuth();
-  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [chatRooms, setChatRooms] = useState<ChatRoom[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showAddDialog, setShowAddDialog] = useState(false);
-  const [activeChat, setActiveChat] = useState<Contact | null>(null);
-  const [chatMessages, setChatMessages] = useState<DirectMessage[]>([]);
+  const [activeChat, setActiveChat] = useState<ChatRoom | null>(null);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [messageInput, setMessageInput] = useState('');
   const [sendingMsg, setSendingMsg] = useState(false);
   const [showCreateGroup, setShowCreateGroup] = useState(false);
   const [groupName, setGroupName] = useState('');
-  const [groupPublic, setGroupPublic] = useState(false);
   const chatScrollRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
+  const loadRooms = useCallback(async () => {
     if (!user) return;
-    const loadContacts = async () => {
-      const { data } = await supabase.from('contacts').select('id, contact_user_id, nickname').eq('user_id', user.id);
-      if (data) {
-        const ids = data.map(c => c.contact_user_id);
-        if (ids.length > 0) {
-          const { data: profiles } = await supabase.from('profiles').select('user_id, name, avatar, email, xp, level').in('user_id', ids);
-          setContacts(data.map(c => ({ ...c, profile: profiles?.find(p => p.user_id === c.contact_user_id) })));
-        } else {
-          setContacts(data.map(c => ({ ...c })));
+    // Get all rooms user is in
+    const { data: myParticipants } = await supabase.from('chat_room_participants').select('room_id').eq('user_id', user.id);
+    if (!myParticipants || myParticipants.length === 0) {
+      setChatRooms([]);
+      return;
+    }
+    
+    const roomIds = myParticipants.map(p => p.room_id);
+    const { data: roomsData } = await supabase.from('chat_rooms').select('*').in('id', roomIds);
+    const { data: participantsData } = await supabase.from('chat_room_participants').select('room_id, user_id').in('room_id', roomIds);
+    
+    if (roomsData && participantsData) {
+      const allUserIds = Array.from(new Set(participantsData.map(p => p.user_id)));
+      const { data: profiles } = await supabase.from('profiles').select('user_id, name, avatar, level, xp').in('user_id', allUserIds);
+      
+      const formattedRooms = roomsData.map(room => {
+        const roomParts = participantsData.filter(p => p.room_id === room.id);
+        const partsWithProfiles = roomParts.map(p => ({
+          user_id: p.user_id,
+          profile: profiles?.find(prof => prof.user_id === p.user_id)
+        }));
+        
+        let otherPart = undefined;
+        if (!room.is_group) {
+          const other = partsWithProfiles.find(p => p.user_id !== user.id);
+          if (other) {
+            otherPart = {
+              user_id: other.user_id,
+              name: other.profile?.name || 'Unknown',
+              avatar: other.profile?.avatar || null,
+              level: other.profile?.level || 0,
+              xp: other.profile?.xp || 0
+            };
+          }
         }
-      }
-    };
-    loadContacts();
+        
+        return {
+          id: room.id,
+          name: room.name,
+          is_group: room.is_group,
+          participants: partsWithProfiles,
+          otherParticipant: otherPart
+        };
+      });
+      setChatRooms(formattedRooms);
+    }
   }, [user]);
+
+  useEffect(() => {
+    loadRooms();
+  }, [loadRooms]);
 
   const handleSearch = useCallback(async (query: string) => {
     setSearchQuery(query);
@@ -78,74 +116,80 @@ const FriendsPage = () => {
 
   const addContact = async (contactUserId: string) => {
     if (!user) return;
-    const { error } = await supabase.from('contacts').insert({ user_id: user.id, contact_user_id: contactUserId });
-    if (error) {
-      if (error.code === '23505') toast({ title: 'Already added!' });
-      else toast({ title: 'Error', description: error.message, variant: 'destructive' });
+    // Check if 1-on-1 chat already exists
+    const existingRoom = chatRooms.find(r => !r.is_group && r.participants.some(p => p.user_id === contactUserId));
+    if (existingRoom) {
+      toast({ title: 'Chat already exists!' });
+      setShowAddDialog(false);
+      openChat(existingRoom);
       return;
     }
-    toast({ title: 'Contact added! ✅' });
-    setShowAddDialog(false);
-    // Reload
-    const { data } = await supabase.from('contacts').select('id, contact_user_id, nickname').eq('user_id', user.id);
-    if (data) {
-      const ids = data.map(c => c.contact_user_id);
-      const { data: profiles } = await supabase.from('profiles').select('user_id, name, avatar, email, xp, level').in('user_id', ids);
-      setContacts(data.map(c => ({ ...c, profile: profiles?.find(p => p.user_id === c.contact_user_id) })));
+    
+    const { data: newRoom, error: roomErr } = await supabase.from('chat_rooms').insert({ is_group: false }).select().single();
+    if (roomErr || !newRoom) {
+      toast({ title: 'Error', description: roomErr?.message, variant: 'destructive' });
+      return;
     }
+    
+    await supabase.from('chat_room_participants').insert([
+      { room_id: newRoom.id, user_id: user.id },
+      { room_id: newRoom.id, user_id: contactUserId }
+    ]);
+    
+    toast({ title: 'Chat started! ✅' });
+    setShowAddDialog(false);
+    loadRooms();
   };
 
-  const openChat = async (contact: Contact) => {
-    setActiveChat(contact);
-    if (!user) return;
-    const { data } = await supabase.from('direct_messages').select('*')
-      .or(`and(sender_id.eq.${user.id},receiver_id.eq.${contact.contact_user_id}),and(sender_id.eq.${contact.contact_user_id},receiver_id.eq.${user.id})`)
+  const loadMessages = async (roomId: string) => {
+    const { data } = await supabase.from('chat_messages').select('*, sender_profile:profiles!chat_messages_sender_id_fkey(name, avatar)')
+      .eq('room_id', roomId)
       .order('created_at', { ascending: true }).limit(100);
-    setChatMessages(data || []);
+    
+    // Fallback manual join if fk is missing
+    let messages = data as unknown as ChatMessage[] || [];
+    setChatMessages(messages);
+  };
+
+  const openChat = async (room: ChatRoom) => {
+    setActiveChat(room);
+    await loadMessages(room.id);
   };
 
   const sendMessage = async () => {
     if (!messageInput.trim() || !user || !activeChat || sendingMsg) return;
     setSendingMsg(true);
-    const { error } = await supabase.from('direct_messages').insert({
-      sender_id: user.id, receiver_id: activeChat.contact_user_id, content: messageInput.trim(),
+    const { error } = await supabase.from('chat_messages').insert({
+      room_id: activeChat.id, sender_id: user.id, content: messageInput.trim(),
     });
     if (!error) {
       setMessageInput('');
-      const { data } = await supabase.from('direct_messages').select('*')
-        .or(`and(sender_id.eq.${user.id},receiver_id.eq.${activeChat.contact_user_id}),and(sender_id.eq.${activeChat.contact_user_id},receiver_id.eq.${user.id})`)
-        .order('created_at', { ascending: true }).limit(100);
-      setChatMessages(data || []);
+      loadMessages(activeChat.id);
     }
     setSendingMsg(false);
   };
 
   const createGroup = async () => {
     if (!groupName.trim() || !user) return;
-    const { data, error } = await supabase.from('chat_groups').insert({
-      name: groupName.trim(), created_by: user.id, is_public: groupPublic,
+    const { data, error } = await supabase.from('chat_rooms').insert({
+      name: groupName.trim(), is_group: true,
     }).select().single();
     if (error) {
       toast({ title: 'Error', description: error.message, variant: 'destructive' });
       return;
     }
-    // Add creator as member
-    await supabase.from('group_members').insert({ group_id: data.id, user_id: user.id, role: 'admin' });
+    await supabase.from('chat_room_participants').insert({ room_id: data.id, user_id: user.id });
     toast({ title: 'Group created! 🎉' });
     setShowCreateGroup(false);
     setGroupName('');
+    loadRooms();
   };
 
-  // Realtime
   useEffect(() => {
     if (!user || !activeChat) return;
-    const channel = supabase.channel('dm-' + activeChat.contact_user_id)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'direct_messages' }, (payload) => {
-        const msg = payload.new as DirectMessage;
-        if ((msg.sender_id === user.id && msg.receiver_id === activeChat.contact_user_id) ||
-            (msg.sender_id === activeChat.contact_user_id && msg.receiver_id === user.id)) {
-          setChatMessages(prev => [...prev, msg]);
-        }
+    const channel = supabase.channel('chat-' + activeChat.id)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: `room_id=eq.${activeChat.id}` }, () => {
+        loadMessages(activeChat.id);
       }).subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [user, activeChat]);
@@ -162,13 +206,15 @@ const FriendsPage = () => {
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" onClick={() => setActiveChat(null)}><ArrowLeft className="w-5 h-5" /></Button>
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-xl">
-              {activeChat.profile?.avatar || '👤'}
+              {activeChat.is_group ? '👥' : activeChat.otherParticipant?.avatar || '👤'}
             </div>
             <div>
-              <h3 className="font-game text-sm">{activeChat.nickname || activeChat.profile?.name || 'Friend'}</h3>
-              <p className="text-[10px] text-muted-foreground">
-                Lvl {activeChat.profile?.level || 0} • {activeChat.profile?.xp || 0} XP
-              </p>
+              <h3 className="font-game text-sm">{activeChat.is_group ? activeChat.name : activeChat.otherParticipant?.name || 'Friend'}</h3>
+              {!activeChat.is_group && activeChat.otherParticipant && (
+                <p className="text-[10px] text-muted-foreground">
+                  Lvl {activeChat.otherParticipant.level} • {activeChat.otherParticipant.xp} XP
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -183,6 +229,9 @@ const FriendsPage = () => {
                 <div className={cn('max-w-[80%] rounded-2xl px-3 py-2 shadow-sm',
                   msg.sender_id === user?.id ? 'bg-accent text-accent-foreground rounded-br-sm' : 'bg-card border border-white/10 rounded-bl-sm'
                 )}>
+                  {msg.sender_id !== user?.id && activeChat.is_group && (
+                    <span className="text-[10px] text-muted-foreground block mb-1">~ {msg.sender_profile?.name || 'User'}</span>
+                  )}
                   <p className="text-sm">{msg.content}</p>
                   <span className="text-[10px] opacity-40 block text-right">
                     {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -223,14 +272,6 @@ const FriendsPage = () => {
                 <DialogHeader><DialogTitle>Create Group</DialogTitle></DialogHeader>
                 <div className="space-y-4">
                   <Input value={groupName} onChange={(e) => setGroupName(e.target.value)} placeholder="Group name..." className="bg-secondary/50" />
-                  <div className="flex items-center gap-3">
-                    <Button variant={groupPublic ? 'default' : 'outline'} size="sm" onClick={() => setGroupPublic(true)} className="gap-1">
-                      <Globe className="w-3 h-3" /> Public
-                    </Button>
-                    <Button variant={!groupPublic ? 'default' : 'outline'} size="sm" onClick={() => setGroupPublic(false)} className="gap-1">
-                      <Lock className="w-3 h-3" /> Private
-                    </Button>
-                  </div>
                   <Button onClick={createGroup} className="w-full bg-primary" disabled={!groupName.trim()}>Create Group</Button>
                 </div>
               </DialogContent>
@@ -280,23 +321,28 @@ const FriendsPage = () => {
           </TabsList>
 
           <TabsContent value="friends">
-            {contacts.length === 0 ? (
+            {chatRooms.length === 0 ? (
               <div className="text-center py-12 space-y-4">
                 <Users className="w-16 h-16 mx-auto text-muted-foreground/30" />
-                <p className="text-muted-foreground">No friends yet</p>
-                <p className="text-xs text-muted-foreground">Tap + to add friends or use Invite tab to share your link!</p>
+                <p className="text-muted-foreground">No chats yet</p>
+                <p className="text-xs text-muted-foreground">Tap + to start a chat or use Invite tab to share your link!</p>
               </div>
             ) : (
               <div className="space-y-3">
-                {contacts.map((contact) => (
-                  <button key={contact.id} onClick={() => openChat(contact)}
+                {chatRooms.map((room) => (
+                  <button key={room.id} onClick={() => openChat(room)}
                     className="w-full glass-panel rounded-xl p-4 border border-white/10 flex items-center gap-3 text-left hover:border-primary/30 transition-colors">
                     <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-2xl">
-                      {contact.profile?.avatar || '👤'}
+                      {room.is_group ? '👥' : room.otherParticipant?.avatar || '👤'}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-medium truncate">{contact.nickname || contact.profile?.name || 'Friend'}</h3>
-                      <p className="text-xs text-muted-foreground">Lvl {contact.profile?.level || 0} • {contact.profile?.xp || 0} XP</p>
+                      <h3 className="font-medium truncate">{room.is_group ? room.name : room.otherParticipant?.name || 'Friend'}</h3>
+                      {!room.is_group && room.otherParticipant && (
+                        <p className="text-xs text-muted-foreground">Lvl {room.otherParticipant.level} • {room.otherParticipant.xp} XP</p>
+                      )}
+                      {room.is_group && (
+                        <p className="text-xs text-muted-foreground">{room.participants.length} members</p>
+                      )}
                     </div>
                     <MessageCircle className="w-5 h-5 text-muted-foreground" />
                   </button>
