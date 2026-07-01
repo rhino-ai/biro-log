@@ -117,12 +117,11 @@ const AdminPage = () => {
 
   const unlockAdmin = async () => {
     setIsUnlocking(true);
-    const { data, error } = await supabase.rpc('verify_admin_step_codes', {
-      _step_one: stepOne,
-      _step_two: stepTwo,
+    const { data, error } = await supabase.functions.invoke('verify-admin-codes', {
+      body: { stepOne, stepTwo },
     });
 
-    if (error || !data) {
+    if (error || !data?.ok) {
       toast({ title: 'Invalid 2-step password', variant: 'destructive' });
     } else {
       setIsUnlocked(true);
