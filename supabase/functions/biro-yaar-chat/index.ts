@@ -1,5 +1,9 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { isAllowedAttachmentUrl, fetchWithSizeCap, checkRateLimit, genericErrorFor, maybeCleanupRateLimit } from "../_shared/security.ts";
+
+const MAX_PDF_BYTES = 18 * 1024 * 1024;
+const MAX_MEDIA_BYTES = 25 * 1024 * 1024;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -83,9 +87,21 @@ serve(async (req) => {
     const { messages, studyTrack, studentName, attachments, clientContext } = await req.json();
     const userId = (data.claims as any).sub as string;
 
+    // Rate limit: 25 messages / minute per user.
+    maybeCleanupRateLimit(supabase);
+    const rl = await checkRateLimit(supabase, userId, "biro-yaar-chat", 25, 60);
+    if (!rl.allowed) {
+      return new Response(JSON.stringify({ error: "Too many requests. Please slow down." }), {
+        status: 429, headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": String(rl.retryAfter ?? 60) },
+      });
+    }
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+      console.error("biro_config_missing");
+      return new Response(JSON.stringify({ error: "Service temporarily unavailable" }), {
+        status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     let contextualPrompt = `${SYSTEM_PROMPT}\n\n# LIVE DEVICE CONTEXT\n${buildClientContextBlock(clientContext)}`;
@@ -126,26 +142,27 @@ serve(async (req) => {
         if (orig.content && typeof orig.content === "string") parts.push({ type: "text", text: orig.content });
         for (const a of attachments) {
           if (!a?.url) continue;
+          if (!isAllowedAttachmentUrl(a.url)) {
+            parts.push({ type: "text", text: `[Attachment "${a.name}" rejected: only files uploaded to our storage are supported.]` });
+            continue;
+          }
           if (a.type === "image") parts.push({ type: "image_url", image_url: { url: a.url } });
           else if (a.type === "document" || /\.pdf(\?|$)/i.test(a.url)) {
             try {
-              const r = await fetch(a.url);
-              if (r.ok) {
-                const buf = new Uint8Array(await r.arrayBuffer());
-                if (buf.length < 18 * 1024 * 1024) {
-                  let bin = ""; for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
-                  const b64 = btoa(bin);
-                  parts.push({ type: "image_url", image_url: { url: `data:application/pdf;base64,${b64}` } });
-                  parts.push({ type: "text", text: `[PDF "${a.name}" — read honestly]` });
-                }
-              }
-            } catch {}
+              const buf = await fetchWithSizeCap(a.url, MAX_PDF_BYTES);
+              let bin = ""; for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
+              const b64 = btoa(bin);
+              parts.push({ type: "image_url", image_url: { url: `data:application/pdf;base64,${b64}` } });
+              parts.push({ type: "text", text: `[PDF "${a.name}" — read honestly]` });
+            } catch {
+              parts.push({ type: "text", text: `[PDF "${a.name}" too large or unavailable — ask for smaller file.]` });
+            }
           } else if (a.type === "audio" || a.type === "video" || /\.(mp3|wav|m4a|mp4|mov|webm|ogg)(\?|$)/i.test(a.url)) {
             try {
               const ELEVEN = Deno.env.get("ELEVENLABS_API_KEY");
               if (!ELEVEN) throw new Error("no key");
-              const fr = await fetch(a.url); if (!fr.ok) throw new Error("fail");
-              const blob = await fr.blob();
+              const buf = await fetchWithSizeCap(a.url, MAX_MEDIA_BYTES);
+              const blob = new Blob([buf]);
               const fd = new FormData();
               fd.append("file", blob, a.name || "a.mp3");
               fd.append("model_id", "scribe_v2");
@@ -188,10 +205,12 @@ serve(async (req) => {
     });
 
     if (!response.ok) {
-      const text = await response.text();
-      console.error("AI gateway error:", response.status, text);
-      return new Response(JSON.stringify({ error: "Kuch gadbad ho gayi. Try again!" }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
+      const errorId = crypto.randomUUID();
+      const text = await response.text().catch(() => "");
+      console.error(`[${errorId}] AI gateway error`, response.status, text);
+      const g = genericErrorFor(response.status);
+      return new Response(JSON.stringify({ error: g.message, errorId }), {
+        status: g.status, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
@@ -221,8 +240,9 @@ serve(async (req) => {
 
     return new Response(clientStream, { headers: { ...corsHeaders, "Content-Type": "text/event-stream" } });
   } catch (error) {
-    console.error("Chat error:", error);
-    return new Response(JSON.stringify({ error: "Something went wrong" }), {
+    const errorId = crypto.randomUUID();
+    console.error(`[${errorId}] Chat error`, error);
+    return new Response(JSON.stringify({ error: "Service temporarily unavailable", errorId }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
