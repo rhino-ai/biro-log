@@ -6,10 +6,12 @@ interface AuthContextType {
   user: User | null;
   session: Session | null;
   isAdmin: boolean;
+  isGuest: boolean;
   isLoading: boolean;
   signUp: (email: string, password: string, name?: string) => Promise<{ error: any }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
+  enterGuestMode: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -18,6 +20,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isGuest, setIsGuest] = useState<boolean>(() => {
+    try { return localStorage.getItem('biro_guest_mode') === 'true'; } catch { return false; }
+  });
   const [isLoading, setIsLoading] = useState(true);
   const loadingResolved = useRef(false);
 
@@ -192,13 +197,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       await supabase.auth.signOut();
       setIsAdmin(false);
+      try { localStorage.removeItem('biro_guest_mode'); } catch {}
+      setIsGuest(false);
     } catch (err) {
       console.error('[Auth] Sign out error:', err);
     }
   };
 
+  const enterGuestMode = () => {
+    try { localStorage.setItem('biro_guest_mode', 'true'); } catch {}
+    setIsGuest(true);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, session, isAdmin, isLoading, signUp, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, session, isAdmin, isGuest, isLoading, signUp, signIn, signOut, enterGuestMode }}>
       {children}
     </AuthContext.Provider>
   );
