@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { useChatStorage, ChatMessage } from '@/hooks/useChatStorage';
+import DOMPurify from 'dompurify';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -73,19 +74,12 @@ const SimpleMarkdown = ({ content }: { content: string }) => {
           .replace(/_(.*?)_/g, '<em>$1</em>')
           .replace(/`(.*?)`/g, '<code class="bg-secondary/50 px-1 rounded text-xs">$1</code>');
         
-        // Sanitize to prevent XSS
-        const sanitize = (html: string) => {
-          const doc = new DOMParser().parseFromString(html, 'text/html');
-          doc.querySelectorAll('script,iframe,object,embed,link,style').forEach(el => el.remove());
-          doc.querySelectorAll('*').forEach(el => {
-            for (const attr of Array.from(el.attributes)) {
-              if (attr.name.startsWith('on') || attr.value.includes('javascript:')) {
-                el.removeAttribute(attr.name);
-              }
-            }
-          });
-          return doc.body.innerHTML;
-        };
+        // Use DOMPurify — homegrown sanitizers are risky.
+        const sanitize = (html: string) => DOMPurify.sanitize(html, {
+          ALLOWED_TAGS: ['strong', 'em', 'code', 'br', 'span'],
+          ALLOWED_ATTR: ['class'],
+          FORBID_ATTR: ['style', 'onerror', 'onclick', 'onload'],
+        });
         
         if (line.startsWith('### ')) return <h3 key={idx} className="font-bold text-sm mt-2">{line.slice(4)}</h3>;
         if (line.startsWith('## ')) return <h2 key={idx} className="font-bold text-base mt-2">{line.slice(3)}</h2>;
