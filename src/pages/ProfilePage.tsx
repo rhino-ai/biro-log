@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useGame } from '@/hooks/useGame';
 import { useAuth } from '@/hooks/useAuth';
 import { Header } from '@/components/layout/Header';
@@ -14,7 +14,8 @@ import { PWAInstallButton } from '@/components/game/PWAInstallButton';
 import { AppRatingSection } from '@/components/game/AppRatingSection';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase as _supabase } from '@/integrations/supabase/client';
+const supabase = _supabase as any;
 import { toast } from '@/hooks/use-toast';
 import { Edit2, Save, Zap, Camera, LogOut, Loader2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
