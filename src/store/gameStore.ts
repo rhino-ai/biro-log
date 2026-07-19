@@ -126,6 +126,7 @@ interface GameState {
   addChapter: (jungleId: string, chapter: Chapter) => void;
   updateChapterName: (jungleId: string, chapterId: string, newName: string) => void;
   deleteChapter: (jungleId: string, chapterId: string) => void;
+  resetForNewAccount: () => void;
 }
 
 // Realistic XP curve: Level = floor(0.5 * sqrt(XP))
