@@ -42,7 +42,7 @@ export const useDataSync = () => {
       await ensureProfileExists(userId);
 
       const profileResult = await withTimeout(
-        supabase.from('profiles').select('*').eq('user_id', userId).maybeSingle(),
+        supabase.from('profiles').select('user_id, name, avatar, dream_college, dream_college_image, dream_marks_cbse, dream_marks_jee_main, dream_marks_jee_advanced, exam_date_cbse, exam_date_jee_main, exam_date_jee_advanced, xp, level, coins, streak, last_study_date, invite_code, unique_id').eq('user_id', userId).maybeSingle(),
         5000,
         { data: null, error: { message: 'Profile load timeout' } as any, count: null, status: 408, statusText: 'Timeout' },
       );
