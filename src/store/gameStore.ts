@@ -452,6 +452,21 @@ export const useGameStore = create<GameState>()(
             ),
           });
         },
+        resetForNewAccount: () => {
+          set({
+            studyTrack: 'jee' as StudyTrack,
+            hasSelectedTrack: false,
+            trackData: {
+              jee: createDefaultTrackData('jee'),
+              neet: createDefaultTrackData('neet'),
+              highschool: createDefaultTrackData('highschool'),
+              teacher: createDefaultTrackData('teacher'),
+              other: createDefaultTrackData('other'),
+            },
+            teacherSubjects: [],
+            otherCategory: null,
+          });
+        },
       };
     },
     {
