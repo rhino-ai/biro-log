@@ -363,8 +363,9 @@ const FriendsPage = () => {
 
   if (activeChat) {
     const group = isGroupChat(activeChat) ? activeChat : null;
-    const title = group ? group.name : activeChat.peer.name;
-    const avatar = group ? (group.icon || '👥') : (activeChat.peer.avatar || '👤');
+    const dm = activeChat.kind === 'dm' ? activeChat : null;
+    const title = group ? group.name : dm?.peer.name || 'Chat';
+    const avatar = group ? (group.icon || '👥') : (dm?.peer.avatar || '👤');
     return (
       <div className="fixed inset-0 z-50 flex flex-col bg-background">
         <div className="flex items-center justify-between p-3 border-b border-border bg-card/95 backdrop-blur-xl">
@@ -373,7 +374,7 @@ const FriendsPage = () => {
             <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-xl shrink-0">{avatar}</div>
             <div className="min-w-0">
               <h3 className="font-game text-sm truncate">{title}</h3>
-              {group ? <p className="text-[10px] text-muted-foreground">{group.memberCount} members • {group.invite_code || 'code creating...'}</p> : <p className="text-[10px] text-muted-foreground">Lvl {activeChat.peer.level || 0} • {activeChat.peer.xp || 0} XP</p>}
+              {group ? <p className="text-[10px] text-muted-foreground">{group.memberCount} members • {group.invite_code || 'code creating...'}</p> : <p className="text-[10px] text-muted-foreground">Lvl {dm?.peer.level || 0} • {dm?.peer.xp || 0} XP</p>}
             </div>
           </div>
           {group && (
