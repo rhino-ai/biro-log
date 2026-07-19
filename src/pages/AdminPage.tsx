@@ -72,7 +72,7 @@ const AdminPage = () => {
     const [usersRes, rulesRes, feedbackRes] = await Promise.all([
       supabase
         .from('profiles')
-        .select('user_id,name,email,level,xp,coins,streak,unique_id')
+        .select('user_id,name,level,xp,coins,streak,unique_id')
         .order(sortBy, { ascending: false })
         .limit(200),
       supabase
