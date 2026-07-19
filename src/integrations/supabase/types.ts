@@ -104,6 +104,7 @@ export type Database = {
           created_by: string
           icon: string | null
           id: string
+          invite_code: string | null
           is_public: boolean | null
           name: string
         }
@@ -112,6 +113,7 @@ export type Database = {
           created_by: string
           icon?: string | null
           id?: string
+          invite_code?: string | null
           is_public?: boolean | null
           name: string
         }
@@ -120,6 +122,7 @@ export type Database = {
           created_by?: string
           icon?: string | null
           id?: string
+          invite_code?: string | null
           is_public?: boolean | null
           name?: string
         }
@@ -760,6 +763,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      join_group_by_invite: { Args: { _code: string }; Returns: string }
     }
     Enums: {
       app_role: "admin" | "user"
