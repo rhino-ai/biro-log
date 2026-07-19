@@ -80,7 +80,7 @@ const AuthPage = () => {
     if (!hasSelectedTrack) {
       setShowTrackSelection(true);
     } else {
-      navigate('/');
+      navigate('/', { replace: true });
     }
   };
 
