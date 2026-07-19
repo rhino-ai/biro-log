@@ -198,6 +198,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await supabase.auth.signOut();
       setIsAdmin(false);
       try { localStorage.removeItem('biro_guest_mode'); } catch {}
+      try { localStorage.removeItem('biro_account_owner'); } catch {}
       setIsGuest(false);
     } catch (err) {
       console.error('[Auth] Sign out error:', err);
