@@ -282,7 +282,7 @@ const AdminPage = () => {
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="font-medium text-sm">{u.name || 'Student'} ({u.unique_id || 'N/A'})</p>
-                        <p className="text-xs text-muted-foreground">{u.email || 'No email'}</p>
+                        <p className="text-xs text-muted-foreground">Streak {u.streak || 0}</p>
                       </div>
                       <p className="text-xs">Lv.{u.level || 0} • ⚡{u.xp || 0} • 🪙{u.coins || 0}</p>
                     </div>
