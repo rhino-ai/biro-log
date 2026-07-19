@@ -126,6 +126,7 @@ interface GameState {
   addChapter: (jungleId: string, chapter: Chapter) => void;
   updateChapterName: (jungleId: string, chapterId: string, newName: string) => void;
   deleteChapter: (jungleId: string, chapterId: string) => void;
+  resetForNewAccount: () => void;
 }
 
 // Realistic XP curve: Level = floor(0.5 * sqrt(XP))
@@ -449,6 +450,21 @@ export const useGameStore = create<GameState>()(
             jungles: currentData.jungles.map((jungle) =>
               jungle.id === jungleId ? { ...jungle, chapters: jungle.chapters.filter((ch) => ch.id !== chapterId) } : jungle
             ),
+          });
+        },
+        resetForNewAccount: () => {
+          set({
+            studyTrack: 'jee' as StudyTrack,
+            hasSelectedTrack: false,
+            trackData: {
+              jee: createDefaultTrackData('jee'),
+              neet: createDefaultTrackData('neet'),
+              highschool: createDefaultTrackData('highschool'),
+              teacher: createDefaultTrackData('teacher'),
+              other: createDefaultTrackData('other'),
+            },
+            teacherSubjects: [],
+            otherCategory: null,
           });
         },
       };

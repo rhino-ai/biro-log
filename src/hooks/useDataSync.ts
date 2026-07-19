@@ -174,6 +174,15 @@ export const useDataSync = () => {
     if (!user) { hasLoadedUserId.current = null; lastSaveHash.current = ''; return; }
     if (hasLoadedUserId.current !== user.id) {
       hasLoadedUserId.current = user.id;
+      // If persisted state belongs to a different account, wipe it before loading fresh values.
+      try {
+        const prevOwner = localStorage.getItem('biro_account_owner');
+        if (prevOwner !== user.id) {
+          useGameStore.getState().resetForNewAccount();
+          localStorage.setItem('biro_account_owner', user.id);
+          lastSaveHash.current = '';
+        }
+      } catch {}
       void loadFromDB(user.id);
     }
   }, [user, loadFromDB]);
