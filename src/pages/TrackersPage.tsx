@@ -121,12 +121,22 @@ const TrackersPage = () => {
     toast({ title: 'Sheet copied with formulas ✅' });
   };
 
-  const colName = (idx: number) => String.fromCharCode(65 + idx);
+  const colName = (idx: number) => {
+    let n = idx + 1;
+    let name = '';
+    while (n > 0) {
+      const rem = (n - 1) % 26;
+      name = String.fromCharCode(65 + rem) + name;
+      n = Math.floor((n - 1) / 26);
+    }
+    return name;
+  };
+  const colIndex = (name: string) => name.split('').reduce((acc, ch) => acc * 26 + ch.charCodeAt(0) - 64, 0) - 1;
   const formulaValue = (value: string | number, seen = new Set<string>()): number | string => {
     if (typeof value !== 'string' || !value.startsWith('=') || !active) return value;
     const cell = (ref: string) => {
-      const m = ref.match(/^([A-Z])([1-9]\d*)$/); if (!m) return 0;
-      const ci = m[1].charCodeAt(0) - 65, ri = Number(m[2]) - 1;
+      const m = ref.match(/^([A-Z]+)([1-9]\d*)$/); if (!m) return 0;
+      const ci = colIndex(m[1]), ri = Number(m[2]) - 1;
       const key = active.columns[ci]?.key; if (!key || !active.rows[ri]) return 0;
       const sig = `${ri}:${key}`; if (seen.has(sig)) return 0;
       seen.add(sig);
@@ -134,13 +144,19 @@ const TrackersPage = () => {
       return Number(v) || 0;
     };
     let expr = value.slice(1).toUpperCase();
-    expr = expr.replace(/(SUM|AVG)\(([A-Z][1-9]\d*):([A-Z][1-9]\d*)\)/g, (_, fn, a, b) => {
-      const ac = a.charCodeAt(0) - 65, ar = Number(a.slice(1)) - 1, bc = b.charCodeAt(0) - 65, br = Number(b.slice(1)) - 1;
+    expr = expr.replace(/(SUM|AVG|AVERAGE|MIN|MAX|COUNT)\(([A-Z]+[1-9]\d*):([A-Z]+[1-9]\d*)\)/g, (_, fn, a, b) => {
+      const [, acLetters, arText] = String(a).match(/^([A-Z]+)([1-9]\d*)$/) || [];
+      const [, bcLetters, brText] = String(b).match(/^([A-Z]+)([1-9]\d*)$/) || [];
+      const ac = colIndex(acLetters), ar = Number(arText) - 1, bc = colIndex(bcLetters), br = Number(brText) - 1;
       const vals: number[] = [];
       for (let r = Math.min(ar, br); r <= Math.max(ar, br); r++) for (let c = Math.min(ac, bc); c <= Math.max(ac, bc); c++) vals.push(Number(cell(`${colName(c)}${r + 1}`)) || 0);
       const sum = vals.reduce((x, y) => x + y, 0);
-      return String(fn === 'AVG' ? sum / Math.max(vals.length, 1) : sum);
-    }).replace(/[A-Z][1-9]\d*/g, ref => String(cell(ref)));
+      if (fn === 'AVG' || fn === 'AVERAGE') return String(sum / Math.max(vals.length, 1));
+      if (fn === 'MIN') return String(vals.length ? Math.min(...vals) : 0);
+      if (fn === 'MAX') return String(vals.length ? Math.max(...vals) : 0);
+      if (fn === 'COUNT') return String(vals.filter(v => Number.isFinite(v)).length);
+      return String(sum);
+    }).replace(/[A-Z]+[1-9]\d*/g, ref => String(cell(ref)));
     if (!/^[\d+\-*/().\s]+$/.test(expr)) return 'ERR';
     try { return Math.round(Function(`"use strict";return (${expr})`)() * 100) / 100; } catch { return 'ERR'; }
   };
@@ -151,7 +167,7 @@ const TrackersPage = () => {
     const numericCols = active.columns.filter(c => c.type === 'number');
     if (numericCols.length === 0 || active.rows.length === 0) return null;
     return numericCols.map(c => {
-      const vals = active.rows.map(r => Number(r[c.key]) || 0);
+      const vals = active.rows.map(r => Number(formulaValue(r[c.key] ?? 0)) || 0);
       const sum = vals.reduce((a, b) => a + b, 0);
       const avg = sum / vals.length;
       const max = Math.max(...vals);
@@ -281,6 +297,7 @@ const TrackersPage = () => {
                 }}><Plus className="w-3 h-3 mr-1" /> Column</Button>
                 <Button size="sm" variant="outline" onClick={duplicateSheet}><Copy className="w-3 h-3 mr-1" /> Copy</Button>
                 <Button size="sm" variant="outline" onClick={() => setZoom(z => Math.max(70, z - 10))}><ZoomOut className="w-3 h-3" /></Button>
+                <span className="inline-flex items-center px-2 text-xs text-muted-foreground">{zoom}%</span>
                 <Button size="sm" variant="outline" onClick={() => setZoom(z => Math.min(150, z + 10))}><ZoomIn className="w-3 h-3" /></Button>
                 <Button size="sm" onClick={() => persist(active)} disabled={!dirty} className={cn(dirty && 'bg-primary glow-purple animate-pulse')}>
                   <Save className="w-3 h-3 mr-1" /> {dirty ? 'Save' : 'Saved'}
