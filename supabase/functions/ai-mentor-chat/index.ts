@@ -19,13 +19,15 @@ const buildClientContextBlock = (clientContext: any) => {
   })();
   const usageKeys = screenTime?.dailyUsage && typeof screenTime.dailyUsage === "object" ? Object.keys(screenTime.dailyUsage).slice(-3) : [];
   return `User device time: ${clientContext?.localTime || "not provided"}
+User device ISO time: ${clientContext?.localTimeIso || "not provided"}
+User device epoch ms: ${clientContext?.nowEpochMs || "not provided"}
 Device timezone: ${clientContext?.timeZone || "Asia/Kolkata"}
 Strict read mode: ${clientContext?.strictReadMode ? "ON" : "OFF"}
 Focus mode: ${screenTime?.focusMode ? "ON" : "OFF/unknown"}
 Shorts blocker: ${screenTime?.shortsBlocker ? "ON" : "OFF/unknown"}
 Recent screen-time entries: ${usageKeys.map((k) => `${k}=${screenTime.dailyUsage[k]}h`).join(", ") || "none"}
 Biro chat usage today: ${biroUsage?.usedMs ? Math.round(biroUsage.usedMs / 60000) + " min" : "unknown"}
-RULE: If asked current time/schedule, trust User device time first. Never invent a different hour.`;
+RULE: If asked current time/schedule, copy User device time exactly. Never use server time, UTC time, or invent a different hour.`;
 };
 
 const getDronacharyaPrompt = (track: string, studentName: string, memoryBlock: string, prefsBlock: string, clientBlock: string) => {
@@ -196,7 +198,9 @@ serve(async (req) => {
 
     // Build long-term memory block from DB
     // ---- TIME / HOLIDAY / DEADLINE AWARENESS ----
-    const now = new Date();
+    const now = typeof clientContext?.nowEpochMs === "number" && Number.isFinite(clientContext.nowEpochMs)
+      ? new Date(clientContext.nowEpochMs)
+      : new Date();
     const istOffsetMs = 5.5 * 60 * 60 * 1000;
     const istNow = new Date(now.getTime() + istOffsetMs);
     const istHour = istNow.getUTCHours();
@@ -263,7 +267,7 @@ serve(async (req) => {
       const effectiveDays = primaryDays != null ? Math.max(0, primaryDays - sundaysLeft) : null;
 
       memoryBlock = `## TIME CONTEXT (use this BEFORE making any plan)
-Now (IST): ${istNow.toISOString().slice(0,16).replace('T',' ')} — ${dayNames[istDow]}${isWeekend ? ' (WEEKEND)' : ''}
+        Now (USER DEVICE / IST): ${clientContext?.localTime || istNow.toISOString().slice(0,16).replace('T',' ')} — ${dayNames[istDow]}${isWeekend ? ' (WEEKEND)' : ''}
 Productive hours left TODAY: ~${hoursLeftToday}h (until 23:00 IST)
 Days till JEE Main: ${dJeeM ?? '-'} | JEE Adv: ${dJeeA ?? '-'} | CBSE: ${dCbse ?? '-'}
 Sundays/holidays in run-up to primary exam: ${sundaysLeft} (effective study days ≈ ${effectiveDays ?? '-'})
@@ -319,7 +323,7 @@ ${chapters || "  (no chapter progress)"}`;
               let bin = "";
               for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
               const b64 = btoa(bin);
-              parts.push({ type: "image_url", image_url: { url: `data:application/pdf;base64,${b64}` } });
+              parts.push({ type: "file", file: { filename: a.name || "document.pdf", file_data: `data:application/pdf;base64,${b64}` } });
               parts.push({ type: "text", text: `[Attached PDF "${a.name}" — read it and analyse honestly]` });
             } catch (e) {
               console.error("pdf fetch failed", (e as Error)?.message);
@@ -327,6 +331,9 @@ ${chapters || "  (no chapter progress)"}`;
             }
           } else if (a.type === "audio" || a.type === "video" || /\.(mp3|wav|m4a|mp4|mov|webm|ogg)(\?|$)/i.test(a.url)) {
             // Transcribe via ElevenLabs Scribe
+            if (a.type === "video") {
+              parts.push({ type: "text", text: `[VIDEO "${a.name}"] Original video attached. Analyse visual content from the following uploaded frame images in this same message, plus transcript below. Do not guess scenes not visible in frames.]` });
+            }
             try {
               const ELEVEN = Deno.env.get("ELEVENLABS_API_KEY");
               if (!ELEVEN) throw new Error("no ELEVENLABS_API_KEY");

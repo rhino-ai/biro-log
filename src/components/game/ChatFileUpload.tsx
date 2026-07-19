@@ -17,12 +17,15 @@ const extractVideoFrames = async (file: File) => {
   const url = URL.createObjectURL(file);
   try {
     const video = document.createElement('video');
+    video.preload = 'metadata';
     video.src = url;
     video.muted = true;
     video.playsInline = true;
+    video.crossOrigin = 'anonymous';
     await new Promise<void>((resolve, reject) => {
       video.onloadedmetadata = () => resolve();
       video.onerror = () => reject(new Error('Could not read video frames'));
+      video.load();
     });
     const canvas = document.createElement('canvas');
     canvas.width = Math.min(960, video.videoWidth || 960);
@@ -30,11 +33,11 @@ const extractVideoFrames = async (file: File) => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return [];
     const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : 1;
-    const stamps = [0.1, 0.5, 0.9].map(p => Math.max(0, Math.min(duration - 0.05, duration * p)));
+    const stamps = [0.05, 0.25, 0.5, 0.75, 0.95].map(p => Math.max(0, Math.min(duration - 0.05, duration * p)));
     const frames: { blob: Blob; name: string }[] = [];
     for (const [idx, stamp] of stamps.entries()) {
       await new Promise<void>((resolve, reject) => {
-        const timer = window.setTimeout(() => resolve(), 900);
+        const timer = window.setTimeout(() => resolve(), 2500);
         video.onseeked = () => { window.clearTimeout(timer); resolve(); };
         video.onerror = () => reject(new Error('Could not seek video'));
         video.currentTime = stamp;
@@ -91,6 +94,7 @@ export const ChatFileUpload = ({ onFileUploaded, className }: ChatFileUploadProp
 
       onFileUploaded(urlData.publicUrl, fileType, file.name);
       if (fileType === 'video') {
+        toast({ title: 'Reading video frames…', description: 'AI will inspect sampled frames + audio transcript.' });
         const frames = await extractVideoFrames(file).catch(() => []);
         for (const frame of frames) {
           const framePath = `chat-uploads/${user.id}/${Date.now()}-${frame.name.replace(/[^a-z0-9._-]/gi, '-')}`;

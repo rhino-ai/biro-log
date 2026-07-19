@@ -34,6 +34,7 @@ export const ChessGame = ({ onWin }: { onWin?: () => void }) => {
   const [game, setGame] = useState(new Chess());
   const [difficulty, setDifficulty] = useState<Difficulty>('easy');
   const [status, setStatus] = useState('Your move (White)');
+  const [history, setHistory] = useState<string[]>([new Chess().fen()]);
   const aiTimerRef = useRef<number | null>(null);
 
   const clearAiTimer = useCallback(() => {
@@ -59,7 +60,9 @@ export const ChessGame = ({ onWin }: { onWin?: () => void }) => {
       const san = pickAIMove(g, difficulty);
       if (!san) { refreshStatus(g); return; }
       const g2 = new Chess(g.fen()); g2.move(san);
-      setGame(g2); refreshStatus(g2);
+      setGame(g2);
+      setHistory(prev => [...prev, g2.fen()]);
+      refreshStatus(g2);
     }, 350);
   }, [clearAiTimer, difficulty, refreshStatus]);
 
@@ -70,21 +73,31 @@ export const ChessGame = ({ onWin }: { onWin?: () => void }) => {
     try {
       const m = g2.move({ from: sourceSquare, to: targetSquare, promotion: 'q' });
       if (!m) return false;
-      setGame(g2); refreshStatus(g2);
+      setGame(g2);
+      setHistory(prev => [...prev, g2.fen()]);
+      refreshStatus(g2);
       if (!g2.isGameOver()) playAI(g2);
       return true;
     } catch { return false; }
   }, [game, playAI, refreshStatus]);
 
-  const reset = () => { clearAiTimer(); const g = new Chess(); setGame(g); setStatus('Your move (White)'); };
+  const reset = () => { clearAiTimer(); const g = new Chess(); setGame(g); setHistory([g.fen()]); setStatus('Your move (White)'); };
 
   const undo = () => {
     clearAiTimer();
-    const g2 = new Chess(game.fen());
-    g2.undo();
-    if (g2.turn() === 'b') g2.undo();
-    setGame(g2);
-    refreshStatus(g2);
+    setHistory(prev => {
+      const targetIndex = Math.max(0, prev.length - 3);
+      const next = prev.slice(0, targetIndex + 1);
+      const g2 = new Chess(next[next.length - 1]);
+      setGame(g2);
+      refreshStatus(g2);
+      return next;
+    });
+  };
+
+  const forceAiMove = () => {
+    clearAiTimer();
+    if (game.turn() === 'b' && !game.isGameOver()) playAI(game);
   };
 
   return (
@@ -102,7 +115,8 @@ export const ChessGame = ({ onWin }: { onWin?: () => void }) => {
       </div>
       <div className="flex justify-center gap-2">
         <Button size="sm" variant="outline" onClick={reset}>Reset</Button>
-        <Button size="sm" variant="outline" onClick={undo}>Undo</Button>
+        <Button size="sm" variant="outline" onClick={undo} disabled={history.length <= 1}>Undo</Button>
+        <Button size="sm" variant="outline" onClick={forceAiMove} disabled={game.turn() !== 'b' || game.isGameOver()}>AI Move</Button>
       </div>
     </Card>
   );

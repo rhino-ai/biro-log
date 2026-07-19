@@ -205,8 +205,15 @@ export const BiroYaarChat = () => {
 
     addMessage(userMessage);
     const sentAttachments = pendingAttachments;
+    const now = new Date();
+    const istParts = new Intl.DateTimeFormat('en-IN', {
+      timeZone: 'Asia/Kolkata', weekday: 'long', year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true,
+    }).format(now);
     const clientContext = {
-      localTime: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', hour12: true }),
+      localTime: istParts,
+      localTimeIso: new Date(now.getTime() + 5.5 * 60 * 60 * 1000).toISOString().replace('Z', '+05:30'),
+      nowEpochMs: now.getTime(),
       timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Kolkata',
       strictReadMode: true,
       screenTimeData: localStorage.getItem('biro-screen-time'),

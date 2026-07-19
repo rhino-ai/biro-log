@@ -80,7 +80,7 @@ const AuthPage = () => {
     if (!hasSelectedTrack) {
       setShowTrackSelection(true);
     } else {
-      navigate('/');
+      navigate('/', { replace: true });
     }
   };
 
@@ -178,9 +178,9 @@ const AuthPage = () => {
 
         <div className="text-center animate-fade-in" style={{ animationDelay: '0.25s' }}>
           <Button
-            variant="ghost"
+            variant="outline"
             onClick={handleGuestMode}
-            className="text-muted-foreground hover:text-foreground text-sm"
+            className="w-full border-accent/60 bg-accent/10 text-foreground hover:bg-accent/20 text-sm font-medium"
           >
             Continue as Guest 👤 (data saved on this device only)
           </Button>

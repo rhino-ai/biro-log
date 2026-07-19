@@ -299,6 +299,21 @@ export type Database = {
         }
         Relationships: []
       }
+      group_invite_attempts: {
+        Row: {
+          attempted_at: string
+          user_id: string
+        }
+        Insert: {
+          attempted_at?: string
+          user_id: string
+        }
+        Update: {
+          attempted_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       group_members: {
         Row: {
           group_id: string

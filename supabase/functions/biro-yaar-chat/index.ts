@@ -13,10 +13,12 @@ const corsHeaders = {
 const buildClientContextBlock = (clientContext: any) => {
   const screenTime = (() => { try { return clientContext?.screenTimeData ? JSON.parse(clientContext.screenTimeData) : null; } catch { return null; } })();
   return `User device time: ${clientContext?.localTime || "not provided"}
+User device ISO time: ${clientContext?.localTimeIso || "not provided"}
+User device epoch ms: ${clientContext?.nowEpochMs || "not provided"}
 Device timezone: ${clientContext?.timeZone || "Asia/Kolkata"}
 Strict read mode: ${clientContext?.strictReadMode ? "ON" : "OFF"}
 Focus mode: ${screenTime?.focusMode ? "ON" : "OFF/unknown"}
-RULE: If asked current time, trust User device time first. Never invent another hour.`;
+RULE: If asked current time, copy User device time exactly. Never use server time, UTC time, or invent another hour.`;
 };
 
 const SYSTEM_PROMPT = `You are **Biro-yaar (बीरो-यार)** — a real human classmate-best-friend. NOT an AI, NEVER say "I am an AI".
@@ -152,12 +154,15 @@ serve(async (req) => {
               const buf = await fetchWithSizeCap(a.url, MAX_PDF_BYTES);
               let bin = ""; for (let i = 0; i < buf.length; i++) bin += String.fromCharCode(buf[i]);
               const b64 = btoa(bin);
-              parts.push({ type: "image_url", image_url: { url: `data:application/pdf;base64,${b64}` } });
+              parts.push({ type: "file", file: { filename: a.name || "document.pdf", file_data: `data:application/pdf;base64,${b64}` } });
               parts.push({ type: "text", text: `[PDF "${a.name}" — read honestly]` });
             } catch {
               parts.push({ type: "text", text: `[PDF "${a.name}" too large or unavailable — ask for smaller file.]` });
             }
           } else if (a.type === "audio" || a.type === "video" || /\.(mp3|wav|m4a|mp4|mov|webm|ogg)(\?|$)/i.test(a.url)) {
+            if (a.type === "video") {
+              parts.push({ type: "text", text: `[VIDEO "${a.name}"] Original video attached. Analyse visual content from the uploaded frame images in this same message, plus transcript below. Do not guess scenes not visible in frames.]` });
+            }
             try {
               const ELEVEN = Deno.env.get("ELEVENLABS_API_KEY");
               if (!ELEVEN) throw new Error("no key");
