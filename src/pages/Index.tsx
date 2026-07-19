@@ -1,4 +1,6 @@
 import { useGame } from '@/hooks/useGame';
+import { useGameStore } from '@/store/gameStore';
+import { TrackSelection } from '@/components/game/TrackSelection';
 import { Header } from '@/components/layout/Header';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { StatCard } from '@/components/game/StatCard';
@@ -22,6 +24,7 @@ import { useDataSync } from '@/hooks/useDataSync';
 const Index = () => {
   const navigate = useNavigate();
   const { level, xp, coins, streak, jungles, backlogCount, calculateJungleHealth, checkDeadlinesAndUpdateBacklog, getOverdueTasks } = useGame();
+  const hasSelectedTrack = useGameStore((s) => s.hasSelectedTrack);
   const [showMotivation, setShowMotivation] = useState(true);
   
   // Sync data with database
@@ -31,6 +34,10 @@ const Index = () => {
   useEffect(() => {
     checkDeadlinesAndUpdateBacklog();
   }, [checkDeadlinesAndUpdateBacklog]);
+
+  if (!hasSelectedTrack) {
+    return <TrackSelection onComplete={() => { /* re-render via store */ }} />;
+  }
 
   // Calculate overall progress
   const totalHealth = jungles.reduce((acc, j) => acc + calculateJungleHealth(j.id), 0);
