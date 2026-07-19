@@ -29,7 +29,6 @@ export const useDataSync = () => {
       supabase.from('profiles').insert([{
         user_id: userId,
         name: fallbackName,
-        email: user?.email ?? null,
       }] as any),
       4000,
       { error: { message: 'profile-create-timeout' } } as any,
@@ -130,7 +129,6 @@ export const useDataSync = () => {
           exam_date_jee_advanced: examDates.jeeAdvanced,
           xp, level, coins, streak,
           last_study_date: lastStudyDate,
-          email: user?.email ?? null,
         }] as any, { onConflict: 'user_id' }),
         5000,
         { error: { message: 'Save timeout' } } as any,
