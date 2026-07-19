@@ -48,6 +48,10 @@ const FriendsPage = () => {
   const [joinCode, setJoinCode] = useState('');
   const chatScrollRef = useRef<HTMLDivElement>(null);
 
+  const appendMessage = useCallback((message: UIMessage) => {
+    setChatMessages(prev => prev.some(m => m.id === message.id) ? prev : [...prev, message].slice(-200));
+  }, []);
+
   const loadChats = useCallback(async () => {
     if (!user) return;
 
@@ -202,7 +206,7 @@ const FriendsPage = () => {
     }
     if (!error) {
       setMessageInput('');
-      loadMessages(activeChat);
+      loadChats();
     } else {
       toast({ title: 'Send failed', description: error.message, variant: 'destructive' });
     }
@@ -269,16 +273,24 @@ const FriendsPage = () => {
           const isThisConvo =
             (m.sender_id === user.id && m.receiver_id === activeChat.id) ||
             (m.sender_id === activeChat.id && m.receiver_id === user.id);
-          if (isThisConvo) loadMessages(activeChat);
+          if (isThisConvo) appendMessage(m as UIMessage);
         }).subscribe();
     } else {
       channel = supabase.channel('group-' + activeChat.id)
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'group_messages', filter: `group_id=eq.${activeChat.id}` }, () => {
-          loadMessages(activeChat);
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'group_messages', filter: `group_id=eq.${activeChat.id}` }, async (payload: any) => {
+          const m = payload.new;
+          let sender_name: string | undefined;
+          let sender_avatar: string | null | undefined;
+          if (m.sender_id !== user.id) {
+            const { data: prof } = await supabase.from('profiles').select('name,avatar').eq('user_id', m.sender_id).maybeSingle();
+            sender_name = prof?.name;
+            sender_avatar = prof?.avatar;
+          }
+          appendMessage({ ...m, sender_name, sender_avatar } as UIMessage);
         }).subscribe();
     }
     return () => { supabase.removeChannel(channel); };
-  }, [user, activeChat]);
+  }, [user, activeChat, appendMessage]);
 
   useEffect(() => {
     if (chatScrollRef.current) chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight;
