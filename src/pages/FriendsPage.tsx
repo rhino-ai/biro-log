@@ -232,7 +232,7 @@ const FriendsPage = () => {
   const joinByCode = async () => {
     const code = joinCode.trim().toUpperCase();
     if (!code) return;
-    const { data, error } = await supabase.rpc('join_group_by_invite', { _code: code });
+    const { data, error } = await supabase.functions.invoke('join-group-by-invite', { body: { code } });
     if (error) {
       toast({ title: 'Failed to join', description: error.message, variant: 'destructive' });
       return;
@@ -256,7 +256,7 @@ const FriendsPage = () => {
     const params = new URLSearchParams(window.location.search);
     const code = params.get('join');
     if (code) {
-      supabase.rpc('join_group_by_invite', { _code: code }).then(({ error }: any) => {
+      supabase.functions.invoke('join-group-by-invite', { body: { code } }).then(({ error }: any) => {
         if (!error) { toast({ title: 'Joined group! 🎉' }); loadChats(); }
         window.history.replaceState({}, '', '/friends');
       });
