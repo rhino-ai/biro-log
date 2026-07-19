@@ -111,8 +111,8 @@ const FriendsPage = () => {
     const escaped = trimmed.replace(/[%_\\]/g, (c) => `\\${c}`);
     setIsSearching(true);
     const { data } = await supabase.from('profiles')
-      .select('user_id, name, avatar, email, xp, level')
-      .or(`email.ilike.%${escaped}%,name.ilike.%${escaped}%,unique_id.ilike.%${escaped}%`)
+      .select('user_id, name, avatar, xp, level, unique_id')
+      .or(`name.ilike.%${escaped}%,unique_id.ilike.%${escaped}%`)
       .neq('user_id', user?.id || '').limit(10);
     setSearchResults(data || []);
     setIsSearching(false);
