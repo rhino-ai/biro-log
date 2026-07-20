@@ -411,6 +411,30 @@ const VirtualLibraryPage = () => {
         setCameraOn(false);
         toast({ title: 'Camera turned off by host', variant: 'destructive' });
       })
+      .on('broadcast', { event: 'request-mic-on' }, ({ payload }: any) => {
+        if (payload?.target !== selfId && payload?.target !== '*') return;
+        if (user && user.id === activeRoom.owner_id) return;
+        const tracks = callStream?.getAudioTracks() || streamRef.current?.getAudioTracks() || [];
+        if (tracks.length) {
+          tracks.forEach((t) => (t.enabled = true));
+          setMicOn(true);
+          toast({ title: 'Host asked you to unmute — mic is on' });
+        } else {
+          toast({ title: 'Host is asking you to unmute', description: 'Tap the Mic button to turn it on.' });
+        }
+      })
+      .on('broadcast', { event: 'request-cam-on' }, ({ payload }: any) => {
+        if (payload?.target !== selfId && payload?.target !== '*') return;
+        if (user && user.id === activeRoom.owner_id) return;
+        const tracks = callStream?.getVideoTracks() || streamRef.current?.getVideoTracks() || [];
+        if (tracks.length) {
+          tracks.forEach((t) => (t.enabled = true));
+          setCameraOn(true);
+          toast({ title: 'Host asked you to turn camera on — camera is on' });
+        } else {
+          toast({ title: 'Host is asking you to turn on camera', description: 'Tap the Camera button to enable it.' });
+        }
+      })
       .on('broadcast', { event: 'kick' }, ({ payload }: any) => {
         if (payload?.target !== selfId) return;
         toast({ title: 'Removed by host', description: payload?.banned ? 'You were banned from this room.' : 'You were removed.', variant: 'destructive' });
