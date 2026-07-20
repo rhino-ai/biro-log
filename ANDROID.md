@@ -297,3 +297,95 @@ npx cap open android
 
 Read the Lovable mobile blog post for extra tips:
 <https://lovable.dev/blog>
+
+---
+
+## 15. FCM end-to-end test (after `google-services.json` + `FIREBASE_SERVICE_ACCOUNT`)
+
+**Server** — `supabase/functions/send-push` now detects rows whose
+`endpoint` starts with `fcm:` and sends them via the **FCM HTTP v1 API**
+using a service-account JWT (RS256 signed inline; no extra deps). Web push
+(VAPID) still runs side by side.
+
+1. Firebase console → Project settings → Service accounts → **Generate new
+   private key**. You get a JSON file.
+2. Add it as the Lovable secret `FIREBASE_SERVICE_ACCOUNT` (paste the entire JSON).
+3. Keep `VAPID_*` secrets for browser push.
+
+**Client** — `src/lib/native.ts` → `registerPush()` handles Android 13+
+POST_NOTIFICATIONS, registers with FCM, and upserts
+`{user_id, endpoint: "fcm:<token>", ...}` into `push_subscriptions`.
+
+**Manual test**
+
+1. `npx cap run android` on a device with `google-services.json` in `android/app/`.
+2. Sign in — a `push_subscriptions` row with `endpoint` starting `fcm:` should appear.
+3. Profile → Push Notifications → **Send test notification**.
+4. Heads-up alert appears with vibration. Tap → app opens and navigates to `data.url`.
+5. Send a chat message from another account. `notify-chat` → `send-push`
+   fans out to browser (VAPID) + Android (FCM) devices in one call, even
+   when the app is closed.
+
+**Dead-token cleanup** — FCM `UNREGISTERED` / 404 / 410 responses delete
+the row so pushes stop for uninstalled apps.
+
+---
+
+## 16. Deep-link validation
+
+Stub committed: `public/.well-known/assetlinks.json` with the correct
+`package_name`.
+
+1. Get your app-signing SHA-256 fingerprint:
+   - Upload key: `keytool -list -v -keystore biro-log-upload.jks -alias upload | grep SHA256`
+   - Or Play-managed signing: Play Console → Setup → App signing → SHA-256.
+2. Replace `REPLACE_WITH_YOUR_APP_SIGNING_SHA256_FINGERPRINT` in
+   `assetlinks.json` (uppercase hex with colons: `AA:BB:CC:...`).
+3. Publish. Confirm reachable at
+   `https://biro-log.lovable.app/.well-known/assetlinks.json` with
+   `Content-Type: application/json`.
+4. Validator: <https://developers.google.com/digital-asset-links/tools/generator>
+5. On device with the release build:
+   ```bash
+   adb shell pm get-app-links app.lovable.0c774921ede04ae78a9e613a154bfa58
+   adb shell am start -W -a android.intent.action.VIEW \
+     -d "https://biro-log.lovable.app/join/DEMO123"
+   ```
+   The app must open on `/join/DEMO123`. Handled by `parseDeepLink()` +
+   `initNative()` (also honors `App.getLaunchUrl()` for cold starts).
+
+---
+
+## 17. Offline uploads & queued messages
+
+`src/lib/offline-queue.ts` — persistent queue that survives refresh and
+cold start, auto-flushes on browser `online` / `focus` events.
+
+```ts
+import { enqueueInsert, enqueueUpload } from "@/lib/offline-queue";
+
+// Text message while offline
+if (!navigator.onLine) {
+  enqueueInsert({
+    table: "direct_messages",
+    row: { sender_id, recipient_id, ciphertext, nonce },
+  });
+}
+
+// File upload while offline
+await enqueueUpload({
+  bucket: "chat-uploads",
+  path: `${uid}/${crypto.randomUUID()}.bin`,
+  file,                    // Blob / File
+  contentType: file.type,
+  followUp: {              // insert once the upload succeeds
+    table: "group_messages",
+    row: { group_id, sender_id, attachment_meta: { /* ... */ } },
+  },
+});
+```
+
+- Persisted in `localStorage` under `biro:offline-queue:v1`.
+- Up to 8 retries per item with exponential-ish backoff, then dropped with a warn.
+- Uploads use `upsert: false`; existing-object errors on retry are treated as success.
+- Safe on native (Capacitor) — `@capacitor/network` events + `online` cover both worlds.
