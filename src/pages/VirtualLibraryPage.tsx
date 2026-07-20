@@ -38,10 +38,20 @@ const VirtualLibraryPage = () => {
   const [cameraOn, setCameraOn] = useState(false);
   const [micOn, setMicOn] = useState(false);
   const [screenOn, setScreenOn] = useState(false);
+  const [callActive, setCallActive] = useState(false);
+  const [callStream, setCallStream] = useState<MediaStream | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const screenStreamRef = useRef<MediaStream | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const { peers } = useWebRTCMesh({
+    roomKey: activeRoom?.id ?? null,
+    selfUserId: user?.id ?? null,
+    selfName: profile.name || 'Student',
+    localStream: callStream,
+    enabled: callActive && !!activeRoom && !!user,
+  });
 
   const stopMedia = useCallback(() => {
     streamRef.current?.getTracks().forEach((track) => track.stop());
