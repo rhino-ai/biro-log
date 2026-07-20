@@ -498,6 +498,40 @@ const VirtualLibraryPage = () => {
     setAuditRows((data as any[]) || []);
   };
 
+  const filteredAuditRows = auditRows.filter((r) => {
+    if (auditFilter !== 'all' && r.action !== auditFilter) return false;
+    if (auditSearch.trim()) {
+      const q = auditSearch.trim().toLowerCase();
+      const hay = `${r.action} ${r.target_name || ''} ${JSON.stringify(r.metadata || {})}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  const exportAuditCsv = () => {
+    const rows = filteredAuditRows;
+    const header = ['timestamp', 'action', 'target', 'metadata'];
+    const csvEscape = (v: string) => `"${v.replace(/"/g, '""')}"`;
+    const lines = [header.join(',')];
+    rows.forEach((r) => {
+      lines.push([
+        csvEscape(new Date(r.created_at).toISOString()),
+        csvEscape(r.action),
+        csvEscape(r.target_name || ''),
+        csvEscape(JSON.stringify(r.metadata || {})),
+      ].join(','));
+    });
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `host-audit-${activeRoom?.code || 'room'}-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
   const hostBroadcast = async (event: string, payload: any) => {
     const ch = hostChannelRef.current;
     if (!ch) return;
