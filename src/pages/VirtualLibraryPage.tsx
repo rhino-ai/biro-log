@@ -238,6 +238,35 @@ const VirtualLibraryPage = () => {
 
   const toggleScreen = async () => {
     try {
+      if (callActive) {
+        if (screenOn) {
+          screenStreamRef.current?.getTracks().forEach((t) => t.stop());
+          screenStreamRef.current = null;
+          // Revert to camera stream
+          const cam = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+          streamRef.current?.getTracks().forEach((t) => t.stop());
+          streamRef.current = cam;
+          setCallStream(cam);
+          if (videoRef.current) videoRef.current.srcObject = cam;
+          setScreenOn(false);
+          return;
+        }
+        const screen = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+        // Merge screen video with existing mic audio for peers
+        const existingAudio = streamRef.current?.getAudioTracks() || [];
+        const merged = new MediaStream([...screen.getVideoTracks(), ...existingAudio]);
+        screenStreamRef.current = screen;
+        setCallStream(merged);
+        if (videoRef.current) videoRef.current.srcObject = merged;
+        screen.getVideoTracks()[0]?.addEventListener('ended', () => {
+          setScreenOn(false);
+          const cam = streamRef.current;
+          if (cam && videoRef.current) videoRef.current.srcObject = cam;
+          if (cam) setCallStream(cam);
+        });
+        setScreenOn(true);
+        return;
+      }
       if (screenOn) {
         screenStreamRef.current?.getTracks().forEach((track) => track.stop());
         screenStreamRef.current = null;
