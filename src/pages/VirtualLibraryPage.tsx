@@ -493,6 +493,11 @@ const VirtualLibraryPage = () => {
             <div className="p-3 border-b border-border flex items-center justify-between"><span className="font-game text-sm">Room Chat</span><span className="text-xs text-muted-foreground flex items-center gap-1"><Users className="w-3 h-3" /> {roomUsers.length}</span></div>
             <ScrollArea className="flex-1 p-3">
               <div className="space-y-3">
+                {isGuestRoom && (
+                  <div className="text-center text-xs text-muted-foreground p-3 bg-secondary/30 rounded-lg">
+                    Sign in to chat & save study history.
+                  </div>
+                )}
                 {messages.map((msg) => (
                   <div key={msg.id} className={cn('rounded-lg p-2 border', msg.sender_id === user?.id ? 'bg-accent/20 border-accent/30 ml-6' : 'bg-secondary/30 border-border mr-6')}>
                     <p className="text-[10px] text-muted-foreground mb-1">{msg.sender_name || 'Student'} • {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
@@ -503,8 +508,8 @@ const VirtualLibraryPage = () => {
               </div>
             </ScrollArea>
             <div className="p-3 border-t border-border flex gap-2">
-              <Textarea value={messageInput} onChange={(e) => setMessageInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void sendMessage(); } }} placeholder="Shared notes / chat..." className="min-h-[44px] max-h-24 bg-secondary/50" />
-              <Button size="icon" onClick={sendMessage} disabled={!messageInput.trim()} className="shrink-0"><Send className="w-4 h-4" /></Button>
+              <Textarea value={messageInput} onChange={(e) => setMessageInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void sendMessage(); } }} placeholder={isGuestRoom ? 'Sign in to chat…' : 'Shared notes / chat...'} disabled={isGuestRoom} className="min-h-[44px] max-h-24 bg-secondary/50" />
+              <Button size="icon" onClick={sendMessage} disabled={!messageInput.trim() || isGuestRoom} className="shrink-0"><Send className="w-4 h-4" /></Button>
             </div>
           </aside>
         </div>
