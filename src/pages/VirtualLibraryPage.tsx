@@ -604,13 +604,58 @@ const VirtualLibraryPage = () => {
 
         <div className="flex-1 grid lg:grid-cols-[1fr_340px] min-h-0">
           <div className="p-4 space-y-4 min-h-0 flex flex-col">
-            <div className="relative aspect-video rounded-xl overflow-hidden bg-secondary/40 border border-border flex items-center justify-center">
-              <video ref={videoRef} autoPlay muted playsInline className={cn('w-full h-full object-cover', !cameraOn && !screenOn && 'hidden')} />
-              {!cameraOn && !screenOn && <div className="text-center space-y-2"><VideoOff className="w-14 h-14 mx-auto text-muted-foreground" /><p className="text-sm text-muted-foreground">Camera off</p></div>}
-              <div className="absolute top-3 left-3 bg-background/80 rounded-lg px-3 py-1 font-mono text-sm">
-                {Math.floor(studySeconds / 3600).toString().padStart(2, '0')}:{Math.floor((studySeconds % 3600) / 60).toString().padStart(2, '0')}:{(studySeconds % 60).toString().padStart(2, '0')}
-              </div>
-            </div>
+            {/* Zoom-style spotlight: big pinned tile + horizontal strip of others */}
+            {(() => {
+              const pinnedPeer = pinnedPeerId ? peers.find(p => p.peerId === pinnedPeerId) : null;
+              const showLocalLarge = !pinnedPeer;
+              const stripPeers = pinnedPeer ? peers.filter(p => p.peerId !== pinnedPeer.peerId) : peers;
+              return (
+                <>
+                  <div className="relative aspect-video rounded-xl overflow-hidden bg-secondary/40 border border-border">
+                    {showLocalLarge ? (
+                      <>
+                        <video ref={videoRef} autoPlay muted playsInline className={cn('w-full h-full object-cover', !cameraOn && !screenOn && 'hidden')} />
+                        {!cameraOn && !screenOn && (
+                          <div className="w-full h-full flex flex-col items-center justify-center gap-2">
+                            <VideoOff className="w-14 h-14 text-muted-foreground" />
+                            <p className="text-sm text-muted-foreground">Camera off</p>
+                          </div>
+                        )}
+                        <div className="absolute bottom-2 left-2 bg-primary/70 rounded px-2 py-0.5 text-xs">{selfName} (you)</div>
+                      </>
+                    ) : (
+                      <RemoteVideoTile peer={pinnedPeer!} large onPin={() => setPinnedPeerId(null)} pinned />
+                    )}
+                    <div className="absolute top-3 left-3 bg-background/80 rounded-lg px-3 py-1 font-mono text-sm">
+                      {Math.floor(studySeconds / 3600).toString().padStart(2, '0')}:{Math.floor((studySeconds % 3600) / 60).toString().padStart(2, '0')}:{(studySeconds % 60).toString().padStart(2, '0')}
+                    </div>
+                  </div>
+                  {/* Strip of other participants */}
+                  {(stripPeers.length > 0 || pinnedPeer) && (
+                    <div className="flex gap-2 overflow-x-auto pb-1">
+                      {pinnedPeer && (
+                        <div className="w-40 shrink-0">
+                          <LocalVideoTile
+                            stream={cameraOn || screenOn ? (callStream || streamRef.current) : null}
+                            name={selfName}
+                            onPin={() => setPinnedPeerId(null)}
+                          />
+                        </div>
+                      )}
+                      {stripPeers.map((p) => (
+                        <div key={p.peerId} className="w-40 shrink-0">
+                          <RemoteVideoTile
+                            peer={p}
+                            onPin={() => setPinnedPeerId(p.peerId === pinnedPeerId ? null : p.peerId)}
+                            pinned={p.peerId === pinnedPeerId}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
 
             <div className="grid grid-cols-3 gap-2">
               <Button variant={cameraOn ? 'default' : 'outline'} onClick={toggleCamera} className="gap-2">{cameraOn ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />} Camera</Button>
