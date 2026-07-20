@@ -1,5 +1,5 @@
 import { cn } from '@/lib/utils';
-import { Book, Zap, TreeDeciduous, Target, Swords, Award, Bell, Timer, Users, Coins, Star } from 'lucide-react';
+import { Book, Zap, TreeDeciduous, Target, Swords, Award, Bell, Timer, Users, Coins, Star, Lock, Video, MessageCircle, Brain, Heart, Calendar, ShieldAlert, BookOpen, Sparkles } from 'lucide-react';
 import {
   Accordion, AccordionContent, AccordionItem, AccordionTrigger,
 } from '@/components/ui/accordion';
@@ -9,6 +9,175 @@ interface GuideSectionProps {
 }
 
 const guideItems = [
+  {
+    id: 'e2ee-chat',
+    icon: Lock,
+    title: '🔐 End-to-End Encrypted Chat',
+    color: 'text-emerald-400',
+    content: `Your DMs are now truly private! 🔒
+
+**How it works:**
+- On first sign-in your device makes a keypair
+- Private key stays in your browser (IndexedDB)
+- Only your public key is uploaded
+- Messages + files are encrypted BEFORE upload
+- Server sees only ciphertext, admins can't read it
+
+**Attachments:**
+- Images, videos, PDFs, audio — all encrypted client-side
+- WhatsApp/TG-style preview panel before sending
+- Tap any file to view full-screen
+- Signed URLs expire in 60 seconds
+
+**Backup:** Export your key from Profile → losing device = losing history!`,
+  },
+  {
+    id: 'video-calls',
+    icon: Video,
+    title: '📹 Virtual Library & Video Calls',
+    color: 'text-cyan-400',
+    content: `Real study rooms with live video! 🎥
+
+**Features:**
+- WebRTC mesh video calling (peer-to-peer)
+- Camera + mic toggle
+- Screen sharing for whiteboards/notes
+- Persistent rooms with Meeting IDs
+- Join by 6-digit room code
+- Presence indicators (who's online)
+
+**Tip:** Create a room, share the code with study buddies — study together like Zoom!`,
+  },
+  {
+    id: 'groups',
+    icon: MessageCircle,
+    title: '💬 Groups (Telegram-style)',
+    color: 'text-blue-400',
+    content: `Full group chat like TG! 👥
+
+**Group features:**
+- Group name, description, DP/avatar
+- Invite via link, QR, or 8-char code
+- Search users by Biro-ID, email, or name
+- Admin controls: promote, kick, ban
+- Realtime messages + media
+- Group info panel with member list
+
+**Safety:** Bans are permanent; creators can't be demoted.`,
+  },
+  {
+    id: 'mentor',
+    icon: Sparkles,
+    title: '🧙 Dronacharya AI Mentor',
+    color: 'text-amber-400',
+    content: `Elite ultra-strict mentor with memory! 🕉️
+
+**Powers:**
+- Remembers every past chat (persistent memory)
+- Reads images, PDFs, videos, audio (OCR + transcription)
+- Knows IST time, day, exam countdown, holidays
+- 5-Layer decision tree for personalized plans
+- Nightly 10 PM check-in with summary
+- Mentor Timeline view for daily journal
+
+**Extras:**
+- One-tap reply quoting
+- Edit & regenerate replies
+- Weakness dashboard from analytics`,
+  },
+  {
+    id: 'revision',
+    icon: Calendar,
+    title: '📅 Revision Scheduler',
+    color: 'text-pink-400',
+    content: `Ebbinghaus spaced repetition! 🧠
+
+- Auto-schedules Day 1, 3, 7, 14, 30 reviews
+- Red / Yellow / Green urgency badges
+- Priority by chapter difficulty + exam date
+- Marks chapters Pending → Mastered
+- Never forget what you learn again!`,
+  },
+  {
+    id: 'villain',
+    icon: ShieldAlert,
+    title: '😈 Villain Mode',
+    color: 'text-red-500',
+    content: `Beast-mode lockdown! 🔥
+
+- Dark red UI + savage motivational quotes
+- Blocks social media routes on device
+- Auto-triggers if daily screen time exceeds limit (Strict Read Mode)
+- Only study routes work until you close the loop`,
+  },
+  {
+    id: 'wellness',
+    icon: Heart,
+    title: '🧘 Wellness & Journal',
+    color: 'text-rose-400',
+    content: `Mental health tools! 💗
+
+- Emoji mood tracker
+- SOS Panic Button + grounding techniques
+- Private daily journal (only you)
+- Mentor uses mood + journal to personalize plans
+- Life Calendar: 90×52 grid of your life in weeks`,
+  },
+  {
+    id: 'braingym',
+    icon: Brain,
+    title: '🧩 Brain Gym & Chess',
+    color: 'text-purple-400',
+    content: `Cognitive workouts! 🎮
+
+**Games included:**
+- ♟️ Chess (AI opponents, undo, difficulty)
+- Pattern Memory, Sequence Recall
+- Math Speed, Reaction Speed
+- Stroop Test, Focus Dot
+
+Earn Brain Score + streaks!`,
+  },
+  {
+    id: 'trackers',
+    icon: BookOpen,
+    title: '📊 Trackers (Sheets clone)',
+    color: 'text-green-400',
+    content: `Google Sheets, right inside Biro! 📈
+
+- Multi-letter columns (A, B, ..., AA, AB)
+- Formulas: =SUM, =AVG, =MIN, =MAX, =COUNT
+- Zoom in/out
+- Auto-analysis via AI
+- Perfect for mock scores, DPP tracking, revision logs`,
+  },
+  {
+    id: 'push',
+    icon: Bell,
+    title: '🔔 Push Notifications',
+    color: 'text-orange-400',
+    content: `Never miss a study slot! 📲
+
+**Auto-scheduled (IST):**
+- 7 AM — Morning Kickoff
+- 1 PM — Midday Nudge
+- 10 PM — Nightly Check-in
+
+Works on web + PWA (install from browser menu). Enable from Profile → Push Toggle.`,
+  },
+  {
+    id: 'feedback',
+    icon: Star,
+    title: '⭐ Feedback & Support',
+    color: 'text-yellow-300',
+    content: `Talk to the Biro team! 💌
+
+- 5-star rate every feature
+- Post comments/corrections in Feedback page
+- Telegram support: @biro1_a
+- Announcements channel: t.me/biroskills
+- Guest mode: try the app without signup`,
+  },
   {
     id: 'xp-rules',
     icon: Star,
