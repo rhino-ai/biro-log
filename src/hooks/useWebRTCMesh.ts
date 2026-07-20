@@ -145,7 +145,7 @@ export function useWebRTCMesh({ roomKey, selfUserId, selfName, localStream, enab
       // Auto-reconnect: on transient drop, attempt ICE restart if we're the offerer
       if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
         const isOfferer = peerIdRef.current < peerId;
-        if (isOfferer && pc.connectionState !== 'closed') {
+        if (isOfferer) {
           if (!restartTimersRef.current[peerId]) {
             restartTimersRef.current[peerId] = setTimeout(async () => {
               delete restartTimersRef.current[peerId];
