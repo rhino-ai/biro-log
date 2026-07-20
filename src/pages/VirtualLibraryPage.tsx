@@ -1126,6 +1126,8 @@ const VirtualLibraryPage = () => {
               <div className="flex flex-wrap gap-2">
                 <Button variant="outline" size="sm" onClick={muteAll} className="gap-1 text-xs"><MicOff className="w-3.5 h-3.5" /> Mute all</Button>
                 <Button variant="outline" size="sm" onClick={camOffAll} className="gap-1 text-xs"><VideoOff className="w-3.5 h-3.5" /> Cams off all</Button>
+                <Button variant="outline" size="sm" onClick={unmuteAll} className="gap-1 text-xs"><Mic className="w-3.5 h-3.5" /> Unmute all</Button>
+                <Button variant="outline" size="sm" onClick={camOnAll} className="gap-1 text-xs"><Video className="w-3.5 h-3.5" /> Cams on all</Button>
               </div>
             )}
 
@@ -1141,7 +1143,9 @@ const VirtualLibraryPage = () => {
                       </PopoverTrigger>
                       <PopoverContent align="end" className="w-44 p-1">
                         <button onClick={() => muteMember(ru)} className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-secondary flex items-center gap-2"><MicOff className="w-3.5 h-3.5" /> Mute mic</button>
+                        <button onClick={() => unmuteMember(ru)} className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-secondary flex items-center gap-2"><Mic className="w-3.5 h-3.5" /> Ask to unmute</button>
                         <button onClick={() => camOffMember(ru)} className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-secondary flex items-center gap-2"><VideoOff className="w-3.5 h-3.5" /> Turn off cam</button>
+                        <button onClick={() => camOnMember(ru)} className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-secondary flex items-center gap-2"><Video className="w-3.5 h-3.5" /> Ask to turn on cam</button>
                         <button onClick={() => kickMember(ru)} className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-secondary flex items-center gap-2 text-orange-500"><UserX className="w-3.5 h-3.5" /> Kick</button>
                         <button onClick={() => setBanTarget(ru)} className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-secondary flex items-center gap-2 text-destructive"><Ban className="w-3.5 h-3.5" /> Ban…</button>
                       </PopoverContent>
