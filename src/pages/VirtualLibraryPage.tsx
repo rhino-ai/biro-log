@@ -224,22 +224,36 @@ const VirtualLibraryPage = () => {
   };
 
   const joinRoom = async () => {
-    if (!meetingId.trim() || !user) return;
+    if (!meetingId.trim()) return;
+    await joinRoomWithCode(meetingId.trim().toUpperCase());
+  };
+
+  const joinRoomWithCode = async (code: string) => {
+    if (!code) return;
     setIsJoining(true);
-    const code = meetingId.trim().toUpperCase();
-    // Ask the server to add us — the RPC validates the code and inserts the membership.
+    if (!user) {
+      // Guest attendee — WebRTC only, no DB writes
+      setIsJoining(false);
+      const guestRoom: StudyRoom = { id: `guest-${code}`, code, title: `Room ${code}`, owner_id: '', is_active: true, created_at: new Date().toISOString() };
+      setActiveRoom(guestRoom);
+      setMeetingId(code);
+      setIsGuestRoom(true);
+      setMessages([]);
+      toast({ title: 'Joined as guest', description: 'Sign in to chat & save study history.' });
+      return;
+    }
     const { data: rid, error: rpcErr } = await supabase.rpc('join_study_room_by_code', { _code: code });
     if (rpcErr || !rid) {
       setIsJoining(false);
       toast({ title: 'Room not found', description: rpcErr?.message || 'Check the meeting ID and try again.', variant: 'destructive' });
       return;
     }
-    // Now we're a member — allowed to SELECT the row.
     const { data, error } = await supabase.from('study_rooms').select('id,code,title,owner_id,is_active,created_at').eq('id', rid as string).maybeSingle();
     setIsJoining(false);
     if (error || !data) { toast({ title: 'Room not found', description: 'Try again.', variant: 'destructive' }); return; }
     setActiveRoom(data as StudyRoom);
     setMeetingId(code);
+    setIsGuestRoom(false);
     await loadMessages((data as StudyRoom).id);
   };
 
@@ -258,6 +272,49 @@ const VirtualLibraryPage = () => {
     setActiveRoom(null);
     setRoomUsers([]);
     setMessages([]);
+    setIsGuestRoom(false);
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('join')) {
+      params.delete('join');
+      const next = window.location.pathname + (params.toString() ? `?${params}` : '');
+      window.history.replaceState({}, '', next);
+    }
+  };
+
+  const isOwner = !!(activeRoom && user && activeRoom.owner_id === user.id);
+
+  const endMeeting = async () => {
+    if (!activeRoom || !isOwner) return;
+    if (!window.confirm('End this meeting for everyone?')) return;
+    try {
+      const c1 = supabase.channel(`study-room-${activeRoom.id}`);
+      const c2 = supabase.channel(`study-room-guest-${activeRoom.code}`);
+      await new Promise<void>((resolve) => { c1.subscribe((s: string) => { if (s === 'SUBSCRIBED') resolve(); }); });
+      await c1.send({ type: 'broadcast', event: 'meeting-ended', payload: {} });
+      await new Promise<void>((resolve) => { c2.subscribe((s: string) => { if (s === 'SUBSCRIBED') resolve(); }); });
+      await c2.send({ type: 'broadcast', event: 'meeting-ended', payload: {} });
+      supabase.removeChannel(c1);
+      supabase.removeChannel(c2);
+    } catch {}
+    await supabase.from('study_rooms').update({ is_active: false }).eq('id', activeRoom.id);
+    toast({ title: 'Meeting ended' });
+    await leaveRoom();
+  };
+
+  const shareInviteLink = async () => {
+    const code = activeRoom?.code || meetingId;
+    if (!code) return;
+    const url = `${window.location.origin}/virtual-library?join=${encodeURIComponent(code)}`;
+    try {
+      if ((navigator as any).share) {
+        await (navigator as any).share({ title: 'Join my Biro-log study room', text: `Join code: ${code}`, url });
+      } else {
+        await navigator.clipboard.writeText(url);
+        toast({ title: 'Invite link copied', description: url });
+      }
+    } catch {
+      try { await navigator.clipboard.writeText(url); toast({ title: 'Invite link copied' }); } catch {}
+    }
   };
 
   const toggleCamera = async () => {
