@@ -17,6 +17,7 @@ export type RemotePeer = {
   name: string;
   stream: MediaStream | null;
   connectionState?: RTCPeerConnectionState;
+  reconnecting?: boolean;
 };
 
 type Options = {
@@ -140,7 +141,8 @@ export function useWebRTCMesh({ roomKey, selfUserId, selfName, localStream, enab
     pc.onconnectionstatechange = () => {
       setPeers((prev) => {
         if (!prev[peerId]) return prev;
-        return { ...prev, [peerId]: { ...prev[peerId], connectionState: pc.connectionState } };
+        const reconnecting = pc.connectionState === 'disconnected' || pc.connectionState === 'failed';
+        return { ...prev, [peerId]: { ...prev[peerId], connectionState: pc.connectionState, reconnecting } };
       });
       // Auto-reconnect: on transient drop, attempt ICE restart if we're the offerer
       if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
@@ -170,6 +172,7 @@ export function useWebRTCMesh({ roomKey, selfUserId, selfName, localStream, enab
         cleanupPeer(peerId);
       }
       if (pc.connectionState === 'connected') {
+        setPeers((prev) => prev[peerId] ? { ...prev, [peerId]: { ...prev[peerId], reconnecting: false } } : prev);
         // Apply the current bandwidth cap once the connection is up
         void applyMaxBitrate(pc, BITRATE_KBPS[currentBwRef.current]);
       }
@@ -338,5 +341,57 @@ export function useWebRTCMesh({ roomKey, selfUserId, selfName, localStream, enab
     return () => clearInterval(interval);
   }, [enabled]);
 
-  return { peers: Object.values(peers) };
+  const getDiagnostics = useCallback(async () => {
+    const out: Array<{
+      peerId: string;
+      name: string;
+      connectionState?: RTCPeerConnectionState;
+      rttMs: number | null;
+      packetLossPct: number | null;
+      outboundKbps: number | null;
+      inboundKbps: number | null;
+      jitterMs: number | null;
+      remoteAudioLevel: number | null;
+    }> = [];
+    for (const [pid, pc] of Object.entries(pcsRef.current)) {
+      const meta = peerMetaRef.current[pid];
+      let rtt: number | null = null, sent = 0, lost = 0, jitter: number | null = null;
+      let outBytes: number | null = null, inBytes: number | null = null, audLvl: number | null = null;
+      try {
+        const stats = await pc.getStats();
+        stats.forEach((r: any) => {
+          if (r.type === 'candidate-pair' && r.state === 'succeeded' && r.currentRoundTripTime != null) {
+            rtt = r.currentRoundTripTime * 1000;
+          }
+          if (r.type === 'outbound-rtp' && !r.isRemote) {
+            sent += r.packetsSent || 0;
+            outBytes = (outBytes || 0) + (r.bytesSent || 0);
+          }
+          if (r.type === 'remote-inbound-rtp') {
+            lost += r.packetsLost || 0;
+            if (r.jitter != null) jitter = r.jitter * 1000;
+          }
+          if (r.type === 'inbound-rtp') {
+            inBytes = (inBytes || 0) + (r.bytesReceived || 0);
+            if (r.kind === 'audio' && r.audioLevel != null) audLvl = r.audioLevel;
+          }
+          if (r.type === 'track' && r.kind === 'audio' && r.audioLevel != null) audLvl = r.audioLevel;
+        });
+      } catch {}
+      out.push({
+        peerId: pid,
+        name: meta?.name || pid,
+        connectionState: pc.connectionState,
+        rttMs: rtt,
+        packetLossPct: sent > 0 ? (lost / sent) * 100 : null,
+        outboundKbps: outBytes != null ? Math.round((outBytes * 8) / 1000) : null,
+        inboundKbps: inBytes != null ? Math.round((inBytes * 8) / 1000) : null,
+        jitterMs: jitter,
+        remoteAudioLevel: audLvl,
+      });
+    }
+    return out;
+  }, []);
+
+  return { peers: Object.values(peers), getDiagnostics };
 }
