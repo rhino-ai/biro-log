@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Video, Users, Monitor, Copy, ExternalLink, Mic, MicOff, VideoOff, Send, DoorOpen, Loader2, PhoneCall, PhoneOff, Search, Share2, XCircle, Link as LinkIcon } from 'lucide-react';
+import { Video, Users, Monitor, Copy, ExternalLink, Mic, MicOff, VideoOff, Send, DoorOpen, Loader2, PhoneCall, PhoneOff, Search, Share2, XCircle, Link as LinkIcon, Ban, UserX, ShieldOff, MoreVertical } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { useGame } from '@/hooks/useGame';
 import { useAuth } from '@/hooks/useAuth';
@@ -14,6 +14,9 @@ import { supabase as _supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useWebRTCMesh, type RemotePeer } from '@/hooks/useWebRTCMesh';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const RemoteVideoTile = ({ peer }: { peer: RemotePeer }) => {
   const ref = useRef<HTMLVideoElement>(null);
@@ -61,10 +64,16 @@ const VirtualLibraryPage = () => {
   const [searchQ, setSearchQ] = useState('');
   const [isGuestRoom, setIsGuestRoom] = useState(false);
   const [autoJoinTried, setAutoJoinTried] = useState(false);
+  const [banTarget, setBanTarget] = useState<RoomUser | null>(null);
+  const [banScope, setBanScope] = useState<'room' | 'host_all'>('room');
+  const [banDuration, setBanDuration] = useState<string>('forever');
+  const [banReason, setBanReason] = useState('');
+  const [isBanning, setIsBanning] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const screenStreamRef = useRef<MediaStream | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const hostChannelRef = useRef<any>(null);
 
   const { peers } = useWebRTCMesh({
     roomKey: activeRoom?.id ?? null,
@@ -165,13 +174,33 @@ const VirtualLibraryPage = () => {
         toast({ title: 'Meeting ended', description: 'The host ended this study room.' });
         void leaveRoom();
       })
+      .on('broadcast', { event: 'force-mute' }, ({ payload }: any) => {
+        if (payload?.target !== user.id) return;
+        streamRef.current?.getAudioTracks().forEach((t) => (t.enabled = false));
+        callStream?.getAudioTracks().forEach((t) => (t.enabled = false));
+        setMicOn(false);
+        toast({ title: 'Muted by host', variant: 'destructive' });
+      })
+      .on('broadcast', { event: 'force-cam-off' }, ({ payload }: any) => {
+        if (payload?.target !== user.id) return;
+        streamRef.current?.getVideoTracks().forEach((t) => (t.enabled = false));
+        callStream?.getVideoTracks().forEach((t) => (t.enabled = false));
+        setCameraOn(false);
+        toast({ title: 'Camera turned off by host', variant: 'destructive' });
+      })
+      .on('broadcast', { event: 'kick' }, ({ payload }: any) => {
+        if (payload?.target !== user.id) return;
+        toast({ title: 'Removed by host', description: payload?.banned ? 'You were banned from this room.' : 'You were removed.', variant: 'destructive' });
+        void leaveRoom();
+      })
       .subscribe(async (status: string) => {
         if (status === 'SUBSCRIBED') {
           await channel.track({ name: profile.name || 'Student', avatar: profile.avatar || '👤', joinedAt: Date.now() });
         }
       });
+    hostChannelRef.current = channel;
     return () => { channel.untrack(); supabase.removeChannel(channel); };
-  }, [activeRoom, user, profile.name, profile.avatar, isGuestRoom]);
+  }, [activeRoom, user, profile.name, profile.avatar, isGuestRoom, callStream]);
 
   // Load my recent rooms for search list
   useEffect(() => {
@@ -299,6 +328,65 @@ const VirtualLibraryPage = () => {
     await supabase.from('study_rooms').update({ is_active: false }).eq('id', activeRoom.id);
     toast({ title: 'Meeting ended' });
     await leaveRoom();
+  };
+
+  const hostBroadcast = async (event: string, payload: any) => {
+    const ch = hostChannelRef.current;
+    if (!ch) return;
+    try { await ch.send({ type: 'broadcast', event, payload }); } catch {}
+  };
+
+  const muteMember = async (target: RoomUser) => {
+    if (!isOwner) return;
+    await hostBroadcast('force-mute', { target: target.id });
+    toast({ title: `Muted ${target.name}` });
+  };
+
+  const camOffMember = async (target: RoomUser) => {
+    if (!isOwner) return;
+    await hostBroadcast('force-cam-off', { target: target.id });
+    toast({ title: `Cam off ${target.name}` });
+  };
+
+  const kickMember = async (target: RoomUser) => {
+    if (!isOwner || !activeRoom) return;
+    await hostBroadcast('kick', { target: target.id, banned: false });
+    await supabase.from('study_room_members').delete().eq('room_id', activeRoom.id).eq('user_id', target.id);
+    toast({ title: `Removed ${target.name}` });
+  };
+
+  const durationToExpiry = (d: string): string | null => {
+    if (d === 'forever') return null;
+    const now = new Date();
+    const map: Record<string, number> = {
+      '1h': 3600e3, '6h': 6 * 3600e3, '24h': 24 * 3600e3,
+      '3d': 3 * 86400e3, '7d': 7 * 86400e3, '30d': 30 * 86400e3,
+      '90d': 90 * 86400e3, '365d': 365 * 86400e3,
+    };
+    return new Date(now.getTime() + (map[d] || 0)).toISOString();
+  };
+
+  const confirmBan = async () => {
+    if (!banTarget || !isOwner || !activeRoom || !user) return;
+    setIsBanning(true);
+    const expires_at = durationToExpiry(banDuration);
+    const { error } = await supabase.from('study_room_bans').insert({
+      room_id: banScope === 'room' ? activeRoom.id : null,
+      host_id: user.id,
+      user_id: banTarget.id,
+      scope: banScope,
+      expires_at,
+      reason: banReason.trim() || null,
+    });
+    setIsBanning(false);
+    if (error) { toast({ title: 'Ban failed', description: error.message, variant: 'destructive' }); return; }
+    await hostBroadcast('kick', { target: banTarget.id, banned: true });
+    await supabase.from('study_room_members').delete().eq('room_id', activeRoom.id).eq('user_id', banTarget.id);
+    toast({ title: `Banned ${banTarget.name}`, description: banScope === 'host_all' ? 'From all your rooms' : 'From this room' });
+    setBanTarget(null);
+    setBanReason('');
+    setBanDuration('forever');
+    setBanScope('room');
   };
 
   const shareInviteLink = async () => {
@@ -483,7 +571,20 @@ const VirtualLibraryPage = () => {
               {roomUsers.map((ru) => (
                 <div key={ru.id} className={cn('glass-panel p-3 rounded-xl flex items-center gap-2 border', ru.id === user?.id ? 'border-primary/50' : 'border-border')}>
                   <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center shrink-0">{ru.avatar || '👤'}</div>
-                  <div className="min-w-0"><p className="text-xs font-semibold truncate">{ru.name}</p><p className="text-[10px] text-muted-foreground">{Math.floor((Date.now() - ru.joinedAt) / 60000)}m</p></div>
+                  <div className="min-w-0 flex-1"><p className="text-xs font-semibold truncate">{ru.name}{ru.id === activeRoom?.owner_id && <span className="ml-1 text-[9px] bg-primary/30 px-1 rounded">HOST</span>}</p><p className="text-[10px] text-muted-foreground">{Math.floor((Date.now() - ru.joinedAt) / 60000)}m</p></div>
+                  {isOwner && ru.id !== user?.id && (
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0"><MoreVertical className="w-3.5 h-3.5" /></Button>
+                      </PopoverTrigger>
+                      <PopoverContent align="end" className="w-44 p-1">
+                        <button onClick={() => muteMember(ru)} className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-secondary flex items-center gap-2"><MicOff className="w-3.5 h-3.5" /> Mute mic</button>
+                        <button onClick={() => camOffMember(ru)} className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-secondary flex items-center gap-2"><VideoOff className="w-3.5 h-3.5" /> Turn off cam</button>
+                        <button onClick={() => kickMember(ru)} className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-secondary flex items-center gap-2 text-orange-500"><UserX className="w-3.5 h-3.5" /> Kick</button>
+                        <button onClick={() => setBanTarget(ru)} className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-secondary flex items-center gap-2 text-destructive"><Ban className="w-3.5 h-3.5" /> Ban…</button>
+                      </PopoverContent>
+                    </Popover>
+                  )}
                 </div>
               ))}
             </div>
@@ -513,6 +614,49 @@ const VirtualLibraryPage = () => {
             </div>
           </aside>
         </div>
+
+        <Dialog open={!!banTarget} onOpenChange={(o) => !o && setBanTarget(null)}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader><DialogTitle className="flex items-center gap-2"><Ban className="w-4 h-4 text-destructive" /> Ban {banTarget?.name}</DialogTitle></DialogHeader>
+            <div className="space-y-3">
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">Scope</label>
+                <Select value={banScope} onValueChange={(v) => setBanScope(v as any)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="room">This meeting only</SelectItem>
+                    <SelectItem value="host_all">All my rooms (present & future)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">Duration</label>
+                <Select value={banDuration} onValueChange={setBanDuration}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1h">1 hour</SelectItem>
+                    <SelectItem value="6h">6 hours</SelectItem>
+                    <SelectItem value="24h">1 day</SelectItem>
+                    <SelectItem value="3d">3 days</SelectItem>
+                    <SelectItem value="7d">1 week</SelectItem>
+                    <SelectItem value="30d">1 month</SelectItem>
+                    <SelectItem value="90d">3 months</SelectItem>
+                    <SelectItem value="365d">1 year</SelectItem>
+                    <SelectItem value="forever">Forever</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-muted-foreground">Reason (optional)</label>
+                <Input value={banReason} onChange={(e) => setBanReason(e.target.value)} placeholder="Spam, disruption, etc." />
+              </div>
+            </div>
+            <DialogFooter className="gap-2">
+              <Button variant="ghost" onClick={() => setBanTarget(null)}>Cancel</Button>
+              <Button variant="destructive" onClick={confirmBan} disabled={isBanning} className="gap-2">{isBanning ? <Loader2 className="w-4 h-4 animate-spin" /> : <Ban className="w-4 h-4" />} Ban</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }
