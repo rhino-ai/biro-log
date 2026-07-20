@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Video, Users, Monitor, Copy, ExternalLink, Mic, MicOff, VideoOff, Send, DoorOpen, Loader2, PhoneCall, PhoneOff, Search, Share2, XCircle, Link as LinkIcon, Ban, UserX, ShieldOff, MoreVertical } from 'lucide-react';
+import { Video, Users, Monitor, Copy, ExternalLink, Mic, MicOff, VideoOff, Send, DoorOpen, Loader2, PhoneCall, PhoneOff, Search, Share2, XCircle, Link as LinkIcon, Ban, UserX, ShieldOff, MoreVertical, Pin, PinOff } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { useGame } from '@/hooks/useGame';
 import { useAuth } from '@/hooks/useAuth';
@@ -18,21 +18,66 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-const RemoteVideoTile = ({ peer }: { peer: RemotePeer }) => {
+const RemoteVideoTile = ({ peer, large, onPin, pinned }: { peer: RemotePeer; large?: boolean; onPin?: () => void; pinned?: boolean }) => {
   const ref = useRef<HTMLVideoElement>(null);
   useEffect(() => {
     if (ref.current && peer.stream) ref.current.srcObject = peer.stream;
   }, [peer.stream]);
   return (
-    <div className="relative aspect-video rounded-lg overflow-hidden bg-secondary/60 border border-border">
+    <div className={cn('relative rounded-lg overflow-hidden bg-secondary/60 border border-border group', large ? 'w-full h-full' : 'aspect-video')}>
       {peer.stream ? (
         <video ref={ref} autoPlay playsInline className="w-full h-full object-cover" />
       ) : (
         <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">Connecting…</div>
       )}
       <div className="absolute bottom-1 left-1 bg-background/70 rounded px-1.5 py-0.5 text-[10px] truncate max-w-[90%]">{peer.name}</div>
+      {onPin && (
+        <button
+          onClick={onPin}
+          className="absolute top-1 right-1 bg-background/80 hover:bg-background rounded p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+          title={pinned ? 'Unpin' : 'Pin'}
+        >
+          {pinned ? <PinOff className="w-3 h-3" /> : <Pin className="w-3 h-3" />}
+        </button>
+      )}
     </div>
   );
+};
+
+const LocalVideoTile = ({ stream, name, large, onPin, pinned }: { stream: MediaStream | null; name: string; large?: boolean; onPin?: () => void; pinned?: boolean }) => {
+  const ref = useRef<HTMLVideoElement>(null);
+  useEffect(() => { if (ref.current) ref.current.srcObject = stream; }, [stream]);
+  return (
+    <div className={cn('relative rounded-lg overflow-hidden bg-secondary/60 border border-primary/40 group', large ? 'w-full h-full' : 'aspect-video')}>
+      {stream ? (
+        <video ref={ref} autoPlay muted playsInline className="w-full h-full object-cover" />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
+          <VideoOff className="w-6 h-6" />
+        </div>
+      )}
+      <div className="absolute bottom-1 left-1 bg-primary/70 rounded px-1.5 py-0.5 text-[10px] truncate max-w-[90%]">{name} (you)</div>
+      {onPin && (
+        <button onClick={onPin} className="absolute top-1 right-1 bg-background/80 hover:bg-background rounded p-1 opacity-0 group-hover:opacity-100 transition-opacity" title={pinned ? 'Unpin' : 'Pin'}>
+          {pinned ? <PinOff className="w-3 h-3" /> : <Pin className="w-3 h-3" />}
+        </button>
+      )}
+    </div>
+  );
+};
+
+// Stable guest identity across reloads for a device
+const getGuestId = () => {
+  try {
+    let g = localStorage.getItem('biro-guest-id');
+    if (!g) {
+      g = 'guest-' + (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now());
+      localStorage.setItem('biro-guest-id', g);
+    }
+    return g;
+  } catch {
+    return 'guest-' + Math.random().toString(36).slice(2);
+  }
 };
 
 const supabase = _supabase as any;
