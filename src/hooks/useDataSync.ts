@@ -46,8 +46,8 @@ export const useDataSync = () => {
       // Sensitive columns (dream_*, exam_date_*, coins, last_study_date, phone,
       // email) are no longer readable via direct SELECT on profiles. Route the
       // owner's full-profile read through the SECURITY DEFINER RPC.
-      const profileResult = await withTimeout(
-        (supabase.rpc as any)('get_my_full_profile').maybeSingle() as Promise<{ data: any; error: any }>,
+      const profileResult = await withTimeout<any>(
+        (supabase.rpc as any)('get_my_full_profile').maybeSingle(),
         5000,
         { data: null, error: { message: 'Profile load timeout' } as any, count: null, status: 408, statusText: 'Timeout' },
       );
