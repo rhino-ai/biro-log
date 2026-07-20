@@ -989,6 +989,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_reschedule_push_cron: {
+        Args: { _job_name?: string; _secret: string }
+        Returns: undefined
+      }
       generate_unique_code: {
         Args: { _len: number; _prefix: string }
         Returns: string
