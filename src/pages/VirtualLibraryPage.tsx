@@ -731,6 +731,26 @@ const VirtualLibraryPage = () => {
             </Button>
             <Button variant="outline" size="sm" onClick={shareInviteLink} className="gap-1"><Share2 className="w-3 h-3" /> Share</Button>
             <Button variant="outline" size="sm" onClick={copyId} className="gap-1"><Copy className="w-3 h-3" /> ID</Button>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-1" aria-label="Bandwidth"><Gauge className="w-3 h-3" /> <span className="hidden sm:inline capitalize">{bandwidthMode}</span></Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-48 p-2" align="end">
+                <p className="text-[11px] text-muted-foreground mb-1 px-1">Video quality</p>
+                {(['auto','high','normal','low'] as const).map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => setBandwidthMode(m)}
+                    className={cn('w-full text-left text-xs rounded px-2 py-1.5 hover:bg-secondary flex items-center justify-between', bandwidthMode === m && 'bg-secondary font-semibold')}
+                  >
+                    <span className="capitalize">{m}</span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {m === 'auto' ? 'Adapt' : m === 'high' ? '~1.5 Mb/s' : m === 'normal' ? '~600 kb/s' : '~150 kb/s'}
+                    </span>
+                  </button>
+                ))}
+              </PopoverContent>
+            </Popover>
             {isOwner && <Button variant="outline" size="sm" onClick={openAuditLog} className="gap-1 hidden sm:inline-flex"><ScrollText className="w-3 h-3" /> Log</Button>}
             {isOwner && <Button variant="destructive" size="sm" onClick={endMeeting} className="gap-1"><XCircle className="w-3 h-3" /> End</Button>}
           </div>
