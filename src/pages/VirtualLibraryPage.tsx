@@ -6,13 +6,31 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Video, Users, Monitor, Copy, ExternalLink, Mic, MicOff, VideoOff, Send, DoorOpen, Loader2 } from 'lucide-react';
+import { Video, Users, Monitor, Copy, ExternalLink, Mic, MicOff, VideoOff, Send, DoorOpen, Loader2, PhoneCall, PhoneOff } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { useGame } from '@/hooks/useGame';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase as _supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { useWebRTCMesh, type RemotePeer } from '@/hooks/useWebRTCMesh';
+
+const RemoteVideoTile = ({ peer }: { peer: RemotePeer }) => {
+  const ref = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    if (ref.current && peer.stream) ref.current.srcObject = peer.stream;
+  }, [peer.stream]);
+  return (
+    <div className="relative aspect-video rounded-lg overflow-hidden bg-secondary/60 border border-border">
+      {peer.stream ? (
+        <video ref={ref} autoPlay playsInline className="w-full h-full object-cover" />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">Connecting…</div>
+      )}
+      <div className="absolute bottom-1 left-1 bg-background/70 rounded px-1.5 py-0.5 text-[10px] truncate max-w-[90%]">{peer.name}</div>
+    </div>
+  );
+};
 
 const supabase = _supabase as any;
 
@@ -37,10 +55,20 @@ const VirtualLibraryPage = () => {
   const [cameraOn, setCameraOn] = useState(false);
   const [micOn, setMicOn] = useState(false);
   const [screenOn, setScreenOn] = useState(false);
+  const [callActive, setCallActive] = useState(false);
+  const [callStream, setCallStream] = useState<MediaStream | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const screenStreamRef = useRef<MediaStream | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const { peers } = useWebRTCMesh({
+    roomKey: activeRoom?.id ?? null,
+    selfUserId: user?.id ?? null,
+    selfName: profile.name || 'Student',
+    localStream: callStream,
+    enabled: callActive && !!activeRoom && !!user,
+  });
 
   const stopMedia = useCallback(() => {
     streamRef.current?.getTracks().forEach((track) => track.stop());
@@ -51,6 +79,36 @@ const VirtualLibraryPage = () => {
     setCameraOn(false);
     setMicOn(false);
     setScreenOn(false);
+    setCallStream(null);
+    setCallActive(false);
+  }, []);
+
+  const startCall = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      streamRef.current = stream;
+      setCallStream(stream);
+      setCameraOn(true);
+      setMicOn(true);
+      setCallActive(true);
+      if (videoRef.current) videoRef.current.srcObject = stream;
+      toast({ title: 'Live call started', description: 'Others in this room will connect automatically.' });
+    } catch (error) {
+      toast({ title: 'Call blocked', description: error instanceof Error ? error.message : 'Allow camera + mic.', variant: 'destructive' });
+    }
+  }, []);
+
+  const endCall = useCallback(() => {
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    screenStreamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    screenStreamRef.current = null;
+    setCallStream(null);
+    setCallActive(false);
+    setScreenOn(false);
+    setCameraOn(false);
+    setMicOn(false);
+    if (videoRef.current) videoRef.current.srcObject = null;
   }, []);
 
   useEffect(() => () => stopMedia(), [stopMedia]);
@@ -146,6 +204,14 @@ const VirtualLibraryPage = () => {
 
   const toggleCamera = async () => {
     try {
+      if (callActive && callStream) {
+        const videoTracks = callStream.getVideoTracks();
+        if (videoTracks.length) {
+          videoTracks.forEach((t) => (t.enabled = !cameraOn));
+          setCameraOn(!cameraOn);
+        }
+        return;
+      }
       if (cameraOn) {
         streamRef.current?.getVideoTracks().forEach((track) => track.stop());
         setCameraOn(false);
@@ -164,6 +230,14 @@ const VirtualLibraryPage = () => {
 
   const toggleMic = async () => {
     try {
+      if (callActive && callStream) {
+        const audioTracks = callStream.getAudioTracks();
+        if (audioTracks.length) {
+          audioTracks.forEach((t) => (t.enabled = !micOn));
+          setMicOn(!micOn);
+        }
+        return;
+      }
       if (micOn) {
         streamRef.current?.getAudioTracks().forEach((track) => track.stop());
         setMicOn(false);
@@ -181,6 +255,35 @@ const VirtualLibraryPage = () => {
 
   const toggleScreen = async () => {
     try {
+      if (callActive) {
+        if (screenOn) {
+          screenStreamRef.current?.getTracks().forEach((t) => t.stop());
+          screenStreamRef.current = null;
+          // Revert to camera stream
+          const cam = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+          streamRef.current?.getTracks().forEach((t) => t.stop());
+          streamRef.current = cam;
+          setCallStream(cam);
+          if (videoRef.current) videoRef.current.srcObject = cam;
+          setScreenOn(false);
+          return;
+        }
+        const screen = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false });
+        // Merge screen video with existing mic audio for peers
+        const existingAudio = streamRef.current?.getAudioTracks() || [];
+        const merged = new MediaStream([...screen.getVideoTracks(), ...existingAudio]);
+        screenStreamRef.current = screen;
+        setCallStream(merged);
+        if (videoRef.current) videoRef.current.srcObject = merged;
+        screen.getVideoTracks()[0]?.addEventListener('ended', () => {
+          setScreenOn(false);
+          const cam = streamRef.current;
+          if (cam && videoRef.current) videoRef.current.srcObject = cam;
+          if (cam) setCallStream(cam);
+        });
+        setScreenOn(true);
+        return;
+      }
       if (screenOn) {
         screenStreamRef.current?.getTracks().forEach((track) => track.stop());
         screenStreamRef.current = null;
@@ -253,6 +356,25 @@ const VirtualLibraryPage = () => {
               <Button variant={micOn ? 'default' : 'outline'} onClick={toggleMic} className="gap-2">{micOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />} Mic</Button>
               <Button variant={screenOn ? 'default' : 'outline'} onClick={toggleScreen} className="gap-2"><Monitor className="w-4 h-4" /> Screen</Button>
             </div>
+
+            <div className="grid grid-cols-1">
+              {callActive ? (
+                <Button variant="destructive" onClick={endCall} className="gap-2"><PhoneOff className="w-4 h-4" /> End Live Call</Button>
+              ) : (
+                <Button onClick={startCall} className="bg-emerald-500 hover:bg-emerald-600 text-white gap-2"><PhoneCall className="w-4 h-4" /> Join Live Video Call</Button>
+              )}
+            </div>
+
+            {callActive && peers.length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {peers.map((p) => (
+                  <RemoteVideoTile key={p.peerId} peer={p} />
+                ))}
+              </div>
+            )}
+            {callActive && peers.length === 0 && (
+              <div className="text-center text-xs text-muted-foreground py-2">Waiting for others to join the call…</div>
+            )}
 
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 overflow-y-auto pb-2">
               {roomUsers.map((ru) => (
