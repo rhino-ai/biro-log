@@ -8,7 +8,9 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Users, MessageCircle, Plus, Search, UserPlus, Send, ArrowLeft, Link2, Loader2, CheckCheck, MailPlus, Paperclip, FileIcon, X as XIcon } from 'lucide-react';
+import { Users, MessageCircle, Plus, Search, UserPlus, Send, ArrowLeft, Link2, Loader2, CheckCheck, MailPlus, Paperclip, FileIcon, X as XIcon, Info, Camera } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { GroupInfoPanel } from '@/components/chat/GroupInfoPanel';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { supabase as _supabase } from '@/integrations/supabase/client';
@@ -27,7 +29,7 @@ type Profile = {
 
 type ChatItem =
   | { kind: 'dm'; id: string; peer: Profile; lastMessage?: string; lastAt?: string }
-  | { kind: 'group'; id: string; name: string; icon: string | null; invite_code: string | null; memberCount: number; lastMessage?: string; lastAt?: string };
+  | { kind: 'group'; id: string; name: string; icon: string | null; avatar_url: string | null; description: string | null; invite_code: string | null; memberCount: number; lastMessage?: string; lastAt?: string };
 
 type UIMessage = {
   id: string;
@@ -61,6 +63,12 @@ const FriendsPage = () => {
   const [showInviteMember, setShowInviteMember] = useState(false);
   const [groupName, setGroupName] = useState('');
   const [groupIcon, setGroupIcon] = useState('👥');
+  const [groupDesc, setGroupDesc] = useState('');
+  const [groupPhotoFile, setGroupPhotoFile] = useState<File | null>(null);
+  const [groupPhotoPreview, setGroupPhotoPreview] = useState<string | null>(null);
+  const [creatingGroup, setCreatingGroup] = useState(false);
+  const [showGroupInfo, setShowGroupInfo] = useState(false);
+  const groupPhotoRef = useRef<HTMLInputElement>(null);
   const [joinCode, setJoinCode] = useState('');
   const [inviteTarget, setInviteTarget] = useState('');
   const [pendingAttachment, setPendingAttachment] = useState<{ url: string; type: string; name: string } | null>(null);
@@ -114,7 +122,7 @@ const FriendsPage = () => {
     let groupItems: ChatItem[] = [];
     if (groupIds.length) {
       const [{ data: groups }, { data: members }, { data: lastMsgs }] = await Promise.all([
-        supabase.from('chat_groups').select('id,name,icon,invite_code').in('id', groupIds),
+        supabase.from('chat_groups').select('id,name,icon,avatar_url,description,invite_code').in('id', groupIds),
         supabase.from('group_members').select('group_id,user_id').in('group_id', groupIds),
         supabase.from('group_messages').select('group_id,content,created_at').in('group_id', groupIds).order('created_at', { ascending: false }).limit(500),
       ]);
@@ -127,6 +135,8 @@ const FriendsPage = () => {
         id: g.id,
         name: g.name,
         icon: g.icon,
+        avatar_url: g.avatar_url,
+        description: g.description,
         invite_code: g.invite_code,
         memberCount: (members || []).filter((m: any) => m.group_id === g.id).length,
         lastMessage: lastByGroup.get(g.id)?.content,
@@ -279,16 +289,38 @@ const FriendsPage = () => {
 
   const createGroup = async () => {
     if (!groupName.trim() || !user) return;
+    setCreatingGroup(true);
     const { data, error } = await supabase.functions.invoke('create-chat-group', { body: { name: groupName.trim(), icon: groupIcon.trim() || '👥' } });
     if (error) {
+      setCreatingGroup(false);
       toast({ title: 'Group create failed', description: error.message, variant: 'destructive' });
       return;
     }
     const group = data.group;
-    const chat: ChatItem = { kind: 'group', id: group.id, name: group.name, icon: group.icon, invite_code: group.invite_code, memberCount: 1 };
+    let avatar_url: string | null = null;
+    // Save description + photo if provided
+    if (groupDesc.trim() || groupPhotoFile) {
+      if (groupPhotoFile) {
+        try {
+          const ext = groupPhotoFile.name.split('.').pop() || 'jpg';
+          const path = `chat/${user.id}/group-${group.id}-${Date.now()}.${ext}`;
+          const { error: upErr } = await supabase.storage.from('chat-uploads').upload(path, groupPhotoFile, { contentType: groupPhotoFile.type, upsert: false });
+          if (!upErr) {
+            const { data: signed } = await supabase.storage.from('chat-uploads').createSignedUrl(path, 60 * 60 * 24 * 365 * 5);
+            avatar_url = signed?.signedUrl || null;
+          }
+        } catch { /* ignore */ }
+      }
+      await supabase.from('chat_groups').update({ description: groupDesc.trim() || null, avatar_url }).eq('id', group.id);
+    }
+    const chat: ChatItem = { kind: 'group', id: group.id, name: group.name, icon: group.icon, avatar_url, description: groupDesc.trim() || null, invite_code: group.invite_code, memberCount: 1 };
     setShowCreateGroup(false);
     setGroupName('');
     setGroupIcon('👥');
+    setGroupDesc('');
+    setGroupPhotoFile(null);
+    setGroupPhotoPreview(null);
+    setCreatingGroup(false);
     setActiveChat(chat);
     setChatMessages([]);
     toast({ title: 'Group created', description: `Invite code: ${group.invite_code}` });
@@ -308,8 +340,8 @@ const FriendsPage = () => {
     setShowAddDialog(false);
     await loadChats();
     if (data?.groupId) {
-      const { data: group } = await supabase.from('chat_groups').select('id,name,icon,invite_code').eq('id', data.groupId).maybeSingle();
-      if (group) setActiveChat({ kind: 'group', id: group.id, name: group.name, icon: group.icon, invite_code: group.invite_code, memberCount: 1 });
+      const { data: group } = await supabase.from('chat_groups').select('id,name,icon,avatar_url,description,invite_code').eq('id', data.groupId).maybeSingle();
+      if (group) setActiveChat({ kind: 'group', id: group.id, name: group.name, icon: group.icon, avatar_url: group.avatar_url, description: group.description, invite_code: group.invite_code, memberCount: 1 });
     }
   };
 
@@ -405,17 +437,24 @@ const FriendsPage = () => {
     const dm = activeChat.kind === 'dm' ? activeChat : null;
     const title = group ? group.name : dm?.peer.name || 'Chat';
     const avatar = group ? (group.icon || '👥') : (dm?.peer.avatar || '👤');
+    const groupPhoto = group?.avatar_url || null;
     return (
       <div className="fixed inset-0 z-50 flex flex-col bg-background">
         <div className="flex items-center justify-between p-3 border-b border-border bg-card/95 backdrop-blur-xl">
-          <div className="flex items-center gap-3 min-w-0">
+          <button
+            className="flex items-center gap-3 min-w-0 text-left flex-1 hover:opacity-80 active:opacity-70 transition-opacity"
+            onClick={() => { if (group) setShowGroupInfo(true); }}
+            disabled={!group}
+          >
             <Button variant="ghost" size="icon" onClick={() => setActiveChat(null)}><ArrowLeft className="w-5 h-5" /></Button>
-            <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-xl shrink-0">{avatar}</div>
+            <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-xl shrink-0 overflow-hidden">
+              {groupPhoto ? <img src={groupPhoto} alt={title} className="w-full h-full object-cover" /> : avatar}
+            </div>
             <div className="min-w-0">
               <h3 className="font-game text-sm truncate">{title}</h3>
               {group ? <p className="text-[10px] text-muted-foreground">{group.memberCount} members • {group.invite_code || 'code creating...'}</p> : <p className="text-[10px] text-muted-foreground">Lvl {dm?.peer.level || 0} • {dm?.peer.xp || 0} XP</p>}
             </div>
-          </div>
+          </button>
           {group && (
             <div className="flex items-center gap-1">
               <Dialog open={showInviteMember} onOpenChange={setShowInviteMember}>
@@ -429,9 +468,21 @@ const FriendsPage = () => {
                 </DialogContent>
               </Dialog>
               <Button variant="ghost" size="icon" onClick={() => copyInvite(group.invite_code)} title="Copy invite link"><Link2 className="w-4 h-4" /></Button>
+              <Button variant="ghost" size="icon" onClick={() => setShowGroupInfo(true)} title="Group info"><Info className="w-4 h-4" /></Button>
             </div>
           )}
         </div>
+        {group && (
+          <GroupInfoPanel
+            groupId={group.id}
+            open={showGroupInfo}
+            onOpenChange={setShowGroupInfo}
+            onUpdated={(patch) => {
+              setActiveChat(prev => prev && isGroupChat(prev) ? { ...prev, ...patch } as ChatItem : prev);
+              void loadChats();
+            }}
+          />
+        )}
 
         <ScrollArea className="flex-1 p-4">
           <div className="space-y-3 pb-4">
@@ -511,9 +562,38 @@ const FriendsPage = () => {
               <DialogContent className="glass-panel border-primary/30">
                 <DialogHeader><DialogTitle>Create Group</DialogTitle></DialogHeader>
                 <div className="space-y-4">
-                  <Input value={groupName} onChange={(e) => setGroupName(e.target.value)} placeholder="Group name..." className="bg-secondary/50" />
-                  <Input value={groupIcon} onChange={(e) => setGroupIcon(e.target.value)} placeholder="Icon emoji" className="bg-secondary/50" maxLength={16} />
-                  <Button onClick={createGroup} className="w-full bg-primary" disabled={!groupName.trim()}>Create Group</Button>
+                  <div className="flex flex-col items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => groupPhotoRef.current?.click()}
+                      className="relative w-20 h-20 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden border border-border hover:opacity-80 transition"
+                    >
+                      {groupPhotoPreview
+                        ? <img src={groupPhotoPreview} alt="preview" className="w-full h-full object-cover" />
+                        : <span className="text-3xl">{groupIcon || '👥'}</span>}
+                      <span className="absolute bottom-0 inset-x-0 bg-black/50 text-white text-[10px] py-0.5 flex items-center justify-center gap-1"><Camera className="w-3 h-3" />Photo</span>
+                    </button>
+                    <input
+                      ref={groupPhotoRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (!f) return;
+                        if (f.size > 5 * 1024 * 1024) { toast({ title: 'Max 5MB', variant: 'destructive' }); return; }
+                        setGroupPhotoFile(f);
+                        setGroupPhotoPreview(URL.createObjectURL(f));
+                        e.target.value = '';
+                      }}
+                    />
+                    <Input value={groupIcon} onChange={(e) => setGroupIcon(e.target.value)} placeholder="Fallback emoji (if no photo)" className="bg-secondary/50 text-center" maxLength={16} />
+                  </div>
+                  <Input value={groupName} onChange={(e) => setGroupName(e.target.value)} placeholder="Group name" className="bg-secondary/50" maxLength={64} />
+                  <Textarea value={groupDesc} onChange={(e) => setGroupDesc(e.target.value)} placeholder="Describe your group (optional)" className="bg-secondary/50" maxLength={500} rows={3} />
+                  <Button onClick={createGroup} className="w-full bg-primary" disabled={!groupName.trim() || creatingGroup}>
+                    {creatingGroup ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Create Group'}
+                  </Button>
                 </div>
               </DialogContent>
             </Dialog>
@@ -569,10 +649,18 @@ const FriendsPage = () => {
               <div className="space-y-3">
                 {chats.map((chat) => (
                   <button key={chat.kind + chat.id} onClick={() => openChat(chat)} className="w-full glass-panel rounded-xl p-4 border border-border flex items-center gap-3 text-left hover:border-primary/30 transition-colors">
-                    <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center text-2xl shrink-0">{chat.kind === 'group' ? (chat.icon || '👥') : (chat.peer.avatar || '👤')}</div>
+                    <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center text-2xl shrink-0 overflow-hidden">
+                      {chat.kind === 'group' && chat.avatar_url
+                        ? <img src={chat.avatar_url} alt={chat.name} className="w-full h-full object-cover" />
+                        : (chat.kind === 'group' ? (chat.icon || '👥') : (chat.peer.avatar || '👤'))}
+                    </div>
                     <div className="flex-1 min-w-0">
                       <h3 className="font-medium truncate">{chat.kind === 'group' ? chat.name : chat.peer.name}</h3>
-                      {chat.lastMessage ? <p className="text-xs text-muted-foreground truncate">{chat.lastMessage}</p> : chat.kind === 'group' ? <p className="text-xs text-muted-foreground">{chat.memberCount} members • {chat.invite_code || 'Invite ready soon'}</p> : <p className="text-xs text-muted-foreground">{chat.peer.unique_id || 'DM'} • Lvl {chat.peer.level || 0}</p>}
+                      {chat.lastMessage
+                        ? <p className="text-xs text-muted-foreground truncate">{chat.lastMessage}</p>
+                        : chat.kind === 'group'
+                          ? <p className="text-xs text-muted-foreground truncate">{chat.description || `${chat.memberCount} members • ${chat.invite_code || 'invite ready'}`}</p>
+                          : <p className="text-xs text-muted-foreground">{chat.peer.unique_id || 'DM'} • Lvl {chat.peer.level || 0}</p>}
                     </div>
                     <MessageCircle className="w-5 h-5 text-muted-foreground" />
                   </button>
