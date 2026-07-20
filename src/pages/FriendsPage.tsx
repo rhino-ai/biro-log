@@ -272,7 +272,7 @@ const FriendsPage = () => {
       void supabase.from('direct_messages').update({ read_at: new Date().toISOString() }).eq('sender_id', chat.id).eq('receiver_id', user.id).is('read_at', null);
     } else {
       const { data, error } = await supabase.from('group_messages')
-        .select('id,sender_id,content,created_at,attachment_url,attachment_type,attachment_name')
+        .select('id,sender_id,content,created_at,attachment_url,attachment_type,attachment_name,attachment_meta')
         .eq('group_id', chat.id)
         .order('created_at', { ascending: true }).limit(250);
       if (error) toast({ title: 'Messages load failed', description: error.message, variant: 'destructive' });
@@ -367,7 +367,7 @@ const FriendsPage = () => {
 
       const request = isDM
         ? supabase.from('direct_messages').insert({ sender_id: user.id, receiver_id: activeChat.id, ...payload }).select('id,sender_id,content,created_at,read_at,attachment_url,attachment_type,attachment_name,encrypted,nonce,attachment_meta').single()
-        : supabase.from('group_messages').insert({ group_id: activeChat.id, sender_id: user.id, ...payload }).select('id,sender_id,content,created_at,attachment_url,attachment_type,attachment_name').single();
+        : supabase.from('group_messages').insert({ group_id: activeChat.id, sender_id: user.id, ...payload }).select('id,sender_id,content,created_at,attachment_url,attachment_type,attachment_name,attachment_meta').single();
 
       const { data, error } = await request;
       if (error) throw error;
