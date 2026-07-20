@@ -275,6 +275,12 @@ const VirtualLibraryPage = () => {
   });
   useEffect(() => { try { localStorage.setItem('biro-bw-mode', bandwidthMode); } catch {} }, [bandwidthMode]);
   const [unreadChat, setUnreadChat] = useState(0);
+  // Media error dialog — shows reason + fix + retry buttons on getUserMedia failures
+  const [mediaError, setMediaError] = useState<{ kind: MediaErrKind; info: MediaErrInfo; retry: () => Promise<void> } | null>(null);
+  // Host-issued turn-on requests that couldn't be honored automatically (device
+  // has no live track). Cleared once the user grants the ask via a button tap.
+  const [pendingHostRequest, setPendingHostRequest] = useState<{ mic?: boolean; cam?: boolean }>({});
+  const [isRestoring, setIsRestoring] = useState(false);
   // Diagnostics + preflight
   const [diagOpen, setDiagOpen] = useState(false);
   const [diagRows, setDiagRows] = useState<Array<any>>([]);
