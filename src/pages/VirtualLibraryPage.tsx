@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Video, Users, Monitor, Copy, ExternalLink, Mic, MicOff, VideoOff, Send, DoorOpen, Loader2, PhoneCall, PhoneOff, Search, Share2, XCircle, Link as LinkIcon, Ban, UserX, ShieldOff, MoreVertical, Pin, PinOff, MessageSquare, Wifi, WifiOff, ScrollText } from 'lucide-react';
+import { Video, Users, Monitor, Copy, ExternalLink, Mic, MicOff, VideoOff, Send, DoorOpen, Loader2, PhoneCall, PhoneOff, Search, Share2, XCircle, Link as LinkIcon, Ban, UserX, ShieldOff, MoreVertical, Pin, PinOff, MessageSquare, Wifi, WifiOff, ScrollText, Download, Gauge } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { useGame } from '@/hooks/useGame';
 import { useAuth } from '@/hooks/useAuth';
@@ -152,6 +152,12 @@ const VirtualLibraryPage = () => {
   const [confirmEndOpen, setConfirmEndOpen] = useState(false);
   const [auditOpen, setAuditOpen] = useState(false);
   const [auditRows, setAuditRows] = useState<Array<{ id: string; action: string; target_name: string | null; created_at: string; metadata: any }>>([]);
+  const [auditFilter, setAuditFilter] = useState<string>('all');
+  const [auditSearch, setAuditSearch] = useState('');
+  const [bandwidthMode, setBandwidthMode] = useState<'auto' | 'low' | 'normal' | 'high'>(() => {
+    try { return (localStorage.getItem('biro-bw-mode') as any) || 'auto'; } catch { return 'auto'; }
+  });
+  useEffect(() => { try { localStorage.setItem('biro-bw-mode', bandwidthMode); } catch {} }, [bandwidthMode]);
   const [unreadChat, setUnreadChat] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -170,6 +176,7 @@ const VirtualLibraryPage = () => {
     selfName,
     localStream: callStream,
     enabled: callActive && !!activeRoom,
+    bandwidthMode,
   });
 
   // Overall self connection health = worst peer state (or 'connected' if no peers yet)
@@ -491,6 +498,40 @@ const VirtualLibraryPage = () => {
     setAuditRows((data as any[]) || []);
   };
 
+  const filteredAuditRows = auditRows.filter((r) => {
+    if (auditFilter !== 'all' && r.action !== auditFilter) return false;
+    if (auditSearch.trim()) {
+      const q = auditSearch.trim().toLowerCase();
+      const hay = `${r.action} ${r.target_name || ''} ${JSON.stringify(r.metadata || {})}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  const exportAuditCsv = () => {
+    const rows = filteredAuditRows;
+    const header = ['timestamp', 'action', 'target', 'metadata'];
+    const csvEscape = (v: string) => `"${v.replace(/"/g, '""')}"`;
+    const lines = [header.join(',')];
+    rows.forEach((r) => {
+      lines.push([
+        csvEscape(new Date(r.created_at).toISOString()),
+        csvEscape(r.action),
+        csvEscape(r.target_name || ''),
+        csvEscape(JSON.stringify(r.metadata || {})),
+      ].join(','));
+    });
+    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `host-audit-${activeRoom?.code || 'room'}-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
   const hostBroadcast = async (event: string, payload: any) => {
     const ch = hostChannelRef.current;
     if (!ch) return;
@@ -724,6 +765,26 @@ const VirtualLibraryPage = () => {
             </Button>
             <Button variant="outline" size="sm" onClick={shareInviteLink} className="gap-1"><Share2 className="w-3 h-3" /> Share</Button>
             <Button variant="outline" size="sm" onClick={copyId} className="gap-1"><Copy className="w-3 h-3" /> ID</Button>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-1" aria-label="Bandwidth"><Gauge className="w-3 h-3" /> <span className="hidden sm:inline capitalize">{bandwidthMode}</span></Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-48 p-2" align="end">
+                <p className="text-[11px] text-muted-foreground mb-1 px-1">Video quality</p>
+                {(['auto','high','normal','low'] as const).map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => setBandwidthMode(m)}
+                    className={cn('w-full text-left text-xs rounded px-2 py-1.5 hover:bg-secondary flex items-center justify-between', bandwidthMode === m && 'bg-secondary font-semibold')}
+                  >
+                    <span className="capitalize">{m}</span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {m === 'auto' ? 'Adapt' : m === 'high' ? '~1.5 Mb/s' : m === 'normal' ? '~600 kb/s' : '~150 kb/s'}
+                    </span>
+                  </button>
+                ))}
+              </PopoverContent>
+            </Popover>
             {isOwner && <Button variant="outline" size="sm" onClick={openAuditLog} className="gap-1 hidden sm:inline-flex"><ScrollText className="w-3 h-3" /> Log</Button>}
             {isOwner && <Button variant="destructive" size="sm" onClick={endMeeting} className="gap-1"><XCircle className="w-3 h-3" /> End</Button>}
           </div>
@@ -887,10 +948,29 @@ const VirtualLibraryPage = () => {
         <Dialog open={auditOpen} onOpenChange={setAuditOpen}>
           <DialogContent className="max-w-md">
             <DialogHeader><DialogTitle className="flex items-center gap-2"><ScrollText className="w-4 h-4" /> Host action log</DialogTitle></DialogHeader>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Input value={auditSearch} onChange={(e) => setAuditSearch(e.target.value)} placeholder="Search target, action, reason…" className="h-8 text-xs" />
+              <div className="flex gap-2">
+                <Select value={auditFilter} onValueChange={setAuditFilter}>
+                  <SelectTrigger className="h-8 text-xs w-[130px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All actions</SelectItem>
+                    <SelectItem value="mute">Mute</SelectItem>
+                    <SelectItem value="mute_all">Mute all</SelectItem>
+                    <SelectItem value="cam_off">Cam off</SelectItem>
+                    <SelectItem value="cam_off_all">Cam off all</SelectItem>
+                    <SelectItem value="kick">Kick</SelectItem>
+                    <SelectItem value="ban">Ban</SelectItem>
+                    <SelectItem value="end_meeting">End meeting</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button variant="outline" size="sm" onClick={exportAuditCsv} disabled={filteredAuditRows.length === 0} className="gap-1 h-8"><Download className="w-3 h-3" /> CSV</Button>
+              </div>
+            </div>
             <ScrollArea className="max-h-[60vh] pr-2">
               <div className="space-y-2">
-                {auditRows.length === 0 && <p className="text-xs text-muted-foreground text-center py-6">No host actions logged yet.</p>}
-                {auditRows.map((row) => (
+                {filteredAuditRows.length === 0 && <p className="text-xs text-muted-foreground text-center py-6">{auditRows.length === 0 ? 'No host actions logged yet.' : 'No entries match your filter.'}</p>}
+                {filteredAuditRows.map((row) => (
                   <div key={row.id} className="rounded border border-border bg-secondary/30 p-2 text-xs">
                     <div className="flex items-center justify-between">
                       <span className="font-semibold uppercase tracking-wide text-[10px] text-primary">{row.action.replace(/_/g, ' ')}</span>
