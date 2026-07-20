@@ -10,13 +10,13 @@ const supabase = _supabase as any;
 
 const JoinInvitePage = () => {
   const { code } = useParams<{ code: string }>();
-  const { user, isGuest, loading } = useAuth();
+  const { user, isGuest, isLoading } = useAuth();
   const navigate = useNavigate();
   const [status, setStatus] = useState<'idle' | 'joining' | 'done' | 'error'>('idle');
   const [error, setError] = useState<string>('');
 
   useEffect(() => {
-    if (loading) return;
+    if (isLoading) return;
     if (!code) { setStatus('error'); setError('No invite code provided.'); return; }
 
     if (!user || isGuest) {
@@ -41,7 +41,7 @@ const JoinInvitePage = () => {
       navigate(`/friends?group=${data ?? ''}`, { replace: true });
     };
     void run();
-  }, [code, user, isGuest, loading, navigate]);
+  }, [code, user, isGuest, isLoading, navigate]);
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
