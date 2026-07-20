@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useGame } from '@/hooks/useGame';
-import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -14,7 +13,6 @@ import { Loader2, Table, Sparkles, TrendingUp } from 'lucide-react';
 import { ResponsiveContainer, LineChart, Line, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts';
 
 const AnalyticsPage = () => {
-  const { user } = useAuth();
   const { xp, level, coins, streak, jungles, tasks, testRecords, calculateJungleHealth } = useGame();
   
   // Google Sheets state
@@ -44,50 +42,13 @@ const AnalyticsPage = () => {
     setAnalysisResult(null);
 
     try {
-      // 1. Fetch CSV
-      const csvResponse = await fetch(`https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`);
-      if (!csvResponse.ok) {
-        throw new Error('Could not read sheet. Ensure it is set to "Anyone with the link can view".');
-      }
-      const csvText = await csvResponse.text();
-      const rows = csvText.split('\n').slice(0, 50).join('\n'); // limit to first 50 rows
-
-      // 2. Get Gemini API Key
-      let apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-      if (user) {
-        const { data } = await (supabase as any).from('user_secrets').select('gemini_api_key').eq('user_id', user.id).maybeSingle();
-        if (data?.gemini_api_key) apiKey = data.gemini_api_key;
-      }
-
-      if (!apiKey) {
-        throw new Error('No Gemini API Key found. Please add it in your Profile settings.');
-      }
-
-      // 3. Call Gemini AI
-      const prompt = `Analyze this CSV data from a student's tracking sheet:\n\n${rows}\n\nReturn ONLY a JSON object (no markdown, no backticks) in this exact format:
-{
-  "summary": "2-3 short sentences giving motivational feedback or study insights based on the numbers.",
-  "chartType": "bar",
-  "dataLabel": "Score / Time",
-  "chartData": [
-    { "name": "Item 1", "value": 85 },
-    { "name": "Item 2", "value": 90 }
-  ]
-}
-Choose "bar" or "line" for chartType. Max 10 items in chartData. Parse numbers cleanly.`;
-
-      const aiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+      // Proxy through edge function — user's Gemini key stays server-side and encrypted.
+      const { data, error } = await supabase.functions.invoke('analyze-sheet', {
+        body: { sheetId },
       });
-
-      const aiJson = await aiRes.json();
-      const rawText = aiJson.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      const cleanJson = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
-      const parsed = JSON.parse(cleanJson);
-
-      setAnalysisResult(parsed);
+      if (error) throw new Error(error.message || 'Analysis failed');
+      if ((data as any)?.error) throw new Error((data as any).error);
+      setAnalysisResult(data as any);
       toast({ title: 'Sheet Analyzed! 📈', description: 'AI generated insights & charts.' });
     } catch (err: any) {
       toast({ title: 'Analysis Failed', description: err.message || 'Error processing sheet', variant: 'destructive' });
