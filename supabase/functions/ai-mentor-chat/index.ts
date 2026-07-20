@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { isAllowedAttachmentUrl, fetchWithSizeCap, checkRateLimit, genericErrorFor, maybeCleanupRateLimit } from "../_shared/security.ts";
+import { getUserApiKey } from "../_shared/user-keys.ts";
 
 const MAX_PDF_BYTES = 18 * 1024 * 1024;   // 18 MB
 const MAX_MEDIA_BYTES = 25 * 1024 * 1024; // 25 MB for audio/video
@@ -186,6 +187,33 @@ serve(async (req) => {
         status: 503, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
+    // Resolve which AI provider to use. User BYO keys take priority.
+    // Providers checked in order: gemini > openrouter > openai. Fallback: Lovable Gateway.
+    const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    let aiEndpoint = "https://ai.gateway.lovable.dev/v1/chat/completions";
+    let aiAuthKey = LOVABLE_API_KEY;
+    let aiModel = "google/gemini-3-flash-preview";
+    let aiProvider = "lovable";
+    for (const p of ["gemini", "openrouter", "openai"] as const) {
+      const k = await getUserApiKey(admin, userId, p);
+      if (k) {
+        aiAuthKey = k;
+        aiProvider = p;
+        if (p === "gemini") {
+          aiEndpoint = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+          aiModel = "gemini-2.5-flash";
+        } else if (p === "openrouter") {
+          aiEndpoint = "https://openrouter.ai/api/v1/chat/completions";
+          aiModel = "google/gemini-2.0-flash-exp:free";
+        } else {
+          aiEndpoint = "https://api.openai.com/v1/chat/completions";
+          aiModel = "gpt-4o-mini";
+        }
+        break;
+      }
+    }
+    console.log("mentor using provider:", aiProvider);
 
     // Load chat preferences
     let prefsBlock = "(default: respectful Hinglish, balanced length, auto persona)";
@@ -374,11 +402,11 @@ ${chapters || "  (no chapter progress)"}`;
       }).then(({ error }: any) => { if (error) console.error("save user msg:", error); });
     }
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch(aiEndpoint, {
       method: "POST",
-      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${aiAuthKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: aiModel,
         messages: [{ role: "system", content: systemPrompt }, ...outMessages],
         stream: true,
       }),

@@ -1,95 +1,57 @@
-## What I verified
+## Status vs. previous plan
 
-- The current Friends page uses real backend tables for DMs, groups, members, and group messages.
-- Real-time is enabled for the chat message/group tables.
-- There is a likely blocker for group invites: the database has an invite-code generator function, but no active trigger is attached to `chat_groups`, so newly created groups can end up with no usable invite code.
-- User search is incomplete: the main chat dialog only searches name and Biro ID, while the invite tab tries to search email directly even though email is protected and should not be exposed to normal client queries.
-- The Virtual Library is currently a presence-based study room only. It shows labels like video calling, screen share, and E2E, but those are not implemented end-to-end yet.
+**Done**
+- Phase 1 chat backend: group invite-code trigger, creator auto-membership, secure `social-search` / `create-chat-group` / `invite-group-member` edge functions, rate-limited invite RPC.
+- Phase 2 Friends UX: search by name/Biro-ID/invite/email, optimistic DM + group send, read receipts, realtime.
+- Phase 3 Virtual Library: persistent rooms, room chat, timer, camera/mic/screen controls, **real peer-to-peer WebRTC calls** (mesh via Supabase realtime signaling, STUN).
+- Push notifications (web + PWA) + 7 AM / 1 PM / 10 PM cron scheduler.
+- Mentor / Biro-Yaar: memory, time-awareness, PDF + audio (ElevenLabs Scribe) + video keyframe understanding, thinking blocks, reply quoting.
+- Chess: FEN undo history + force-AI move.
+- Security: private avatars bucket, admin-code edge function, redacted email/phone columns, activity-log lockdown, revoked anon listing on chat-uploads.
 
-## Remaining features not fully end-to-end yet
+**Remaining** (from the previous plan and follow-ups)
+1. Media sharing in social chat (Friends DMs + groups can't upload images/files yet).
+2. Invite links open a direct join flow (deep-link route `/join/:code`).
+3. BYO AI keys (per-user Gemini/OpenAI key stored server-side, used by mentor when set).
+4. OCR for screenshots into mentor memory.
+5. Strict screen-time read-mode enforcement (block navigation past limit).
+6. Full end-to-end QA sweep + bug fixes.
 
-1. **Chat system**
-   - DMs exist, but UX needs reliable send/receive confirmation, optimistic messages, error states, and read status.
-   - Group creation needs guaranteed invite codes and automatic creator membership.
-   - Search needs username, Biro ID, invite code, and safe email-based lookup.
-   - Invite links should open directly into add/join flows.
-   - Media sharing in social chat is not end-to-end in the Friends page.
-   - True client-side E2EE is not implemented; current system is transport encryption + backend row security.
+Skipping unless you ask: full Google-Sheets parity beyond current formulas/zoom/dup, human-level video scene analysis, true client-side E2EE.
 
-2. **Virtual Library**
-   - Current room system only tracks online members.
-   - Real video calling, mic/camera controls, screen sharing, room chat, and study-room invite links are not implemented end-to-end.
-   - Shared notes and room persistence are not implemented.
+## Execution order
 
-3. **Other previously requested big features still needing dedicated build passes**
-   - Push notifications for web/app.
-   - OTP-style flows beyond normal auth.
-   - Strict screen-time enforcement/read mode.
-   - User-provided AI keys for Gemini/OpenAI with secure backend-only storage.
-   - Full Google-Sheets-grade clone parity beyond current formulas/zoom basics.
-   - Full video understanding like human-level scene/logos/person/action analysis.
-   - Full mentor task planning tied to every task/wellness/screen-time signal with QA scenarios.
+### Step 1 — Chat media sharing
+- Reuse `chat-uploads` bucket. Add `attachment_url` + `attachment_type` columns (or JSON `metadata`) on `direct_messages` and `group_messages`.
+- Add image/file button in Friends chat composer using existing `ChatFileUpload` pattern.
+- Render inline thumbnails / file cards in message list.
 
-## Execution plan
+### Step 2 — Deep-link invite join
+- Add route `/join/:code`.
+- On mount: if signed in, call `join_group_by_invite` and redirect into the group; if guest, bounce through `/auth?next=/join/:code`.
+- "Copy invite link" in group settings now yields `https://…/join/GRPXXXX`.
 
-### Phase 1: Fix real chat and group creation
+### Step 3 — BYO AI keys
+- Table `user_api_keys(user_id, provider, key_ciphertext)` with RLS locked to owner + service_role.
+- Edge function `save-user-api-key` (encrypt with `ADMIN_STEP_TWO`-style project secret via WebCrypto) and `get-user-api-key` used server-side only.
+- `ai-mentor-chat` / `biro-yaar-chat`: if user has a Gemini key, call Gemini direct; else fall back to Lovable AI gateway.
+- Profile page: "My AI Keys" section with add/rotate/remove.
 
-- Add a backend migration that:
-  - Attaches the existing group invite-code trigger to `chat_groups`.
-  - Adds missing safeguards so every group gets a unique `GRP...` invite code.
-  - Ensures the creator can reliably become the first group admin/member.
-  - Adds or fixes indexes for fast chat loading and search.
-  - Keeps profile email protected while enabling safe lookup by exact email.
+### Step 4 — OCR into mentor memory
+- Add optional Tesseract.js OCR in `ChatFileUpload` for image attachments; attach extracted text alongside the image so the mentor prompt sees it, and store it in `mentor_conversations.attachments`.
 
-- Add secure backend functions for:
-  - Searching users by Biro ID, username/name, invite code, and exact email.
-  - Creating a group and adding the creator in one backend-safe operation.
-  - Inviting/adding a user to a group by user ID or exact email without exposing email data.
+### Step 5 — Strict read-mode enforcement
+- Add a `ReadModeGuard` provider that watches daily screen-time; when limit is breached and villain/read mode is on, redirect all non-essential routes to `/villain` and disable social/AI pages.
 
-### Phase 2: Upgrade Friends page UX
+### Step 6 — QA sweep
+- Two-account manual walk of: signup → task → mentor plan → group create → invite by link → DM with image → library video call → push receipt → chess undo → villain mode.
+- Fix any regressions found; run `bunx tsgo --noEmit` and edge-function logs check.
 
-- Replace direct profile email search with the safe backend search function.
-- Show search results with name, avatar, Biro ID, level, and action buttons.
-- Add flows:
-  - Start DM from user search.
-  - Add contact by ID/name/invite code/email.
-  - Create group with name/icon.
-  - Copy group invite code/link.
-  - Join group from code/link.
-  - Invite selected users/email matches to a group.
-- Improve message UX:
-  - Optimistic message bubble immediately after send.
-  - Clear failed-send toast if backend rejects it.
-  - Auto-scroll reliably.
-  - Mark received DM messages as read.
-  - Show loading/empty/error states.
+I'll implement Step 1 first, ship it, then move to Step 2, etc. Each step is a small verifiable slice so you can test as we go.
 
-### Phase 3: Make Virtual Library real enough for first working version
+## Technical notes
 
-- Add persisted study rooms in the backend with room code, owner, title, and member list.
-- Upgrade the Virtual Library UI from “presence only” to:
-  - Create/join room by code/link.
-  - Live member list.
-  - Built-in room text chat.
-  - Study timer per room.
-  - Camera/mic preview controls using browser media APIs.
-  - Screen-share button using browser screen capture.
-- Important limitation: true multi-user video calling needs WebRTC signaling/TURN infrastructure. I’ll implement the browser media controls and room/signaling foundation first; if TURN/server relay is needed for reliable calls across all networks, I’ll flag that as the next backend integration step instead of falsely labeling it complete.
-
-### Phase 4: QA and verification
-
-- Test with the current preview session:
-  - Friends page loads without errors.
-  - Search works by name/Biro ID/invite code/email exact match.
-  - DM can be created and a message insert succeeds.
-  - Group creation returns a usable invite code.
-  - Invite-code join endpoint works.
-  - Virtual Library room create/join flow works.
-- Run typecheck after code changes.
-- Check backend logs/function errors for the affected endpoints.
-
-## Security stance
-
-- Real chat features will require signed-in users. Guest mode cannot safely send real backend messages because there is no verified user identity.
-- Email lookup will not expose other users’ email addresses; it will only use exact email matching to find the safe public profile fields needed for invite/contact actions.
-- I will not claim true WhatsApp-style client-side E2EE unless we build actual client key generation/encryption/decryption and accept the tradeoff that AI/search/moderation cannot read encrypted message bodies.
+- All new tables get GRANTs + RLS + service_role access per project conventions.
+- Storage: reuse existing `chat-uploads` bucket; signed URLs for private items.
+- BYO keys: keys never returned to client; only used inside edge functions with `service_role`; decrypt in-function.
+- WebRTC already uses public STUN; for cross-NAT reliability we can add a TURN provider later — flagged, not blocking.

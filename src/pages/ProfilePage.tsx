@@ -4,6 +4,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { Header } from '@/components/layout/Header';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { PushToggle } from '@/components/PushToggle';
+import { UserApiKeysDialog } from '@/components/settings/UserApiKeysDialog';
+import { KeyRound } from 'lucide-react';
 import { BackButton } from '@/components/layout/BackButton';
 import { Avatar } from '@/components/game/Avatar';
 import { XPBar } from '@/components/game/XPBar';
@@ -196,9 +198,26 @@ const ProfilePage = () => {
         </div>
         <div className="glass-panel rounded-2xl p-5 animate-fade-in border border-accent/20" style={{ animationDelay: '0.35s' }}><RewardsList /></div>
         <div className="animate-fade-in" style={{ animationDelay: '0.38s' }}><PushToggle /></div>
+        <ApiKeysSection />
         <div className="animate-fade-in" style={{ animationDelay: '0.4s' }}><AppRatingSection /></div>
       </main>
       <BottomNav />
+    </div>
+  );
+};
+
+const ApiKeysSection = () => {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="animate-fade-in glass-panel rounded-2xl p-4 border border-primary/20" style={{ animationDelay: '0.39s' }}>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium flex items-center gap-2"><KeyRound className="w-4 h-4 text-primary" /> Your AI Keys</p>
+          <p className="text-[11px] text-muted-foreground">Bring your own Gemini / OpenAI key — never hit AI credit limits.</p>
+        </div>
+        <Button size="sm" variant="secondary" onClick={() => setOpen(true)}>Manage</Button>
+      </div>
+      <UserApiKeysDialog open={open} onOpenChange={setOpen} />
     </div>
   );
 };

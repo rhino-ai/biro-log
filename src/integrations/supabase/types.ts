@@ -190,6 +190,9 @@ export type Database = {
       }
       direct_messages: {
         Row: {
+          attachment_name: string | null
+          attachment_type: string | null
+          attachment_url: string | null
           content: string
           created_at: string
           id: string
@@ -198,6 +201,9 @@ export type Database = {
           sender_id: string
         }
         Insert: {
+          attachment_name?: string | null
+          attachment_type?: string | null
+          attachment_url?: string | null
           content: string
           created_at?: string
           id?: string
@@ -206,6 +212,9 @@ export type Database = {
           sender_id: string
         }
         Update: {
+          attachment_name?: string | null
+          attachment_type?: string | null
+          attachment_url?: string | null
           content?: string
           created_at?: string
           id?: string
@@ -348,6 +357,9 @@ export type Database = {
       }
       group_messages: {
         Row: {
+          attachment_name: string | null
+          attachment_type: string | null
+          attachment_url: string | null
           content: string
           created_at: string
           group_id: string
@@ -355,6 +367,9 @@ export type Database = {
           sender_id: string
         }
         Insert: {
+          attachment_name?: string | null
+          attachment_type?: string | null
+          attachment_url?: string | null
           content: string
           created_at?: string
           group_id: string
@@ -362,6 +377,9 @@ export type Database = {
           sender_id: string
         }
         Update: {
+          attachment_name?: string | null
+          attachment_type?: string | null
+          attachment_url?: string | null
           content?: string
           created_at?: string
           group_id?: string
@@ -788,6 +806,39 @@ export type Database = {
           name?: string
           position?: number | null
           rows?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_api_keys: {
+        Row: {
+          created_at: string
+          id: string
+          iv: string
+          key_ciphertext: string
+          label: string | null
+          provider: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          iv: string
+          key_ciphertext: string
+          label?: string | null
+          provider: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          iv?: string
+          key_ciphertext?: string
+          label?: string | null
+          provider?: string
           updated_at?: string
           user_id?: string
         }

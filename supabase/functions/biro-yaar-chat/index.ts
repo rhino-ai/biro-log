@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { isAllowedAttachmentUrl, fetchWithSizeCap, checkRateLimit, genericErrorFor, maybeCleanupRateLimit } from "../_shared/security.ts";
+import { getUserApiKey } from "../_shared/user-keys.ts";
 
 const MAX_PDF_BYTES = 18 * 1024 * 1024;
 const MAX_MEDIA_BYTES = 25 * 1024 * 1024;
@@ -106,6 +107,21 @@ serve(async (req) => {
       });
     }
 
+    const admin = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    let aiEndpoint = "https://ai.gateway.lovable.dev/v1/chat/completions";
+    let aiAuthKey = LOVABLE_API_KEY;
+    let aiModel = "google/gemini-3-flash-preview";
+    for (const p of ["gemini", "openrouter", "openai"] as const) {
+      const k = await getUserApiKey(admin, userId, p);
+      if (k) {
+        aiAuthKey = k;
+        if (p === "gemini") { aiEndpoint = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"; aiModel = "gemini-2.5-flash"; }
+        else if (p === "openrouter") { aiEndpoint = "https://openrouter.ai/api/v1/chat/completions"; aiModel = "google/gemini-2.0-flash-exp:free"; }
+        else { aiEndpoint = "https://api.openai.com/v1/chat/completions"; aiModel = "gpt-4o-mini"; }
+        break;
+      }
+    }
+
     let contextualPrompt = `${SYSTEM_PROMPT}\n\n# LIVE DEVICE CONTEXT\n${buildClientContextBlock(clientContext)}`;
     try {
       const { data: prefs } = await supabase.from("chat_preferences").select("*").eq("user_id", userId).maybeSingle();
@@ -196,14 +212,14 @@ serve(async (req) => {
       }).then(({ error }: any) => { if (error) console.error("save biro user msg:", error); });
     }
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch(aiEndpoint, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${aiAuthKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model: aiModel,
         messages: [{ role: "system", content: contextualPrompt }, ...outMessages],
         stream: true,
       }),

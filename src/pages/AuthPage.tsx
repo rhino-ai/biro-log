@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { useGameStore } from '@/store/gameStore';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,8 @@ import { lovable } from '@/integrations/lovable/index';
 
 const AuthPage = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const nextPath = searchParams.get('next') || '/';
   const { signIn, signUp, user, enterGuestMode } = useAuth();
   const { hasSelectedTrack } = useGameStore();
   const [isLoading, setIsLoading] = useState(false);
@@ -52,7 +54,7 @@ const AuthPage = () => {
       toast({ title: 'Login Failed', description: error.message, variant: 'destructive' });
     } else {
       toast({ title: 'Welcome back! 🎉', description: 'Redirecting to your jungle...' });
-      navigate('/');
+      navigate(nextPath, { replace: true });
     }
     setIsLoading(false);
   };
@@ -72,7 +74,7 @@ const AuthPage = () => {
 
   const handleTrackComplete = () => {
     setShowTrackSelection(false);
-    navigate('/');
+    navigate(nextPath, { replace: true });
   };
 
   const handleGuestMode = () => {
@@ -80,7 +82,7 @@ const AuthPage = () => {
     if (!hasSelectedTrack) {
       setShowTrackSelection(true);
     } else {
-      navigate('/', { replace: true });
+      navigate(nextPath, { replace: true });
     }
   };
 

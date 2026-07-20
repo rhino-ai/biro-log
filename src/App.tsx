@@ -29,6 +29,7 @@ import TrackersPage from "./pages/TrackersPage";
 import VillainModePage from "./pages/VillainModePage";
 import RevisionSchedulerPage from "./pages/RevisionSchedulerPage";
 import MentorTimelinePage from "./pages/MentorTimelinePage";
+import JoinInvitePage from "./pages/JoinInvitePage";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 
@@ -61,6 +62,7 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
 const AppRoutes = () => (
   <Routes>
     <Route path="/auth" element={<PublicRoute><AuthPage /></PublicRoute>} />
+    <Route path="/join/:code" element={<JoinInvitePage />} />
     <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
     <Route path="/jungles" element={<ProtectedRoute><JunglesPage /></ProtectedRoute>} />
     <Route path="/jungle/:jungleId" element={<ProtectedRoute><JungleDetailPage /></ProtectedRoute>} />

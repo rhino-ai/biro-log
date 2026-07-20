@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Users, MessageCircle, Plus, Search, UserPlus, Send, ArrowLeft, Link2, Loader2, CheckCheck, MailPlus } from 'lucide-react';
+import { Users, MessageCircle, Plus, Search, UserPlus, Send, ArrowLeft, Link2, Loader2, CheckCheck, MailPlus, Paperclip, FileIcon, X as XIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { supabase as _supabase } from '@/integrations/supabase/client';
@@ -39,6 +39,9 @@ type UIMessage = {
   sender_avatar?: string | null;
   pending?: boolean;
   failed?: boolean;
+  attachment_url?: string | null;
+  attachment_type?: string | null;
+  attachment_name?: string | null;
 };
 
 const isGroupChat = (chat: ChatItem): chat is Extract<ChatItem, { kind: 'group' }> => chat.kind === 'group';
@@ -60,8 +63,11 @@ const FriendsPage = () => {
   const [groupIcon, setGroupIcon] = useState('👥');
   const [joinCode, setJoinCode] = useState('');
   const [inviteTarget, setInviteTarget] = useState('');
+  const [pendingAttachment, setPendingAttachment] = useState<{ url: string; type: string; name: string } | null>(null);
+  const [uploadingAttach, setUploadingAttach] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const searchAbortRef = useRef<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const appendMessage = useCallback((message: UIMessage) => {
     setChatMessages(prev => {
@@ -185,7 +191,7 @@ const FriendsPage = () => {
     if (!user) return;
     if (chat.kind === 'dm') {
       const { data, error } = await supabase.from('direct_messages')
-        .select('id,sender_id,content,created_at,read_at')
+        .select('id,sender_id,content,created_at,read_at,attachment_url,attachment_type,attachment_name')
         .or(`and(sender_id.eq.${user.id},receiver_id.eq.${chat.id}),and(sender_id.eq.${chat.id},receiver_id.eq.${user.id})`)
         .order('created_at', { ascending: true }).limit(250);
       if (error) toast({ title: 'Messages load failed', description: error.message, variant: 'destructive' });
@@ -193,7 +199,7 @@ const FriendsPage = () => {
       void supabase.from('direct_messages').update({ read_at: new Date().toISOString() }).eq('sender_id', chat.id).eq('receiver_id', user.id).is('read_at', null);
     } else {
       const { data, error } = await supabase.from('group_messages')
-        .select('id,sender_id,content,created_at')
+        .select('id,sender_id,content,created_at,attachment_url,attachment_type,attachment_name')
         .eq('group_id', chat.id)
         .order('created_at', { ascending: true }).limit(250);
       if (error) toast({ title: 'Messages load failed', description: error.message, variant: 'destructive' });
@@ -216,16 +222,27 @@ const FriendsPage = () => {
 
   const sendMessage = async () => {
     const content = messageInput.trim();
-    if (!content || !user || !activeChat || sendingMsg) return;
+    if ((!content && !pendingAttachment) || !user || !activeChat || sendingMsg) return;
     setSendingMsg(true);
     setMessageInput('');
+    const attachment = pendingAttachment;
+    setPendingAttachment(null);
     const tempId = `tmp-${Date.now()}`;
-    const optimistic: UIMessage = { id: tempId, sender_id: user.id, content, created_at: new Date().toISOString(), pending: true };
+    const optimistic: UIMessage = {
+      id: tempId, sender_id: user.id, content, created_at: new Date().toISOString(), pending: true,
+      attachment_url: attachment?.url ?? null, attachment_type: attachment?.type ?? null, attachment_name: attachment?.name ?? null,
+    };
     appendMessage(optimistic);
 
+    const payload: Record<string, any> = { content };
+    if (attachment) {
+      payload.attachment_url = attachment.url;
+      payload.attachment_type = attachment.type;
+      payload.attachment_name = attachment.name;
+    }
     const request = activeChat.kind === 'dm'
-      ? supabase.from('direct_messages').insert({ sender_id: user.id, receiver_id: activeChat.id, content }).select('id,sender_id,content,created_at,read_at').single()
-      : supabase.from('group_messages').insert({ group_id: activeChat.id, sender_id: user.id, content }).select('id,sender_id,content,created_at').single();
+      ? supabase.from('direct_messages').insert({ sender_id: user.id, receiver_id: activeChat.id, ...payload }).select('id,sender_id,content,created_at,read_at,attachment_url,attachment_type,attachment_name').single()
+      : supabase.from('group_messages').insert({ group_id: activeChat.id, sender_id: user.id, ...payload }).select('id,sender_id,content,created_at,attachment_url,attachment_type,attachment_name').single();
 
     const { data, error } = await request;
     if (error) {
@@ -236,6 +253,27 @@ const FriendsPage = () => {
       void loadChats();
     }
     setSendingMsg(false);
+  };
+
+  const handleAttach = async (file: File) => {
+    if (!user) return;
+    if (file.size > 20 * 1024 * 1024) {
+      toast({ title: 'File too large', description: 'Max 20MB.', variant: 'destructive' });
+      return;
+    }
+    setUploadingAttach(true);
+    try {
+      const ext = file.name.split('.').pop() || 'bin';
+      const path = `chat/${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const { error: upErr } = await supabase.storage.from('chat-uploads').upload(path, file, { contentType: file.type, upsert: false });
+      if (upErr) throw upErr;
+      const { data: pub } = supabase.storage.from('chat-uploads').getPublicUrl(path);
+      setPendingAttachment({ url: pub.publicUrl, type: file.type || 'application/octet-stream', name: file.name });
+    } catch (err: any) {
+      toast({ title: 'Upload failed', description: err?.message || 'Try again.', variant: 'destructive' });
+    } finally {
+      setUploadingAttach(false);
+    }
   };
 
   const createGroup = async () => {
@@ -293,9 +331,9 @@ const FriendsPage = () => {
 
   const copyInvite = async (code: string | null) => {
     if (!code) { toast({ title: 'Invite code missing', variant: 'destructive' }); return; }
-    const link = `${window.location.origin}/friends?join=${encodeURIComponent(code)}`;
+    const link = `${window.location.origin}/join/${encodeURIComponent(code)}`;
     await navigator.clipboard.writeText(link);
-    toast({ title: 'Invite link copied' });
+    toast({ title: 'Invite link copied', description: 'Share it — recipients auto-join.' });
   };
 
   useEffect(() => {
@@ -401,7 +439,18 @@ const FriendsPage = () => {
               <div key={msg.id} className={cn('flex', msg.sender_id === user?.id ? 'justify-end' : 'justify-start')}>
                 <div className={cn('max-w-[80%] rounded-2xl px-3 py-2 shadow-sm border', msg.sender_id === user?.id ? 'bg-accent text-accent-foreground border-accent/40 rounded-br-sm' : 'bg-card border-border rounded-bl-sm', msg.failed && 'border-destructive text-destructive-foreground')}>
                   {msg.sender_id !== user?.id && group && <span className="text-[10px] text-muted-foreground block mb-1">~ {msg.sender_name || 'User'}</span>}
-                  <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
+                  {msg.attachment_url && msg.attachment_type?.startsWith('image/') && (
+                    <a href={msg.attachment_url} target="_blank" rel="noreferrer" className="block mb-1">
+                      <img src={msg.attachment_url} alt={msg.attachment_name || 'image'} className="max-h-64 rounded-lg object-cover" loading="lazy" />
+                    </a>
+                  )}
+                  {msg.attachment_url && !msg.attachment_type?.startsWith('image/') && (
+                    <a href={msg.attachment_url} target="_blank" rel="noreferrer" className="flex items-center gap-2 mb-1 p-2 rounded-lg bg-background/40 border border-border text-xs">
+                      <FileIcon className="w-4 h-4 shrink-0" />
+                      <span className="truncate">{msg.attachment_name || 'File'}</span>
+                    </a>
+                  )}
+                  {msg.content && <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>}
                   <span className="text-[10px] opacity-60 flex justify-end items-center gap-1 mt-1">
                     {msg.pending ? 'Sending...' : msg.failed ? 'Failed' : new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     {!group && msg.sender_id === user?.id && msg.read_at && <CheckCheck className="w-3 h-3" />}
@@ -414,9 +463,34 @@ const FriendsPage = () => {
         </ScrollArea>
 
         <div className="p-3 border-t border-border bg-card/80">
-          <div className="flex gap-2">
+          {pendingAttachment && (
+            <div className="flex items-center gap-2 mb-2 p-2 rounded-lg bg-secondary/60 border border-border text-xs">
+              {pendingAttachment.type.startsWith('image/')
+                ? <img src={pendingAttachment.url} alt="preview" className="w-10 h-10 object-cover rounded" />
+                : <FileIcon className="w-4 h-4" />}
+              <span className="truncate flex-1">{pendingAttachment.name}</span>
+              <Button variant="ghost" size="icon" onClick={() => setPendingAttachment(null)}><XIcon className="w-4 h-4" /></Button>
+            </div>
+          )}
+          <div className="flex gap-2 items-end">
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              accept="image/*,application/pdf,audio/*,video/*,.doc,.docx,.txt"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleAttach(f); e.target.value = ''; }}
+            />
+            <Button
+              variant="ghost" size="icon"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingAttach || sendingMsg}
+              className="shrink-0"
+              title="Attach file"
+            >
+              {uploadingAttach ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}
+            </Button>
             <Input value={messageInput} onChange={(e) => setMessageInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) void sendMessage(); }} placeholder="Type a message..." className="flex-1 bg-secondary/50" />
-            <Button onClick={sendMessage} disabled={!messageInput.trim() || sendingMsg} size="icon" className="bg-accent shrink-0">{sendingMsg ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}</Button>
+            <Button onClick={sendMessage} disabled={(!messageInput.trim() && !pendingAttachment) || sendingMsg} size="icon" className="bg-accent shrink-0">{sendingMsg ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}</Button>
           </div>
         </div>
       </div>
