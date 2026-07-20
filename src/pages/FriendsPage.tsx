@@ -8,15 +8,30 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Users, MessageCircle, Plus, Search, UserPlus, Send, ArrowLeft, Link2, Loader2, CheckCheck, MailPlus, Paperclip, FileIcon, X as XIcon, Info, Camera } from 'lucide-react';
+import { Users, MessageCircle, Plus, Search, UserPlus, Send, ArrowLeft, Link2, Loader2, CheckCheck, MailPlus, Paperclip, FileIcon, X as XIcon, Info, Camera, ShieldCheck, Shield } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { GroupInfoPanel } from '@/components/chat/GroupInfoPanel';
+import { AttachmentComposerPreview, AttachmentViewer, classify, type PreviewFile } from '@/components/chat/AttachmentPreviewPanel';
+import { ensureKeypair, sharedKeyFor, encryptText, decryptText, encryptFile, decryptFile } from '@/lib/e2ee';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { supabase as _supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 
 const supabase = _supabase as any;
+
+// Encode/decode base64 for raw bytes.
+const b64ToBytes = (b64: string): Uint8Array => {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+};
+const bytesToB64 = (bytes: Uint8Array): string => {
+  let s = '';
+  bytes.forEach((b) => (s += String.fromCharCode(b)));
+  return btoa(s);
+};
 
 type Profile = {
   user_id: string;
@@ -44,6 +59,9 @@ type UIMessage = {
   attachment_url?: string | null;
   attachment_type?: string | null;
   attachment_name?: string | null;
+  encrypted?: boolean;
+  nonce?: string | null;
+  attachment_meta?: any;
 };
 
 const isGroupChat = (chat: ChatItem): chat is Extract<ChatItem, { kind: 'group' }> => chat.kind === 'group';
