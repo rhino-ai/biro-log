@@ -1213,6 +1213,78 @@ const VirtualLibraryPage = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <Dialog open={diagOpen} onOpenChange={setDiagOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader><DialogTitle className="flex items-center gap-2"><Activity className="w-4 h-4" /> Network diagnostics</DialogTitle></DialogHeader>
+            <ScrollArea className="max-h-[60vh] pr-2">
+              <div className="space-y-2">
+                {diagRows.length === 0 && <p className="text-xs text-muted-foreground text-center py-6">No peers connected yet.</p>}
+                {diagRows.map((r) => (
+                  <div key={r.peerId} className="rounded border border-border bg-secondary/30 p-2 text-xs space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold truncate">{r.name}</span>
+                      <ConnBadge state={r.connectionState} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
+                      <span>RTT</span><span className="text-right tabular-nums text-foreground">{r.rttMs != null ? `${Math.round(r.rttMs)} ms` : '—'}</span>
+                      <span>Loss</span><span className="text-right tabular-nums text-foreground">{r.packetLossPct != null ? `${r.packetLossPct.toFixed(2)}%` : '—'}</span>
+                      <span>Jitter</span><span className="text-right tabular-nums text-foreground">{r.jitterMs != null ? `${r.jitterMs.toFixed(0)} ms` : '—'}</span>
+                      <span>Out</span><span className="text-right tabular-nums text-foreground">{r.outboundKbps != null ? `${r.outboundKbps} kbps` : '—'}</span>
+                      <span>In</span><span className="text-right tabular-nums text-foreground">{r.inboundKbps != null ? `${r.inboundKbps} kbps` : '—'}</span>
+                      <span>Audio</span><span className="text-right tabular-nums text-foreground">{r.remoteAudioLevel != null ? `${Math.round(r.remoteAudioLevel * 100)}%` : '—'}</span>
+                    </div>
+                    {r.remoteAudioLevel != null && <LevelBar value={r.remoteAudioLevel} />}
+                  </div>
+                ))}
+                <p className="text-[10px] text-muted-foreground text-center pt-1">Updates every 2s • bitrate mode: <span className="capitalize">{bandwidthMode}</span></p>
+              </div>
+            </ScrollArea>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={preflightOpen} onOpenChange={setPreflightOpen}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader><DialogTitle className="flex items-center gap-2"><Stethoscope className="w-4 h-4" /> Device self-test</DialogTitle></DialogHeader>
+            <div className="space-y-3">
+              <div className="aspect-video rounded-lg overflow-hidden bg-secondary/60 border border-border">
+                <video ref={preflightVideoRef} autoPlay muted playsInline className="w-full h-full object-cover" />
+              </div>
+              <div className="flex items-center gap-2 text-xs">
+                <Mic className="w-3.5 h-3.5 shrink-0" />
+                <LevelBar value={preflightMicLevel} />
+                <span className="w-10 text-right tabular-nums">{Math.round(preflightMicLevel * 100)}%</span>
+              </div>
+              <div className="space-y-1.5 text-xs">
+                {([
+                  ['Camera', preflightResult.cam, preflightResult.camErr],
+                  ['Microphone', preflightResult.mic, preflightResult.micErr],
+                  ['Network (STUN)', preflightResult.net, preflightResult.netErr],
+                ] as const).map(([label, state, err]) => (
+                  <div key={label} className="flex items-center justify-between rounded border border-border bg-secondary/30 px-2 py-1.5">
+                    <span>{label}</span>
+                    <span className={cn('inline-flex items-center gap-1',
+                      state === 'ok' ? 'text-emerald-500' :
+                      state === 'silent' ? 'text-amber-500' :
+                      state === 'fail' ? 'text-destructive' : 'text-muted-foreground')}>
+                      {state === 'ok' && <CheckCircle2 className="w-3.5 h-3.5" />}
+                      {state === 'silent' && <AlertTriangle className="w-3.5 h-3.5" />}
+                      {state === 'fail' && <XCircle className="w-3.5 h-3.5" />}
+                      {state === 'pending' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                      <span className="capitalize">{state === 'silent' ? 'No sound detected' : state}</span>
+                    </span>
+                    {err && <span className="hidden">{err}</span>}
+                  </div>
+                ))}
+                {preflightResult.netErr && <p className="text-[10px] text-muted-foreground">{preflightResult.netErr}</p>}
+              </div>
+            </div>
+            <DialogFooter className="gap-2">
+              <Button variant="ghost" onClick={() => setPreflightOpen(false)}>Close</Button>
+              <Button onClick={runPreflight} className="gap-2"><Stethoscope className="w-4 h-4" /> Re-run</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }
