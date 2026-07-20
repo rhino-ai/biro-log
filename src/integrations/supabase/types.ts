@@ -196,34 +196,43 @@ export type Database = {
       }
       direct_messages: {
         Row: {
+          attachment_meta: Json | null
           attachment_name: string | null
           attachment_type: string | null
           attachment_url: string | null
           content: string
           created_at: string
+          encrypted: boolean
           id: string
+          nonce: string | null
           read_at: string | null
           receiver_id: string
           sender_id: string
         }
         Insert: {
+          attachment_meta?: Json | null
           attachment_name?: string | null
           attachment_type?: string | null
           attachment_url?: string | null
           content: string
           created_at?: string
+          encrypted?: boolean
           id?: string
+          nonce?: string | null
           read_at?: string | null
           receiver_id: string
           sender_id: string
         }
         Update: {
+          attachment_meta?: Json | null
           attachment_name?: string | null
           attachment_type?: string | null
           attachment_url?: string | null
           content?: string
           created_at?: string
+          encrypted?: boolean
           id?: string
+          nonce?: string | null
           read_at?: string | null
           receiver_id?: string
           sender_id?: string
@@ -914,6 +923,27 @@ export type Database = {
           revision_done?: boolean | null
           theory_done?: boolean | null
           updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_public_keys: {
+        Row: {
+          created_at: string
+          public_key: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          public_key: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          public_key?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
