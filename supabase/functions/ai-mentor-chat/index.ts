@@ -284,7 +284,10 @@ serve(async (req) => {
       const attachLog = (attachHistory || []).map((a: any) => {
         const meta = a.attachment_meta || {};
         const arr = Array.isArray(meta) ? meta : [meta];
-        return arr.map((m: any) => `  • ${a.created_at?.slice(0,10)}: ${m.type || 'file'} "${m.name || ''}" (${m.url || ''})`).join("\n");
+        return arr.map((m: any) => {
+          const ocr = m.ocr_text ? `\n      OCR: ${String(m.ocr_text).slice(0, 500)}` : "";
+          return `  • ${a.created_at?.slice(0,10)}: ${m.type || 'file'} "${m.name || ''}"${ocr}`;
+        }).join("\n");
       }).join("\n");
       const pastChats = (recentChatsRes.data || []).reverse().map((c: any) => `  • ${c.role}: ${String(c.content||'').slice(0,200)}`).join("\n");
       const dJeeM = daysUntil(p?.exam_date_jee_main);
@@ -396,10 +399,38 @@ ${chapters || "  (no chapter progress)"}`;
     // Save the latest user message to long-term memory (with attachment metadata)
     const lastUserMsg = [...messages].reverse().find((m: any) => m.role === "user");
     if (lastUserMsg?.content) {
-      supabase.from("mentor_conversations").insert({
+      const savedAttachments = (attachments && attachments.length) ? attachments : null;
+      const { data: savedRow } = await supabase.from("mentor_conversations").insert({
         user_id: userId, role: "user", content: String(lastUserMsg.content).slice(0, 8000), study_track: studyTrack || null,
-        attachment_meta: (attachments && attachments.length) ? attachments : null,
-      }).then(({ error }: any) => { if (error) console.error("save user msg:", error); });
+        attachment_meta: savedAttachments,
+      }).select("id").maybeSingle();
+
+      // Fire-and-forget OCR pass for image attachments — enriches memory for future turns.
+      if (savedRow?.id && Array.isArray(attachments)) {
+        const imgs = attachments.filter((a: any) => a?.type === "image" && isAllowedAttachmentUrl(a?.url)).slice(0, 3);
+        if (imgs.length > 0) {
+          (async () => {
+            try {
+              const ocrParts: any[] = [{ type: "text", text: "Extract ALL visible text from these images verbatim. Include numbers, formulas, handwriting. Output plain text only, no commentary. If no text, output the string NO_TEXT." }];
+              for (const im of imgs) ocrParts.push({ type: "image_url", image_url: { url: im.url } });
+              const ocrRes = await fetch(aiEndpoint, {
+                method: "POST",
+                headers: { Authorization: `Bearer ${aiAuthKey}`, "Content-Type": "application/json" },
+                body: JSON.stringify({ model: aiModel, messages: [{ role: "user", content: ocrParts }], stream: false }),
+              });
+              if (!ocrRes.ok) { console.error("ocr failed", ocrRes.status); return; }
+              const j = await ocrRes.json();
+              const text = String(j?.choices?.[0]?.message?.content || "").slice(0, 4000).trim();
+              if (!text || text === "NO_TEXT") return;
+              const enriched = (attachments as any[]).map((a) => a?.type === "image" ? { ...a, ocr_text: text } : a);
+              await supabase.from("mentor_conversations").update({ attachment_meta: enriched }).eq("id", savedRow.id);
+              console.log("ocr saved for msg", savedRow.id, "chars=", text.length);
+            } catch (e) {
+              console.error("ocr pipeline error", (e as Error)?.message);
+            }
+          })();
+        }
+      }
     }
 
     const response = await fetch(aiEndpoint, {
