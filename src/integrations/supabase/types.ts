@@ -1104,7 +1104,39 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      profiles_public: {
+        Row: {
+          avatar: string | null
+          avatar_url: string | null
+          level: number | null
+          name: string | null
+          streak: number | null
+          unique_id: string | null
+          user_id: string | null
+          xp: number | null
+        }
+        Insert: {
+          avatar?: string | null
+          avatar_url?: string | null
+          level?: number | null
+          name?: string | null
+          streak?: number | null
+          unique_id?: string | null
+          user_id?: string | null
+          xp?: number | null
+        }
+        Update: {
+          avatar?: string | null
+          avatar_url?: string | null
+          level?: number | null
+          name?: string | null
+          streak?: number | null
+          unique_id?: string | null
+          user_id?: string | null
+          xp?: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       admin_reschedule_push_cron: {
