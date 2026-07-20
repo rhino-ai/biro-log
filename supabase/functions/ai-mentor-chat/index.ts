@@ -284,7 +284,10 @@ serve(async (req) => {
       const attachLog = (attachHistory || []).map((a: any) => {
         const meta = a.attachment_meta || {};
         const arr = Array.isArray(meta) ? meta : [meta];
-        return arr.map((m: any) => `  • ${a.created_at?.slice(0,10)}: ${m.type || 'file'} "${m.name || ''}" (${m.url || ''})`).join("\n");
+        return arr.map((m: any) => {
+          const ocr = m.ocr_text ? `\n      OCR: ${String(m.ocr_text).slice(0, 500)}` : "";
+          return `  • ${a.created_at?.slice(0,10)}: ${m.type || 'file'} "${m.name || ''}"${ocr}`;
+        }).join("\n");
       }).join("\n");
       const pastChats = (recentChatsRes.data || []).reverse().map((c: any) => `  • ${c.role}: ${String(c.content||'').slice(0,200)}`).join("\n");
       const dJeeM = daysUntil(p?.exam_date_jee_main);
