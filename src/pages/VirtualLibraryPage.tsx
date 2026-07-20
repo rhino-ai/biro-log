@@ -175,14 +175,16 @@ const VirtualLibraryPage = () => {
         void leaveRoom();
       })
       .on('broadcast', { event: 'force-mute' }, ({ payload }: any) => {
-        if (payload?.target !== user.id) return;
+        if (payload?.target !== user.id && payload?.target !== '*') return;
+        if (user.id === activeRoom.owner_id) return; // host exempt
         streamRef.current?.getAudioTracks().forEach((t) => (t.enabled = false));
         callStream?.getAudioTracks().forEach((t) => (t.enabled = false));
         setMicOn(false);
         toast({ title: 'Muted by host', variant: 'destructive' });
       })
       .on('broadcast', { event: 'force-cam-off' }, ({ payload }: any) => {
-        if (payload?.target !== user.id) return;
+        if (payload?.target !== user.id && payload?.target !== '*') return;
+        if (user.id === activeRoom.owner_id) return; // host exempt
         streamRef.current?.getVideoTracks().forEach((t) => (t.enabled = false));
         callStream?.getVideoTracks().forEach((t) => (t.enabled = false));
         setCameraOn(false);
@@ -346,6 +348,18 @@ const VirtualLibraryPage = () => {
     if (!isOwner) return;
     await hostBroadcast('force-cam-off', { target: target.id });
     toast({ title: `Cam off ${target.name}` });
+  };
+
+  const muteAll = async () => {
+    if (!isOwner) return;
+    await hostBroadcast('force-mute', { target: '*' });
+    toast({ title: 'Muted everyone' });
+  };
+
+  const camOffAll = async () => {
+    if (!isOwner) return;
+    await hostBroadcast('force-cam-off', { target: '*' });
+    toast({ title: 'Cameras off for everyone' });
   };
 
   const kickMember = async (target: RoomUser) => {
@@ -565,6 +579,13 @@ const VirtualLibraryPage = () => {
             )}
             {callActive && peers.length === 0 && (
               <div className="text-center text-xs text-muted-foreground py-2">Waiting for others to join the call…</div>
+            )}
+
+            {isOwner && (
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" onClick={muteAll} className="gap-1 text-xs"><MicOff className="w-3.5 h-3.5" /> Mute all</Button>
+                <Button variant="outline" size="sm" onClick={camOffAll} className="gap-1 text-xs"><VideoOff className="w-3.5 h-3.5" /> Cams off all</Button>
+              </div>
             )}
 
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 overflow-y-auto pb-2">
