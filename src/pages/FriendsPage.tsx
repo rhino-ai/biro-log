@@ -267,8 +267,9 @@ const FriendsPage = () => {
       const path = `chat/${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
       const { error: upErr } = await supabase.storage.from('chat-uploads').upload(path, file, { contentType: file.type, upsert: false });
       if (upErr) throw upErr;
-      const { data: pub } = supabase.storage.from('chat-uploads').getPublicUrl(path);
-      setPendingAttachment({ url: pub.publicUrl, type: file.type || 'application/octet-stream', name: file.name });
+      const { data: signed, error: signErr } = await supabase.storage.from('chat-uploads').createSignedUrl(path, 60 * 60 * 24 * 365);
+      if (signErr || !signed) throw signErr || new Error('Failed to sign URL');
+      setPendingAttachment({ url: signed.signedUrl, type: file.type || 'application/octet-stream', name: file.name });
     } catch (err: any) {
       toast({ title: 'Upload failed', description: err?.message || 'Try again.', variant: 'destructive' });
     } finally {
