@@ -45,6 +45,16 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: "Invalid invite code." }), { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
+    const { data: banned } = await backend
+      .from("group_bans")
+      .select("id")
+      .eq("group_id", group.id)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (banned) {
+      return new Response(JSON.stringify({ error: "You are banned from this group." }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     const { error: joinError } = await backend.from("group_members").upsert(
       { group_id: group.id, user_id: user.id, role: "member" },
       { onConflict: "group_id,user_id" },
