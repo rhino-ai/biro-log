@@ -403,7 +403,8 @@ const VirtualLibraryPage = () => {
       if (videoRef.current) videoRef.current.srcObject = stream;
       toast({ title: 'Live call started', description: 'Others in this room will connect automatically.' });
     } catch (error) {
-      toast({ title: 'Call blocked', description: error instanceof Error ? error.message : 'Allow camera + mic.', variant: 'destructive' });
+      const info = explainMediaError(error, 'both');
+      setMediaError({ kind: 'both', info, retry: startCall });
     }
   }, []);
 
