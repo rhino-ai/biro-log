@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Video, Users, Monitor, Copy, ExternalLink, Mic, MicOff, VideoOff, Send, DoorOpen, Loader2, PhoneCall, PhoneOff, Search, Share2, XCircle, Link as LinkIcon, Ban, UserX, ShieldOff, MoreVertical, Pin, PinOff, MessageSquare, Wifi, WifiOff, ScrollText, Download, Gauge, Activity, Stethoscope, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Video, Users, Monitor, Copy, ExternalLink, Mic, MicOff, VideoOff, Send, DoorOpen, Loader2, PhoneCall, PhoneOff, Search, Share2, XCircle, Link as LinkIcon, Ban, UserX, ShieldOff, MoreVertical, Pin, PinOff, MessageSquare, Wifi, WifiOff, ScrollText, Download, Gauge, Activity, Stethoscope, CheckCircle2, AlertTriangle, ArrowLeft, RefreshCw, LifeBuoy, Settings } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { useGame } from '@/hooks/useGame';
 import { useAuth } from '@/hooks/useAuth';
@@ -111,6 +111,74 @@ const getGuestId = () => {
 };
 
 const supabase = _supabase as any;
+
+// Interpret a MediaDevices / getUserMedia error into human, actionable info.
+type MediaErrKind = 'camera' | 'mic' | 'both';
+type MediaErrInfo = {
+  title: string;
+  reason: string;
+  fix: string;
+  code: string;
+};
+const explainMediaError = (err: unknown, kind: MediaErrKind): MediaErrInfo => {
+  const anyErr = err as any;
+  const name: string = anyErr?.name || '';
+  const message: string = anyErr?.message || String(err ?? '');
+  const dev = kind === 'camera' ? 'camera' : kind === 'mic' ? 'microphone' : 'camera & microphone';
+  const base = (reason: string, fix: string, code = name || 'Error') => ({
+    title: `${dev[0].toUpperCase()}${dev.slice(1)} blocked`,
+    reason,
+    fix,
+    code,
+  });
+  if (name === 'NotAllowedError' || /permission|denied/i.test(message)) {
+    return base(
+      `Permission was denied for your ${dev}.`,
+      `Tap the lock/permissions icon in your browser's address bar → set ${dev} to "Allow", then hit Retry. On Vivo / MIUI / OneUI, also enable ${dev} for your browser under phone Settings → Apps → Permissions.`,
+      name || 'NotAllowedError',
+    );
+  }
+  if (name === 'NotFoundError' || /not found|no device/i.test(message)) {
+    return base(
+      `No ${dev} was detected on this device.`,
+      `Plug in / enable your ${dev} and try again. If it's built-in, restart the browser and phone Bluetooth headset (if any) that might be capturing it.`,
+      name || 'NotFoundError',
+    );
+  }
+  if (name === 'NotReadableError' || /could not start|in use|hardware|track start/i.test(message)) {
+    return base(
+      `Your ${dev} is being used by another app (e.g. WhatsApp, Instagram, another browser tab, or the Zoom app).`,
+      `Close every other app / tab that might be using the ${dev} — including background apps in the recent-apps tray — then tap Retry. On Vivo you may also need to force-stop the browser and re-open this link.`,
+      name || 'NotReadableError',
+    );
+  }
+  if (name === 'OverconstrainedError' || /constrain/i.test(message)) {
+    return base(
+      `The requested ${dev} settings aren't supported by this device.`,
+      `Tap Retry — we'll ask for default settings. If it still fails, switch to a different camera in your browser's site settings.`,
+      name || 'OverconstrainedError',
+    );
+  }
+  if (name === 'SecurityError' || /secure|https/i.test(message)) {
+    return base(
+      `This browser only allows ${dev} access over HTTPS.`,
+      `Open the app from the https:// address — not http:// or a direct IP.`,
+      name || 'SecurityError',
+    );
+  }
+  if (name === 'AbortError') {
+    return base(
+      `${dev} start was aborted by the system.`,
+      `Retry once. If it keeps failing, restart your browser or phone.`,
+      name,
+    );
+  }
+  return base(
+    message || 'Unknown media error.',
+    `Try again. If it keeps failing, restart the browser or phone and re-open the invite link.`,
+    name || 'Error',
+  );
+};
 
 // Live microphone input level meter (0..1) driven by an AnalyserNode.
 const useMicLevel = (stream: MediaStream | null) => {
