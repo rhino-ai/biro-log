@@ -3,10 +3,20 @@ import { corsHeaders } from "npm:@supabase/supabase-js@2/cors";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const CRON_SECRET = Deno.env.get("CRON_SECRET") || "";
 
 // Runs on a schedule (every 15 min via pg_cron). Decides what to push based on IST hour.
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+
+  // Require the shared cron secret so only the internal scheduler (or admin caller) can invoke this.
+  const provided = req.headers.get("x-cron-secret") || "";
+  if (!CRON_SECRET || provided !== CRON_SECRET) {
+    return new Response(JSON.stringify({ error: "unauthorized" }), {
+      status: 401,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
 
   try {
     const admin = createClient(SUPABASE_URL, SERVICE_KEY);

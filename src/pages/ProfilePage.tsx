@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { useGame } from '@/hooks/useGame';
 import { useAuth } from '@/hooks/useAuth';
 import { Header } from '@/components/layout/Header';
@@ -31,18 +31,8 @@ const ProfilePage = () => {
   const { profile, updateProfile, level, xp, coins, streak, calculateJungleHealth, jungles, backlogCount } = useGame();
   const [isEditing, setIsEditing] = useState(false);
   const [editedProfile, setEditedProfile] = useState(profile);
-  const [geminiKey, setGeminiKey] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    const fetchSecrets = async () => {
-      if (!user) return;
-      const { data } = await supabase.from('user_secrets').select('gemini_api_key').eq('user_id', user.id).maybeSingle();
-      if (data?.gemini_api_key) setGeminiKey(data.gemini_api_key);
-    };
-    fetchSecrets();
-  }, [user]);
 
   const handleSave = async () => {
     updateProfile(editedProfile);
@@ -57,14 +47,6 @@ const ProfilePage = () => {
           dream_marks_jee_main: editedProfile.dreamMarks.jeeMain,
           dream_marks_jee_advanced: editedProfile.dreamMarks.jeeAdvanced,
         }).eq('user_id', user.id);
-        
-        // Upsert user secrets
-        const { data: existingSecret } = await supabase.from('user_secrets').select('id').eq('user_id', user.id).maybeSingle();
-        if (existingSecret) {
-          await supabase.from('user_secrets').update({ gemini_api_key: geminiKey }).eq('user_id', user.id);
-        } else {
-          await supabase.from('user_secrets').insert({ user_id: user.id, gemini_api_key: geminiKey });
-        }
       } catch (err) {
         console.error('Error saving profile to DB:', err);
       }
@@ -147,9 +129,8 @@ const ProfilePage = () => {
                 <div><label className="text-xs text-muted-foreground">JEE Main</label><Input type="number" value={editedProfile.dreamMarks.jeeMain} onChange={(e) => setEditedProfile({ ...editedProfile, dreamMarks: { ...editedProfile.dreamMarks, jeeMain: parseInt(e.target.value) || 0 } })} className="text-center bg-secondary/50" /></div>
                 <div><label className="text-xs text-muted-foreground">JEE Adv</label><Input type="number" value={editedProfile.dreamMarks.jeeAdvanced} onChange={(e) => setEditedProfile({ ...editedProfile, dreamMarks: { ...editedProfile.dreamMarks, jeeAdvanced: parseInt(e.target.value) || 0 } })} className="text-center bg-secondary/50" /></div>
               </div>
-              <div className="pt-2 border-t border-white/10">
-                <label className="text-xs text-muted-foreground">Gemini API Key (Optional)</label>
-                <Input type="password" placeholder="AI Studio Key for free usage" value={geminiKey} onChange={(e) => setGeminiKey(e.target.value)} className="text-center bg-secondary/50" />
+              <div className="pt-2 border-t border-white/10 text-[11px] text-muted-foreground">
+                Bring your own AI key? Use the encrypted API Keys panel below (Gemini / OpenAI / OpenRouter). Keys never leave the server.
               </div>
             </div>
           ) : (
