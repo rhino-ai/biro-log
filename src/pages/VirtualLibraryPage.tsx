@@ -959,6 +959,8 @@ const VirtualLibraryPage = () => {
               </PopoverContent>
             </Popover>
             {isOwner && <Button variant="outline" size="sm" onClick={openAuditLog} className="gap-1 hidden sm:inline-flex"><ScrollText className="w-3 h-3" /> Log</Button>}
+            <Button variant="outline" size="sm" onClick={runPreflight} className="gap-1 hidden sm:inline-flex" title="Run a mic / camera / network self-test"><Stethoscope className="w-3 h-3" /> Test</Button>
+            {callActive && <Button variant="outline" size="sm" onClick={() => setDiagOpen(true)} className="gap-1 hidden sm:inline-flex" title="Network diagnostics"><Activity className="w-3 h-3" /> Diag</Button>}
             {isOwner && <Button variant="destructive" size="sm" onClick={endMeeting} className="gap-1"><XCircle className="w-3 h-3" /> End</Button>}
           </div>
         </div>
@@ -1023,6 +1025,14 @@ const VirtualLibraryPage = () => {
               <Button variant={micOn ? 'default' : 'outline'} onClick={toggleMic} className="gap-2">{micOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />} Mic</Button>
               <Button variant={screenOn ? 'default' : 'outline'} onClick={toggleScreen} className="gap-2"><Monitor className="w-4 h-4" /> Screen</Button>
             </div>
+
+            {callActive && micOn && (
+              <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                <Mic className="w-3 h-3 shrink-0" />
+                <LevelBar value={liveMicLevel} />
+                <span className="w-8 text-right tabular-nums">{Math.round(liveMicLevel * 100)}%</span>
+              </div>
+            )}
 
             <div className="grid grid-cols-1">
               {callActive ? (
@@ -1138,6 +1148,7 @@ const VirtualLibraryPage = () => {
                   </SelectContent>
                 </Select>
                 <Button variant="outline" size="sm" onClick={exportAuditCsv} disabled={filteredAuditRows.length === 0} className="gap-1 h-8"><Download className="w-3 h-3" /> CSV</Button>
+                <Button variant="outline" size="sm" onClick={exportAuditJson} disabled={filteredAuditRows.length === 0} className="gap-1 h-8"><Download className="w-3 h-3" /> JSON</Button>
               </div>
             </div>
             <ScrollArea className="max-h-[60vh] pr-2">
