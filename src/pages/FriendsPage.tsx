@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Users, MessageCircle, Plus, Search, UserPlus, Send, ArrowLeft, Link2, Loader2, CheckCheck, MailPlus } from 'lucide-react';
+import { Users, MessageCircle, Plus, Search, UserPlus, Send, ArrowLeft, Link2, Loader2, CheckCheck, MailPlus, Paperclip, FileIcon, X as XIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { supabase as _supabase } from '@/integrations/supabase/client';
@@ -39,6 +39,9 @@ type UIMessage = {
   sender_avatar?: string | null;
   pending?: boolean;
   failed?: boolean;
+  attachment_url?: string | null;
+  attachment_type?: string | null;
+  attachment_name?: string | null;
 };
 
 const isGroupChat = (chat: ChatItem): chat is Extract<ChatItem, { kind: 'group' }> => chat.kind === 'group';
