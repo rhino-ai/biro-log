@@ -63,8 +63,11 @@ const FriendsPage = () => {
   const [groupIcon, setGroupIcon] = useState('👥');
   const [joinCode, setJoinCode] = useState('');
   const [inviteTarget, setInviteTarget] = useState('');
+  const [pendingAttachment, setPendingAttachment] = useState<{ url: string; type: string; name: string } | null>(null);
+  const [uploadingAttach, setUploadingAttach] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const searchAbortRef = useRef<number | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const appendMessage = useCallback((message: UIMessage) => {
     setChatMessages(prev => {
