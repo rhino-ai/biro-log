@@ -701,17 +701,35 @@ const VirtualLibraryPage = () => {
             <Button variant="ghost" size="sm" onClick={leaveRoom} className="gap-1"><DoorOpen className="w-4 h-4" /> Leave</Button>
             <div className="min-w-0">
               <div className="flex items-center gap-2"><Video className="w-4 h-4 text-accent" /><span className="font-game text-sm truncate">{activeRoom.title}</span>{isGuestRoom && <span className="text-[9px] bg-accent/30 px-1.5 py-0.5 rounded">GUEST</span>}</div>
-              <p className="text-[10px] text-muted-foreground">{activeRoom.code}</p>
+              <div className="flex items-center gap-2">
+                <p className="text-[10px] text-muted-foreground">{activeRoom.code}</p>
+                {callActive && <ConnBadge state={overallConn} />}
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setChatOpen((v) => !v)}
+              className="gap-1 relative lg:hidden"
+              aria-label="Toggle chat"
+            >
+              <MessageSquare className="w-3 h-3" /> Chat
+              {unreadChat > 0 && !chatOpen && (
+                <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-[9px] rounded-full min-w-[16px] h-4 px-1 flex items-center justify-center">
+                  {unreadChat > 9 ? '9+' : unreadChat}
+                </span>
+              )}
+            </Button>
             <Button variant="outline" size="sm" onClick={shareInviteLink} className="gap-1"><Share2 className="w-3 h-3" /> Share</Button>
             <Button variant="outline" size="sm" onClick={copyId} className="gap-1"><Copy className="w-3 h-3" /> ID</Button>
+            {isOwner && <Button variant="outline" size="sm" onClick={openAuditLog} className="gap-1 hidden sm:inline-flex"><ScrollText className="w-3 h-3" /> Log</Button>}
             {isOwner && <Button variant="destructive" size="sm" onClick={endMeeting} className="gap-1"><XCircle className="w-3 h-3" /> End</Button>}
           </div>
         </div>
 
-        <div className="flex-1 grid lg:grid-cols-[1fr_340px] min-h-0">
+        <div className={cn('flex-1 grid min-h-0', chatOpen ? 'lg:grid-cols-[1fr_340px]' : 'lg:grid-cols-1')}>
           <div className="p-4 space-y-4 min-h-0 flex flex-col">
             {/* Zoom-style spotlight: big pinned tile + horizontal strip of others */}
             {(() => {
