@@ -1021,6 +1021,7 @@ export type Database = {
         Returns: boolean
       }
       join_group_by_invite: { Args: { _code: string }; Returns: string }
+      join_study_room_by_code: { Args: { _code: string }; Returns: string }
       shares_group_with_user: {
         Args: { _profile_user_id: string; _viewer_id: string }
         Returns: boolean
