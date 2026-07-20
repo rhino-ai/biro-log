@@ -130,7 +130,8 @@ const VirtualLibraryPage = () => {
 
   const enterRoom = useCallback(async (room: StudyRoom) => {
     if (!user) return;
-    const { error } = await supabase.from('study_room_members').upsert({ room_id: room.id, user_id: user.id, role: room.owner_id === user.id ? 'host' : 'member', last_seen_at: new Date().toISOString() }, { onConflict: 'room_id,user_id' });
+    // Join via secure RPC: verifies the room code server-side and enforces invite semantics.
+    const { error } = await supabase.rpc('join_study_room_by_code', { _code: room.code });
     if (error) { toast({ title: 'Join failed', description: error.message, variant: 'destructive' }); return; }
     setActiveRoom(room);
     setMeetingId(room.code);
@@ -179,10 +180,20 @@ const VirtualLibraryPage = () => {
     if (!meetingId.trim() || !user) return;
     setIsJoining(true);
     const code = meetingId.trim().toUpperCase();
-    const { data, error } = await supabase.from('study_rooms').select('id,code,title,owner_id,is_active,created_at').eq('code', code).eq('is_active', true).maybeSingle();
+    // Ask the server to add us — the RPC validates the code and inserts the membership.
+    const { data: rid, error: rpcErr } = await supabase.rpc('join_study_room_by_code', { _code: code });
+    if (rpcErr || !rid) {
+      setIsJoining(false);
+      toast({ title: 'Room not found', description: rpcErr?.message || 'Check the meeting ID and try again.', variant: 'destructive' });
+      return;
+    }
+    // Now we're a member — allowed to SELECT the row.
+    const { data, error } = await supabase.from('study_rooms').select('id,code,title,owner_id,is_active,created_at').eq('id', rid as string).maybeSingle();
     setIsJoining(false);
-    if (error || !data) { toast({ title: 'Room not found', description: 'Check the meeting ID and try again.', variant: 'destructive' }); return; }
-    await enterRoom(data as StudyRoom);
+    if (error || !data) { toast({ title: 'Room not found', description: 'Try again.', variant: 'destructive' }); return; }
+    setActiveRoom(data as StudyRoom);
+    setMeetingId(code);
+    await loadMessages((data as StudyRoom).id);
   };
 
   const copyId = async () => {
