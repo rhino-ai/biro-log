@@ -31,12 +31,13 @@ serve(async (req) => {
 
     const { data: membership, error: membershipError } = await backend
       .from("group_members")
-      .select("id")
+      .select("id, role")
       .eq("group_id", cleanGroupId)
       .eq("user_id", user.id)
       .maybeSingle();
     if (membershipError) throw membershipError;
     if (!membership) return json({ error: "Only group members can invite people." }, 403);
+    if (membership.role !== "admin") return json({ error: "Only group admins can add members." }, 403);
 
     let targetId = String(userId ?? "").trim();
     if (!targetId) {
@@ -55,6 +56,14 @@ serve(async (req) => {
 
     if (!/^[0-9a-f-]{36}$/i.test(targetId)) return json({ error: "User not found." }, 404);
     if (targetId === user.id) return json({ error: "You are already in this group." }, 400);
+
+    const { data: banned } = await backend
+      .from("group_bans")
+      .select("id")
+      .eq("group_id", cleanGroupId)
+      .eq("user_id", targetId)
+      .maybeSingle();
+    if (banned) return json({ error: "This user is banned from this group." }, 403);
 
     const { error: joinError } = await backend.from("group_members").upsert(
       { group_id: cleanGroupId, user_id: targetId, role: "member" },
