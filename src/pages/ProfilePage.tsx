@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import { useGame } from '@/hooks/useGame';
 import { useAuth } from '@/hooks/useAuth';
 import { Header } from '@/components/layout/Header';
