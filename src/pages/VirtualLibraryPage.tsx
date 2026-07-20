@@ -340,6 +340,25 @@ const VirtualLibraryPage = () => {
               <Button variant={screenOn ? 'default' : 'outline'} onClick={toggleScreen} className="gap-2"><Monitor className="w-4 h-4" /> Screen</Button>
             </div>
 
+            <div className="grid grid-cols-1">
+              {callActive ? (
+                <Button variant="destructive" onClick={endCall} className="gap-2"><PhoneOff className="w-4 h-4" /> End Live Call</Button>
+              ) : (
+                <Button onClick={startCall} className="bg-emerald-500 hover:bg-emerald-600 text-white gap-2"><PhoneCall className="w-4 h-4" /> Join Live Video Call</Button>
+              )}
+            </div>
+
+            {callActive && peers.length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {peers.map((p) => (
+                  <RemoteVideoTile key={p.peerId} peer={p} />
+                ))}
+              </div>
+            )}
+            {callActive && peers.length === 0 && (
+              <div className="text-center text-xs text-muted-foreground py-2">Waiting for others to join the call…</div>
+            )}
+
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 overflow-y-auto pb-2">
               {roomUsers.map((ru) => (
                 <div key={ru.id} className={cn('glass-panel p-3 rounded-xl flex items-center gap-2 border', ru.id === user?.id ? 'border-primary/50' : 'border-border')}>
