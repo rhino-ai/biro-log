@@ -114,18 +114,28 @@ const VirtualLibraryPage = () => {
   const [banDuration, setBanDuration] = useState<string>('forever');
   const [banReason, setBanReason] = useState('');
   const [isBanning, setIsBanning] = useState(false);
+  const [pinnedPeerId, setPinnedPeerId] = useState<string | null>(null);
+  const [guestId] = useState<string>(() => getGuestId());
+  const [guestName, setGuestName] = useState<string>(() => {
+    try { return localStorage.getItem('biro-guest-name') || 'Guest'; } catch { return 'Guest'; }
+  });
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const screenStreamRef = useRef<MediaStream | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const hostChannelRef = useRef<any>(null);
 
+  // Unified identity — auth users use their UUID, guests use device-stable id
+  const selfId = user?.id ?? guestId;
+  const selfName = user ? (profile.name || 'Student') : guestName;
+
   const { peers } = useWebRTCMesh({
-    roomKey: activeRoom?.id ?? null,
-    selfUserId: user?.id ?? null,
-    selfName: profile.name || 'Student',
+    // Key on room CODE so auth users and guests join the same mesh
+    roomKey: activeRoom?.code ?? null,
+    selfUserId: selfId,
+    selfName,
     localStream: callStream,
-    enabled: callActive && !!activeRoom && !!user,
+    enabled: callActive && !!activeRoom,
   });
 
   const stopMedia = useCallback(() => {
