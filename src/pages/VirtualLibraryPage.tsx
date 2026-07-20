@@ -187,6 +187,14 @@ const VirtualLibraryPage = () => {
 
   const toggleCamera = async () => {
     try {
+      if (callActive && callStream) {
+        const videoTracks = callStream.getVideoTracks();
+        if (videoTracks.length) {
+          videoTracks.forEach((t) => (t.enabled = !cameraOn));
+          setCameraOn(!cameraOn);
+        }
+        return;
+      }
       if (cameraOn) {
         streamRef.current?.getVideoTracks().forEach((track) => track.stop());
         setCameraOn(false);
@@ -205,6 +213,14 @@ const VirtualLibraryPage = () => {
 
   const toggleMic = async () => {
     try {
+      if (callActive && callStream) {
+        const audioTracks = callStream.getAudioTracks();
+        if (audioTracks.length) {
+          audioTracks.forEach((t) => (t.enabled = !micOn));
+          setMicOn(!micOn);
+        }
+        return;
+      }
       if (micOn) {
         streamRef.current?.getAudioTracks().forEach((track) => track.stop());
         setMicOn(false);
