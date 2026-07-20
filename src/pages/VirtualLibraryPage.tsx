@@ -490,11 +490,14 @@ const VirtualLibraryPage = () => {
         if (payload?.target !== selfId && payload?.target !== '*') return;
         if (user && user.id === activeRoom.owner_id) return;
         const tracks = callStream?.getAudioTracks() || streamRef.current?.getAudioTracks() || [];
-        if (tracks.length) {
+        const live = tracks.filter((t) => t.readyState === 'live');
+        if (live.length) {
           tracks.forEach((t) => (t.enabled = true));
           setMicOn(true);
+          setPendingHostRequest((p) => ({ ...p, mic: false }));
           toast({ title: 'Host asked you to unmute — mic is on' });
         } else {
+          setPendingHostRequest((p) => ({ ...p, mic: true }));
           toast({ title: 'Host is asking you to unmute', description: 'Tap the Mic button to turn it on.' });
         }
       })
@@ -502,11 +505,14 @@ const VirtualLibraryPage = () => {
         if (payload?.target !== selfId && payload?.target !== '*') return;
         if (user && user.id === activeRoom.owner_id) return;
         const tracks = callStream?.getVideoTracks() || streamRef.current?.getVideoTracks() || [];
-        if (tracks.length) {
+        const live = tracks.filter((t) => t.readyState === 'live');
+        if (live.length) {
           tracks.forEach((t) => (t.enabled = true));
           setCameraOn(true);
+          setPendingHostRequest((p) => ({ ...p, cam: false }));
           toast({ title: 'Host asked you to turn camera on — camera is on' });
         } else {
+          setPendingHostRequest((p) => ({ ...p, cam: true }));
           toast({ title: 'Host is asking you to turn on camera', description: 'Tap the Camera button to enable it.' });
         }
       })
