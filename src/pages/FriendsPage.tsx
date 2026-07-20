@@ -753,7 +753,7 @@ const FriendsPage = () => {
               {uploadingAttach ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}
             </Button>
             <Input value={messageInput} onChange={(e) => setMessageInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) void sendMessage(); }} placeholder="Type a message..." className="flex-1 bg-secondary/50" />
-            <Button onClick={sendMessage} disabled={(!messageInput.trim() && !pendingAttachment) || sendingMsg} size="icon" className="bg-accent shrink-0">{sendingMsg ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}</Button>
+            <Button onClick={() => void sendMessage()} disabled={(!messageInput.trim() && !pendingAttachment) || sendingMsg} size="icon" className="bg-accent shrink-0">{sendingMsg ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}</Button>
           </div>
         </div>
       </div>
