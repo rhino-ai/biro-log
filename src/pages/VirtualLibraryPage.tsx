@@ -348,6 +348,18 @@ const VirtualLibraryPage = () => {
     toast({ title: `Cam off ${target.name}` });
   };
 
+  const muteAll = async () => {
+    if (!isOwner) return;
+    await hostBroadcast('force-mute', { target: '*' });
+    toast({ title: 'Muted everyone' });
+  };
+
+  const camOffAll = async () => {
+    if (!isOwner) return;
+    await hostBroadcast('force-cam-off', { target: '*' });
+    toast({ title: 'Cameras off for everyone' });
+  };
+
   const kickMember = async (target: RoomUser) => {
     if (!isOwner || !activeRoom) return;
     await hostBroadcast('kick', { target: target.id, banned: false });
