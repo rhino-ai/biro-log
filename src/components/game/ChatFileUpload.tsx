@@ -80,9 +80,10 @@ export const ChatFileUpload = ({ onFileUploaded, className }: ChatFileUploadProp
 
       if (error) throw error;
 
-      const { data: urlData } = supabase.storage
+      const { data: urlData, error: signErr } = await supabase.storage
         .from('chat-uploads')
-        .getPublicUrl(path);
+        .createSignedUrl(path, 60 * 60 * 24 * 365);
+      if (signErr || !urlData) throw signErr || new Error('Failed to sign URL');
 
       const fileType = file.type.startsWith('image')
         ? 'image'
@@ -92,7 +93,7 @@ export const ChatFileUpload = ({ onFileUploaded, className }: ChatFileUploadProp
             ? 'audio'
             : 'document';
 
-      onFileUploaded(urlData.publicUrl, fileType, file.name);
+      onFileUploaded(urlData.signedUrl, fileType, file.name);
       if (fileType === 'video') {
         toast({ title: 'Reading video frames…', description: 'AI will inspect sampled frames + audio transcript.' });
         const frames = await extractVideoFrames(file).catch(() => []);
@@ -102,8 +103,8 @@ export const ChatFileUpload = ({ onFileUploaded, className }: ChatFileUploadProp
             .from('chat-uploads')
             .upload(framePath, frame.blob, { contentType: 'image/jpeg', upsert: false });
           if (!frameError) {
-            const { data: frameUrl } = supabase.storage.from('chat-uploads').getPublicUrl(framePath);
-            onFileUploaded(frameUrl.publicUrl, 'image', frame.name);
+            const { data: frameUrl } = await supabase.storage.from('chat-uploads').createSignedUrl(framePath, 60 * 60 * 24 * 365);
+            if (frameUrl) onFileUploaded(frameUrl.signedUrl, 'image', frame.name);
           }
         }
       }
