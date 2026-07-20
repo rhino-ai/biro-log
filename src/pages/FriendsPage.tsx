@@ -669,52 +669,29 @@ const FriendsPage = () => {
               <div key={msg.id} className={cn('flex', msg.sender_id === user?.id ? 'justify-end' : 'justify-start')}>
                 <div className={cn('max-w-[80%] rounded-2xl px-3 py-2 shadow-sm border', msg.sender_id === user?.id ? 'bg-accent text-accent-foreground border-accent/40 rounded-br-sm' : 'bg-card border-border rounded-bl-sm', msg.failed && 'border-destructive text-destructive-foreground')}>
                   {msg.sender_id !== user?.id && group && <span className="text-[10px] text-muted-foreground block mb-1">~ {msg.sender_name || 'User'}</span>}
-                  {msg.attachment_url && (() => {
-                    const t = msg.attachment_type || '';
-                    const n = msg.attachment_name || '';
-                    const isImg = t.startsWith('image/') || /\.(png|jpe?g|gif|webp|avif|bmp|svg)$/i.test(n);
-                    const isVid = t.startsWith('video/') || /\.(mp4|webm|mov|m4v|mkv)$/i.test(n);
-                    const isAud = t.startsWith('audio/') || /\.(mp3|wav|ogg|m4a|aac|opus)$/i.test(n);
-                    const isPdf = t === 'application/pdf' || /\.pdf$/i.test(n);
-                    if (isImg) {
-                      return (
-                        <a href={msg.attachment_url} target="_blank" rel="noreferrer" className="block mb-1">
-                          <img src={msg.attachment_url} alt={n || 'image'} className="max-h-64 rounded-lg object-cover" loading="lazy" />
-                        </a>
-                      );
-                    }
-                    if (isVid) {
-                      return (
-                        <video src={msg.attachment_url} controls playsInline preload="metadata" className="max-h-72 w-full rounded-lg mb-1 bg-black" />
-                      );
-                    }
-                    if (isAud) {
-                      return (
-                        <audio src={msg.attachment_url} controls preload="metadata" className="w-full mb-1" />
-                      );
-                    }
-                    if (isPdf) {
-                      return (
-                        <div className="mb-1 space-y-1">
-                          <object data={msg.attachment_url} type="application/pdf" className="w-64 h-80 rounded-lg border border-border bg-background/40">
-                            <a href={msg.attachment_url} target="_blank" rel="noreferrer" className="flex items-center gap-2 p-2 rounded-lg bg-background/40 border border-border text-xs">
-                              <FileIcon className="w-4 h-4 shrink-0" />
-                              <span className="truncate">{n || 'PDF'}</span>
-                            </a>
-                          </object>
-                          <a href={msg.attachment_url} target="_blank" rel="noreferrer" className="text-[10px] underline opacity-70">Open {n || 'PDF'}</a>
-                        </div>
-                      );
-                    }
+                  {(msg.attachment_url || msg.attachment_meta?.path) && (() => {
+                    const t = msg.attachment_type || msg.attachment_meta?.mime || '';
+                    const n = msg.attachment_name || msg.attachment_meta?.name || 'File';
+                    const kind = classify(t, n);
                     return (
-                      <a href={msg.attachment_url} target="_blank" rel="noreferrer" download={n || undefined} className="flex items-center gap-2 mb-1 p-2 rounded-lg bg-background/40 border border-border text-xs">
-                        <FileIcon className="w-4 h-4 shrink-0" />
-                        <span className="truncate">{n || 'File'}</span>
-                      </a>
+                      <button type="button" onClick={() => void openAttachment(msg)} className="block mb-1 w-full text-left group">
+                        <div className="flex items-center gap-2 p-2 rounded-lg bg-background/40 border border-border text-xs group-hover:bg-background/60 transition">
+                          <FileIcon className="w-4 h-4 shrink-0" />
+                          <span className="truncate flex-1">{n}</span>
+                          <span className="opacity-60 uppercase text-[10px]">{kind}</span>
+                        </div>
+                      </button>
                     );
                   })()}
-                  {msg.content && <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>}
+                  {(() => {
+                    const text = msg.encrypted ? (decryptedText[msg.id] ?? '') : msg.content;
+                    if (msg.encrypted && !(msg.id in decryptedText)) {
+                      return <p className="text-xs italic opacity-60">🔒 Decrypting…</p>;
+                    }
+                    return text ? <p className="text-sm whitespace-pre-wrap break-words">{text}</p> : null;
+                  })()}
                   <span className="text-[10px] opacity-60 flex justify-end items-center gap-1 mt-1">
+                    {msg.encrypted && <ShieldCheck className="w-3 h-3 text-emerald-400" />}
                     {msg.pending ? 'Sending...' : msg.failed ? 'Failed' : new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     {!group && msg.sender_id === user?.id && msg.read_at && <CheckCheck className="w-3 h-3" />}
                   </span>
