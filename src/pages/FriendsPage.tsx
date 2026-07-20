@@ -439,7 +439,18 @@ const FriendsPage = () => {
               <div key={msg.id} className={cn('flex', msg.sender_id === user?.id ? 'justify-end' : 'justify-start')}>
                 <div className={cn('max-w-[80%] rounded-2xl px-3 py-2 shadow-sm border', msg.sender_id === user?.id ? 'bg-accent text-accent-foreground border-accent/40 rounded-br-sm' : 'bg-card border-border rounded-bl-sm', msg.failed && 'border-destructive text-destructive-foreground')}>
                   {msg.sender_id !== user?.id && group && <span className="text-[10px] text-muted-foreground block mb-1">~ {msg.sender_name || 'User'}</span>}
-                  <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>
+                  {msg.attachment_url && msg.attachment_type?.startsWith('image/') && (
+                    <a href={msg.attachment_url} target="_blank" rel="noreferrer" className="block mb-1">
+                      <img src={msg.attachment_url} alt={msg.attachment_name || 'image'} className="max-h-64 rounded-lg object-cover" loading="lazy" />
+                    </a>
+                  )}
+                  {msg.attachment_url && !msg.attachment_type?.startsWith('image/') && (
+                    <a href={msg.attachment_url} target="_blank" rel="noreferrer" className="flex items-center gap-2 mb-1 p-2 rounded-lg bg-background/40 border border-border text-xs">
+                      <FileIcon className="w-4 h-4 shrink-0" />
+                      <span className="truncate">{msg.attachment_name || 'File'}</span>
+                    </a>
+                  )}
+                  {msg.content && <p className="text-sm whitespace-pre-wrap break-words">{msg.content}</p>}
                   <span className="text-[10px] opacity-60 flex justify-end items-center gap-1 mt-1">
                     {msg.pending ? 'Sending...' : msg.failed ? 'Failed' : new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     {!group && msg.sender_id === user?.id && msg.read_at && <CheckCheck className="w-3 h-3" />}
@@ -452,9 +463,34 @@ const FriendsPage = () => {
         </ScrollArea>
 
         <div className="p-3 border-t border-border bg-card/80">
-          <div className="flex gap-2">
+          {pendingAttachment && (
+            <div className="flex items-center gap-2 mb-2 p-2 rounded-lg bg-secondary/60 border border-border text-xs">
+              {pendingAttachment.type.startsWith('image/')
+                ? <img src={pendingAttachment.url} alt="preview" className="w-10 h-10 object-cover rounded" />
+                : <FileIcon className="w-4 h-4" />}
+              <span className="truncate flex-1">{pendingAttachment.name}</span>
+              <Button variant="ghost" size="icon" onClick={() => setPendingAttachment(null)}><XIcon className="w-4 h-4" /></Button>
+            </div>
+          )}
+          <div className="flex gap-2 items-end">
+            <input
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              accept="image/*,application/pdf,audio/*,video/*,.doc,.docx,.txt"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleAttach(f); e.target.value = ''; }}
+            />
+            <Button
+              variant="ghost" size="icon"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={uploadingAttach || sendingMsg}
+              className="shrink-0"
+              title="Attach file"
+            >
+              {uploadingAttach ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}
+            </Button>
             <Input value={messageInput} onChange={(e) => setMessageInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) void sendMessage(); }} placeholder="Type a message..." className="flex-1 bg-secondary/50" />
-            <Button onClick={sendMessage} disabled={!messageInput.trim() || sendingMsg} size="icon" className="bg-accent shrink-0">{sendingMsg ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}</Button>
+            <Button onClick={sendMessage} disabled={(!messageInput.trim() && !pendingAttachment) || sendingMsg} size="icon" className="bg-accent shrink-0">{sendingMsg ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}</Button>
           </div>
         </div>
       </div>
