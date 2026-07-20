@@ -208,9 +208,12 @@ const VirtualLibraryPage = () => {
   }, [user, loadMessages]);
 
   useEffect(() => {
-    if (!activeRoom || !user) return;
-    if (isGuestRoom) return;
-    const channel = supabase.channel(`study-room-${activeRoom.id}`, { config: { presence: { key: user.id } } });
+    if (!activeRoom) return;
+    // Unified live channel keyed on room CODE so guests + auth users share presence,
+    // chat notifications, host broadcasts, and meeting-ended events.
+    const channel = supabase.channel(`study-room-live-${activeRoom.code}`, {
+      config: { presence: { key: selfId } },
+    });
     channel
       .on('presence', { event: 'sync' }, () => {
         const state = channel.presenceState();
@@ -221,43 +224,56 @@ const VirtualLibraryPage = () => {
         });
         setRoomUsers(users);
       })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'study_room_messages', filter: `room_id=eq.${activeRoom.id}` }, async (payload: any) => {
-        const { data: prof } = await supabase.from('profiles').select('name').eq('user_id', payload.new.sender_id).maybeSingle();
-        setMessages(prev => prev.some(m => m.id === payload.new.id) ? prev : [...prev, { ...payload.new, sender_name: prof?.name || 'Student' }]);
-      })
       .on('broadcast', { event: 'meeting-ended' }, () => {
         toast({ title: 'Meeting ended', description: 'The host ended this study room.' });
         void leaveRoom();
       })
       .on('broadcast', { event: 'force-mute' }, ({ payload }: any) => {
-        if (payload?.target !== user.id && payload?.target !== '*') return;
-        if (user.id === activeRoom.owner_id) return; // host exempt
+        if (payload?.target !== selfId && payload?.target !== '*') return;
+        if (user && user.id === activeRoom.owner_id) return; // host exempt
         streamRef.current?.getAudioTracks().forEach((t) => (t.enabled = false));
         callStream?.getAudioTracks().forEach((t) => (t.enabled = false));
         setMicOn(false);
         toast({ title: 'Muted by host', variant: 'destructive' });
       })
       .on('broadcast', { event: 'force-cam-off' }, ({ payload }: any) => {
-        if (payload?.target !== user.id && payload?.target !== '*') return;
-        if (user.id === activeRoom.owner_id) return; // host exempt
+        if (payload?.target !== selfId && payload?.target !== '*') return;
+        if (user && user.id === activeRoom.owner_id) return; // host exempt
         streamRef.current?.getVideoTracks().forEach((t) => (t.enabled = false));
         callStream?.getVideoTracks().forEach((t) => (t.enabled = false));
         setCameraOn(false);
         toast({ title: 'Camera turned off by host', variant: 'destructive' });
       })
       .on('broadcast', { event: 'kick' }, ({ payload }: any) => {
-        if (payload?.target !== user.id) return;
+        if (payload?.target !== selfId) return;
         toast({ title: 'Removed by host', description: payload?.banned ? 'You were banned from this room.' : 'You were removed.', variant: 'destructive' });
         void leaveRoom();
       })
       .subscribe(async (status: string) => {
         if (status === 'SUBSCRIBED') {
-          await channel.track({ name: profile.name || 'Student', avatar: profile.avatar || '👤', joinedAt: Date.now() });
+          await channel.track({
+            name: selfName,
+            avatar: user ? (profile.avatar || '👤') : '👥',
+            joinedAt: Date.now(),
+            isGuest: !user,
+          });
         }
       });
     hostChannelRef.current = channel;
     return () => { channel.untrack(); supabase.removeChannel(channel); };
-  }, [activeRoom, user, profile.name, profile.avatar, isGuestRoom, callStream]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeRoom?.code, selfId, selfName]);
+
+  // Separate postgres-changes listener for chat messages (auth users only)
+  useEffect(() => {
+    if (!activeRoom || !user || isGuestRoom) return;
+    const ch = supabase.channel(`study-room-msgs-${activeRoom.id}`);
+    ch.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'study_room_messages', filter: `room_id=eq.${activeRoom.id}` }, async (payload: any) => {
+      const { data: prof } = await supabase.from('profiles').select('name').eq('user_id', payload.new.sender_id).maybeSingle();
+      setMessages(prev => prev.some(m => m.id === payload.new.id) ? prev : [...prev, { ...payload.new, sender_name: prof?.name || 'Student' }]);
+    }).subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [activeRoom, user, isGuestRoom]);
 
   // Load my recent rooms for search list
   useEffect(() => {
@@ -271,17 +287,7 @@ const VirtualLibraryPage = () => {
     })();
   }, [user, activeRoom]);
 
-  // Guest-mode meeting-ended listener
-  useEffect(() => {
-    if (!activeRoom || !isGuestRoom) return;
-    const channel = supabase.channel(`study-room-guest-${activeRoom.code}`);
-    channel.on('broadcast', { event: 'meeting-ended' }, () => {
-      toast({ title: 'Meeting ended', description: 'The host ended this study room.' });
-      void leaveRoom();
-    }).subscribe();
-    return () => { supabase.removeChannel(channel); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeRoom, isGuestRoom]);
+  // (guest listener merged into unified live channel above)
 
   // Auto-join via ?join=CODE (Zoom-style deep link)
   useEffect(() => {
