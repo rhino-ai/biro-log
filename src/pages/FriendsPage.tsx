@@ -329,7 +329,7 @@ const FriendsPage = () => {
         if (useE2EE && shared) {
           const enc = await encryptFile(bytes);
           const path = `chat/${user.id}/${Date.now()}-${rand}.${ext}.enc`;
-          const blob = new Blob([enc.ciphertext], { type: 'application/octet-stream' });
+          const blob = new Blob([enc.ciphertext as BlobPart], { type: 'application/octet-stream' });
           const { error: upErr } = await supabase.storage.from('chat-uploads').upload(path, blob, { contentType: 'application/octet-stream', upsert: false });
           if (upErr) throw upErr;
           // Wrap the file key with the DM shared key.
@@ -447,7 +447,7 @@ const FriendsPage = () => {
         const wrap = await decryptText(meta.keyCipher, meta.keyNonce, sharedKeyRef.current);
         const { k, n, mime: m2, name: n2 } = JSON.parse(wrap);
         const plain = await decryptFile(encBytes, k, n);
-        const blob = new Blob([plain], { type: m2 || mime || 'application/octet-stream' });
+        const blob = new Blob([plain as BlobPart], { type: m2 || mime || 'application/octet-stream' });
         const objUrl = URL.createObjectURL(blob);
         setViewer({ url: objUrl, name: n2 || name, kind: classify(m2 || mime, n2 || name), loading: false });
         return;
