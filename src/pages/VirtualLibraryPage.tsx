@@ -1349,9 +1349,27 @@ const VirtualLibraryPage = () => {
               chatOpen ? 'fixed inset-0 top-[57px] z-40 flex lg:static' : 'hidden',
             )}
           >
-            <div className="p-3 border-b border-border flex items-center justify-between"><span className="font-game text-sm">Room Chat</span><span className="text-xs text-muted-foreground flex items-center gap-1"><Users className="w-3 h-3" /> {roomUsers.length}</span></div>
-            <div className="lg:hidden px-3 pb-2">
-              <Button variant="ghost" size="sm" onClick={() => setChatOpen(false)} className="w-full gap-2 text-xs"><XCircle className="w-3 h-3" /> Close chat</Button>
+            <div className="p-3 border-b border-border flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setChatOpen(false)}
+                className="lg:hidden h-8 w-8 shrink-0"
+                aria-label="Back to room"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </Button>
+              <span className="font-game text-sm flex-1">Room Chat</span>
+              <span className="text-xs text-muted-foreground flex items-center gap-1"><Users className="w-3 h-3" /> {roomUsers.length}</span>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setChatOpen(false)}
+                className="hidden lg:inline-flex h-8 w-8 shrink-0"
+                aria-label="Close chat"
+              >
+                <XCircle className="w-4 h-4" />
+              </Button>
             </div>
             <ScrollArea className="flex-1 p-3">
               <div className="space-y-3">
