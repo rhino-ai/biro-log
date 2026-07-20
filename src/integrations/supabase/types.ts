@@ -407,6 +407,7 @@ export type Database = {
       }
       group_messages: {
         Row: {
+          attachment_meta: Json | null
           attachment_name: string | null
           attachment_type: string | null
           attachment_url: string | null
@@ -417,6 +418,7 @@ export type Database = {
           sender_id: string
         }
         Insert: {
+          attachment_meta?: Json | null
           attachment_name?: string | null
           attachment_type?: string | null
           attachment_url?: string | null
@@ -427,6 +429,7 @@ export type Database = {
           sender_id: string
         }
         Update: {
+          attachment_meta?: Json | null
           attachment_name?: string | null
           attachment_type?: string | null
           attachment_url?: string | null
