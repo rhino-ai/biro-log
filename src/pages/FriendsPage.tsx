@@ -91,9 +91,54 @@ const FriendsPage = () => {
   const [inviteTarget, setInviteTarget] = useState('');
   const [pendingAttachment, setPendingAttachment] = useState<{ url: string; type: string; name: string } | null>(null);
   const [uploadingAttach, setUploadingAttach] = useState(false);
+  const [composerPreview, setComposerPreview] = useState<PreviewFile | null>(null);
+  const [composerCaption, setComposerCaption] = useState('');
+  const [composerSending, setComposerSending] = useState(false);
+  const [viewer, setViewer] = useState<{ url: string | null; name: string; kind: PreviewFile['kind']; loading: boolean } | null>(null);
+  const [decryptedText, setDecryptedText] = useState<Record<string, string>>({});
+  const [dmE2EEReady, setDmE2EEReady] = useState<boolean>(false);
+  const sharedKeyRef = useRef<Uint8Array | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const searchAbortRef = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Initialize the user's E2EE keypair once, in the background. Failure is non-fatal.
+  useEffect(() => {
+    if (!user) return;
+    void ensureKeypair(user.id).catch(() => {});
+  }, [user]);
+
+  // When opening a DM, derive the shared key with the peer (or fall back to plaintext).
+  useEffect(() => {
+    sharedKeyRef.current = null;
+    setDmE2EEReady(false);
+    if (!user || !activeChat || activeChat.kind !== 'dm') return;
+    let cancelled = false;
+    void (async () => {
+      const shared = await sharedKeyFor(user.id, activeChat.id).catch(() => null);
+      if (cancelled) return;
+      sharedKeyRef.current = shared;
+      setDmE2EEReady(!!shared);
+    })();
+    return () => { cancelled = true; };
+  }, [user, activeChat]);
+
+  // Decrypt encrypted DM texts in the transcript as they show up.
+  useEffect(() => {
+    if (!activeChat || activeChat.kind !== 'dm') return;
+    const shared = sharedKeyRef.current;
+    if (!shared) return;
+    const pending = chatMessages.filter(m => m.encrypted && m.nonce && !(m.id in decryptedText));
+    if (!pending.length) return;
+    void (async () => {
+      const patch: Record<string, string> = {};
+      for (const m of pending) {
+        try { patch[m.id] = await decryptText(m.content, m.nonce as string, shared); }
+        catch { patch[m.id] = '[unable to decrypt]'; }
+      }
+      setDecryptedText(prev => ({ ...prev, ...patch }));
+    })();
+  }, [chatMessages, activeChat, decryptedText]);
 
   const appendMessage = useCallback((message: UIMessage) => {
     setChatMessages(prev => {
