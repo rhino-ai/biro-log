@@ -342,10 +342,15 @@ const VirtualLibraryPage = () => {
     const ch = supabase.channel(`study-room-msgs-${activeRoom.id}`);
     ch.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'study_room_messages', filter: `room_id=eq.${activeRoom.id}` }, async (payload: any) => {
       const { data: prof } = await supabase.from('profiles').select('name').eq('user_id', payload.new.sender_id).maybeSingle();
-      setMessages(prev => prev.some(m => m.id === payload.new.id) ? prev : [...prev, { ...payload.new, sender_name: prof?.name || 'Student' }]);
+      setMessages(prev => {
+        if (prev.some(m => m.id === payload.new.id)) return prev;
+        // Bump unread if chat panel is closed and message is from someone else
+        if (!chatOpen && payload.new.sender_id !== user.id) setUnreadChat((n) => n + 1);
+        return [...prev, { ...payload.new, sender_name: prof?.name || 'Student' }];
+      });
     }).subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [activeRoom, user, isGuestRoom]);
+  }, [activeRoom, user, isGuestRoom, chatOpen]);
 
   // Load my recent rooms for search list
   useEffect(() => {
