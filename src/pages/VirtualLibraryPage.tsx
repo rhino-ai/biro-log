@@ -411,6 +411,30 @@ const VirtualLibraryPage = () => {
         setCameraOn(false);
         toast({ title: 'Camera turned off by host', variant: 'destructive' });
       })
+      .on('broadcast', { event: 'request-mic-on' }, ({ payload }: any) => {
+        if (payload?.target !== selfId && payload?.target !== '*') return;
+        if (user && user.id === activeRoom.owner_id) return;
+        const tracks = callStream?.getAudioTracks() || streamRef.current?.getAudioTracks() || [];
+        if (tracks.length) {
+          tracks.forEach((t) => (t.enabled = true));
+          setMicOn(true);
+          toast({ title: 'Host asked you to unmute — mic is on' });
+        } else {
+          toast({ title: 'Host is asking you to unmute', description: 'Tap the Mic button to turn it on.' });
+        }
+      })
+      .on('broadcast', { event: 'request-cam-on' }, ({ payload }: any) => {
+        if (payload?.target !== selfId && payload?.target !== '*') return;
+        if (user && user.id === activeRoom.owner_id) return;
+        const tracks = callStream?.getVideoTracks() || streamRef.current?.getVideoTracks() || [];
+        if (tracks.length) {
+          tracks.forEach((t) => (t.enabled = true));
+          setCameraOn(true);
+          toast({ title: 'Host asked you to turn camera on — camera is on' });
+        } else {
+          toast({ title: 'Host is asking you to turn on camera', description: 'Tap the Camera button to enable it.' });
+        }
+      })
       .on('broadcast', { event: 'kick' }, ({ payload }: any) => {
         if (payload?.target !== selfId) return;
         toast({ title: 'Removed by host', description: payload?.banned ? 'You were banned from this room.' : 'You were removed.', variant: 'destructive' });
@@ -739,6 +763,34 @@ const VirtualLibraryPage = () => {
     toast({ title: 'Cameras off for everyone' });
   };
 
+  const unmuteMember = async (target: RoomUser) => {
+    if (!isOwner) return;
+    await hostBroadcast('request-mic-on', { target: target.id });
+    await logAudit('unmute', target);
+    toast({ title: `Asked ${target.name} to unmute` });
+  };
+
+  const camOnMember = async (target: RoomUser) => {
+    if (!isOwner) return;
+    await hostBroadcast('request-cam-on', { target: target.id });
+    await logAudit('cam_on', target);
+    toast({ title: `Asked ${target.name} to turn camera on` });
+  };
+
+  const unmuteAll = async () => {
+    if (!isOwner) return;
+    await hostBroadcast('request-mic-on', { target: '*' });
+    await logAudit('unmute_all');
+    toast({ title: 'Asked everyone to unmute' });
+  };
+
+  const camOnAll = async () => {
+    if (!isOwner) return;
+    await hostBroadcast('request-cam-on', { target: '*' });
+    await logAudit('cam_on_all');
+    toast({ title: 'Asked everyone to turn cameras on' });
+  };
+
   const kickMember = async (target: RoomUser) => {
     if (!isOwner || !activeRoom) return;
     await hostBroadcast('kick', { target: target.id, banned: false });
@@ -802,9 +854,22 @@ const VirtualLibraryPage = () => {
     try {
       if (callActive && callStream) {
         const videoTracks = callStream.getVideoTracks();
-        if (videoTracks.length) {
+        const anyLive = videoTracks.some((t) => t.readyState === 'live');
+        if (videoTracks.length && anyLive) {
           videoTracks.forEach((t) => (t.enabled = !cameraOn));
           setCameraOn(!cameraOn);
+          return;
+        }
+        // No live video track — acquire one and add to the call stream
+        if (!cameraOn) {
+          const fresh = await navigator.mediaDevices.getUserMedia({ video: true });
+          fresh.getVideoTracks().forEach((t) => {
+            // remove any dead track first
+            callStream.getVideoTracks().forEach((old) => { try { callStream.removeTrack(old); } catch {} });
+            callStream.addTrack(t);
+          });
+          setCallStream(new MediaStream(callStream.getTracks()));
+          setCameraOn(true);
         }
         return;
       }
@@ -828,9 +893,20 @@ const VirtualLibraryPage = () => {
     try {
       if (callActive && callStream) {
         const audioTracks = callStream.getAudioTracks();
-        if (audioTracks.length) {
+        const anyLive = audioTracks.some((t) => t.readyState === 'live');
+        if (audioTracks.length && anyLive) {
           audioTracks.forEach((t) => (t.enabled = !micOn));
           setMicOn(!micOn);
+          return;
+        }
+        if (!micOn) {
+          const fresh = await navigator.mediaDevices.getUserMedia({ audio: true });
+          fresh.getAudioTracks().forEach((t) => {
+            callStream.getAudioTracks().forEach((old) => { try { callStream.removeTrack(old); } catch {} });
+            callStream.addTrack(t);
+          });
+          setCallStream(new MediaStream(callStream.getTracks()));
+          setMicOn(true);
         }
         return;
       }
@@ -1050,6 +1126,8 @@ const VirtualLibraryPage = () => {
               <div className="flex flex-wrap gap-2">
                 <Button variant="outline" size="sm" onClick={muteAll} className="gap-1 text-xs"><MicOff className="w-3.5 h-3.5" /> Mute all</Button>
                 <Button variant="outline" size="sm" onClick={camOffAll} className="gap-1 text-xs"><VideoOff className="w-3.5 h-3.5" /> Cams off all</Button>
+                <Button variant="outline" size="sm" onClick={unmuteAll} className="gap-1 text-xs"><Mic className="w-3.5 h-3.5" /> Unmute all</Button>
+                <Button variant="outline" size="sm" onClick={camOnAll} className="gap-1 text-xs"><Video className="w-3.5 h-3.5" /> Cams on all</Button>
               </div>
             )}
 
@@ -1065,7 +1143,9 @@ const VirtualLibraryPage = () => {
                       </PopoverTrigger>
                       <PopoverContent align="end" className="w-44 p-1">
                         <button onClick={() => muteMember(ru)} className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-secondary flex items-center gap-2"><MicOff className="w-3.5 h-3.5" /> Mute mic</button>
+                        <button onClick={() => unmuteMember(ru)} className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-secondary flex items-center gap-2"><Mic className="w-3.5 h-3.5" /> Ask to unmute</button>
                         <button onClick={() => camOffMember(ru)} className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-secondary flex items-center gap-2"><VideoOff className="w-3.5 h-3.5" /> Turn off cam</button>
+                        <button onClick={() => camOnMember(ru)} className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-secondary flex items-center gap-2"><Video className="w-3.5 h-3.5" /> Ask to turn on cam</button>
                         <button onClick={() => kickMember(ru)} className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-secondary flex items-center gap-2 text-orange-500"><UserX className="w-3.5 h-3.5" /> Kick</button>
                         <button onClick={() => setBanTarget(ru)} className="w-full text-left text-xs px-2 py-1.5 rounded hover:bg-secondary flex items-center gap-2 text-destructive"><Ban className="w-3.5 h-3.5" /> Ban…</button>
                       </PopoverContent>
