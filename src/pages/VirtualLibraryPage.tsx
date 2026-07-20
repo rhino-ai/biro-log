@@ -15,6 +15,23 @@ import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { useWebRTCMesh, type RemotePeer } from '@/hooks/useWebRTCMesh';
 
+const RemoteVideoTile = ({ peer }: { peer: RemotePeer }) => {
+  const ref = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    if (ref.current && peer.stream) ref.current.srcObject = peer.stream;
+  }, [peer.stream]);
+  return (
+    <div className="relative aspect-video rounded-lg overflow-hidden bg-secondary/60 border border-border">
+      {peer.stream ? (
+        <video ref={ref} autoPlay playsInline className="w-full h-full object-cover" />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">Connecting…</div>
+      )}
+      <div className="absolute bottom-1 left-1 bg-background/70 rounded px-1.5 py-0.5 text-[10px] truncate max-w-[90%]">{peer.name}</div>
+    </div>
+  );
+};
+
 const supabase = _supabase as any;
 
 type StudyRoom = { id: string; code: string; title: string; owner_id: string; is_active: boolean; created_at: string };
