@@ -763,6 +763,34 @@ const VirtualLibraryPage = () => {
     toast({ title: 'Cameras off for everyone' });
   };
 
+  const unmuteMember = async (target: RoomUser) => {
+    if (!isOwner) return;
+    await hostBroadcast('request-mic-on', { target: target.id });
+    await logAudit('unmute', target);
+    toast({ title: `Asked ${target.name} to unmute` });
+  };
+
+  const camOnMember = async (target: RoomUser) => {
+    if (!isOwner) return;
+    await hostBroadcast('request-cam-on', { target: target.id });
+    await logAudit('cam_on', target);
+    toast({ title: `Asked ${target.name} to turn camera on` });
+  };
+
+  const unmuteAll = async () => {
+    if (!isOwner) return;
+    await hostBroadcast('request-mic-on', { target: '*' });
+    await logAudit('unmute_all');
+    toast({ title: 'Asked everyone to unmute' });
+  };
+
+  const camOnAll = async () => {
+    if (!isOwner) return;
+    await hostBroadcast('request-cam-on', { target: '*' });
+    await logAudit('cam_on_all');
+    toast({ title: 'Asked everyone to turn cameras on' });
+  };
+
   const kickMember = async (target: RoomUser) => {
     if (!isOwner || !activeRoom) return;
     await hostBroadcast('kick', { target: target.id, banned: false });
