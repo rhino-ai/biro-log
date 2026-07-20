@@ -90,10 +90,12 @@ self.addEventListener('push', (event) => {
   const title = data.title || 'Biro-log Reminder';
   const options = {
     body: data.body || 'You have a task reminder!',
-    icon: '/favicon.ico',
-    badge: '/favicon.ico',
+    icon: data.icon || '/pwa-192x192.png',
+    badge: data.badge || '/pwa-192x192.png',
     vibrate: [200, 100, 200],
     tag: data.tag || 'default',
+    data: { url: data.url || '/' },
+    requireInteraction: !!data.requireInteraction,
   };
   
   event.waitUntil(self.registration.showNotification(title, options));
@@ -102,7 +104,13 @@ self.addEventListener('push', (event) => {
 // Handle notification clicks
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
+  const target = (event.notification.data && event.notification.data.url) || '/';
   event.waitUntil(
-    clients.openWindow('/')
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((wins) => {
+      for (const w of wins) {
+        if ('focus' in w) { w.navigate(target); return w.focus(); }
+      }
+      return clients.openWindow(target);
+    })
   );
 });

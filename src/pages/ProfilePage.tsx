@@ -3,6 +3,7 @@ import { useGame } from '@/hooks/useGame';
 import { useAuth } from '@/hooks/useAuth';
 import { Header } from '@/components/layout/Header';
 import { BottomNav } from '@/components/layout/BottomNav';
+import { PushToggle } from '@/components/PushToggle';
 import { BackButton } from '@/components/layout/BackButton';
 import { Avatar } from '@/components/game/Avatar';
 import { XPBar } from '@/components/game/XPBar';
@@ -194,6 +195,7 @@ const ProfilePage = () => {
           )}
         </div>
         <div className="glass-panel rounded-2xl p-5 animate-fade-in border border-accent/20" style={{ animationDelay: '0.35s' }}><RewardsList /></div>
+        <div className="animate-fade-in" style={{ animationDelay: '0.38s' }}><PushToggle /></div>
         <div className="animate-fade-in" style={{ animationDelay: '0.4s' }}><AppRatingSection /></div>
       </main>
       <BottomNav />
