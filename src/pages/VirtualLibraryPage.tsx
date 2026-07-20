@@ -526,24 +526,53 @@ const VirtualLibraryPage = () => {
         <div className="glass-panel rounded-xl p-6 border border-primary/30 text-center space-y-4">
           <div className="w-20 h-20 rounded-full bg-primary/20 mx-auto flex items-center justify-center"><Video className="w-10 h-10 text-primary" /></div>
           <h2 className="font-game text-lg">Study Together</h2>
-          <p className="text-sm text-muted-foreground">Create a persistent study room, share its ID, chat, use camera/mic, and screen-share while studying.</p>
+          <p className="text-sm text-muted-foreground">{isGuest ? 'Paste an invite link or code below to join as guest — no install needed.' : 'Create a room, share the invite link (Zoom-style), and study together.'}</p>
         </div>
 
-        <Card className="glass-panel border-primary/20">
+        {!isGuest && <Card className="glass-panel border-primary/20">
           <CardHeader><CardTitle className="text-sm font-game">Create New Room</CardTitle></CardHeader>
           <CardContent className="space-y-3">
             <Input value={roomTitle} onChange={(e) => setRoomTitle(e.target.value)} placeholder="Room title" className="bg-secondary/50" />
             <Button onClick={createRoom} className="w-full bg-primary gap-2" disabled={isCreating}>{isCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Video className="w-4 h-4" />} Create & Enter</Button>
           </CardContent>
-        </Card>
+        </Card>}
 
         <Card className="glass-panel border-accent/20">
-          <CardHeader><CardTitle className="text-sm font-game">Join Room</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-sm font-game flex items-center gap-2"><LinkIcon className="w-4 h-4" /> Join with Code or Link</CardTitle></CardHeader>
           <CardContent className="space-y-3">
             <Input value={meetingId} onChange={e => setMeetingId(e.target.value.toUpperCase())} placeholder="BIRO-XXXX-XXXX" className="bg-secondary/50 font-game text-center" />
             <Button onClick={joinRoom} className="w-full bg-accent gap-2" disabled={!meetingId.trim() || isJoining}>{isJoining ? <Loader2 className="w-4 h-4 animate-spin" /> : <ExternalLink className="w-4 h-4" />} Join Room</Button>
+            <p className="text-[10px] text-muted-foreground text-center">Anyone with the link can join — even guests without signing in.</p>
           </CardContent>
         </Card>
+
+        {!isGuest && (
+          <Card className="glass-panel border-border">
+            <CardHeader><CardTitle className="text-sm font-game flex items-center gap-2"><Search className="w-4 h-4" /> My Study Rooms</CardTitle></CardHeader>
+            <CardContent className="space-y-3">
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Input value={searchQ} onChange={(e) => setSearchQ(e.target.value)} placeholder="Search by title or code…" className="pl-9 bg-secondary/50" />
+              </div>
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {myRooms.filter((r) => {
+                  const q = searchQ.trim().toLowerCase();
+                  if (!q) return true;
+                  return r.title.toLowerCase().includes(q) || r.code.toLowerCase().includes(q);
+                }).map((r) => (
+                  <button key={r.id} onClick={() => enterRoom(r)} className="w-full text-left glass-panel p-3 rounded-lg border border-border hover:border-primary/50 transition flex items-center justify-between">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold truncate flex items-center gap-2">{r.title} {!r.is_active && <span className="text-[9px] bg-destructive/30 px-1.5 rounded">ENDED</span>}</p>
+                      <p className="text-[10px] text-muted-foreground font-mono">{r.code}</p>
+                    </div>
+                    <ExternalLink className="w-4 h-4 text-muted-foreground shrink-0" />
+                  </button>
+                ))}
+                {myRooms.length === 0 && <p className="text-xs text-muted-foreground text-center py-3">No rooms yet. Create one above.</p>}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <div className="glass-panel rounded-xl p-4 border border-border space-y-2">
           <h3 className="font-game text-xs text-muted-foreground">Live Tools</h3>
