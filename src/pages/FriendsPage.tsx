@@ -703,13 +703,10 @@ const FriendsPage = () => {
         </ScrollArea>
 
         <div className="p-3 border-t border-border bg-card/80">
-          {pendingAttachment && (
-            <div className="flex items-center gap-2 mb-2 p-2 rounded-lg bg-secondary/60 border border-border text-xs">
-              {pendingAttachment.type.startsWith('image/')
-                ? <img src={pendingAttachment.url} alt="preview" className="w-10 h-10 object-cover rounded" />
-                : <FileIcon className="w-4 h-4" />}
-              <span className="truncate flex-1">{pendingAttachment.name}</span>
-              <Button variant="ghost" size="icon" onClick={() => setPendingAttachment(null)}><XIcon className="w-4 h-4" /></Button>
+          {activeChat?.kind === 'dm' && (
+            <div className={cn('flex items-center gap-1.5 text-[10px] mb-2', dmE2EEReady ? 'text-emerald-400' : 'text-amber-400')}>
+              {dmE2EEReady ? <ShieldCheck className="w-3 h-3" /> : <Shield className="w-3 h-3" />}
+              <span>{dmE2EEReady ? 'End-to-end encrypted' : 'Not encrypted — waiting for peer to open the app once'}</span>
             </div>
           )}
           <div className="flex gap-2 items-end">
@@ -718,21 +715,35 @@ const FriendsPage = () => {
               type="file"
               className="hidden"
               accept="image/*,application/pdf,audio/*,video/*,.doc,.docx,.txt"
-              onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleAttach(f); e.target.value = ''; }}
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleAttach(f); e.target.value = ''; }}
             />
             <Button
               variant="ghost" size="icon"
               onClick={() => fileInputRef.current?.click()}
-              disabled={uploadingAttach || sendingMsg}
+              disabled={sendingMsg}
               className="shrink-0"
               title="Attach file"
             >
-              {uploadingAttach ? <Loader2 className="w-4 h-4 animate-spin" /> : <Paperclip className="w-4 h-4" />}
+              <Paperclip className="w-4 h-4" />
             </Button>
             <Input value={messageInput} onChange={(e) => setMessageInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) void sendMessage(); }} placeholder="Type a message..." className="flex-1 bg-secondary/50" />
-            <Button onClick={() => void sendMessage()} disabled={(!messageInput.trim() && !pendingAttachment) || sendingMsg} size="icon" className="bg-accent shrink-0">{sendingMsg ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}</Button>
+            <Button onClick={() => void sendMessage()} disabled={!messageInput.trim() || sendingMsg} size="icon" className="bg-accent shrink-0">{sendingMsg ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}</Button>
           </div>
         </div>
+        {composerPreview && (
+          <AttachmentComposerPreview
+            file={composerPreview}
+            caption={composerCaption}
+            onCaptionChange={setComposerCaption}
+            onSend={() => void confirmComposerSend()}
+            onCancel={cancelComposer}
+            onAddMore={() => fileInputRef.current?.click()}
+            sending={composerSending}
+          />
+        )}
+        {viewer && (
+          <AttachmentViewer url={viewer.url} name={viewer.name} kind={viewer.kind} onClose={closeViewer} loading={viewer.loading} />
+        )}
       </div>
     );
   }
