@@ -32,13 +32,18 @@ export async function initNative(navigate: (path: string) => void) {
 
   // Deep links / App Links: universal URLs open into the SPA route
   CapApp.addListener('appUrlOpen', ({ url }) => {
-    try {
-      const u = new URL(url);
-      // Handle both custom scheme (app.lovable.<id>://) and https App Links
-      const path = (u.pathname || '/') + (u.search || '') + (u.hash || '');
-      if (path && path !== '/') navigate(path);
-    } catch {}
+    const path = parseDeepLink(url);
+    if (path) navigate(path);
   });
+
+  // If the app was cold-launched by a link, honor it once ready.
+  try {
+    const launch = await CapApp.getLaunchUrl();
+    if (launch?.url) {
+      const path = parseDeepLink(launch.url);
+      if (path) navigate(path);
+    }
+  } catch {}
 
   // Network status logging (available to app via Network.getStatus / addListener)
   Network.addListener('networkStatusChange', (status) => {
@@ -47,6 +52,25 @@ export async function initNative(navigate: (path: string) => void) {
 
   // FCM push notifications
   await registerPush();
+}
+
+/** Extract an in-app route from any incoming deep link. Returns null if not routable. */
+export function parseDeepLink(url: string): string | null {
+  try {
+    const u = new URL(url);
+    // Accept our https host + custom scheme; ignore anything else.
+    const allowedHosts = new Set([
+      'biro-log.lovable.app',
+      'id-preview--0c774921-ede0-4ae7-8a9e-613a154bfa58.lovable.app',
+    ]);
+    const isCustomScheme = u.protocol.startsWith('app.lovable');
+    if (!isCustomScheme && u.protocol !== 'https:') return null;
+    if (!isCustomScheme && !allowedHosts.has(u.hostname)) return null;
+    const path = (u.pathname || '/') + (u.search || '') + (u.hash || '');
+    return path && path !== '/' ? path : null;
+  } catch {
+    return null;
+  }
 }
 
 async function registerPush() {
