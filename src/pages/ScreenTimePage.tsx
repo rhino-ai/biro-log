@@ -34,9 +34,12 @@ const ScreenTimePage = () => {
     bestStreak: number;
     graceDaysUsed: number;
     achievements: string[];
+    strictReadMode?: boolean;
+    dailyLimitHours?: number;
   }>({
     apps: defaultApps, seasons: [], focusMode: false, shortsBlocker: false,
     dailyUsage: {}, streakDays: 0, bestStreak: 0, graceDaysUsed: 0, achievements: ['first_step'],
+    strictReadMode: false, dailyLimitHours: 4,
   });
   const [newAppName, setNewAppName] = useState('');
   const [newSeasonName, setNewSeasonName] = useState('');
@@ -71,6 +74,12 @@ const ScreenTimePage = () => {
 
   const toggleFocus = () => save({ ...data, focusMode: !data.focusMode });
   const toggleShorts = () => save({ ...data, shortsBlocker: !data.shortsBlocker });
+  const toggleStrict = () => {
+    const next = !data.strictReadMode;
+    save({ ...data, strictReadMode: next });
+    toast({ title: next ? '🔒 Strict Read Mode ON' : 'Strict Read Mode off', description: next ? `Social & games blocked after ${data.dailyLimitHours ?? 4}h in-app.` : 'Blocks removed.' });
+  };
+  const setLimit = (v: number) => save({ ...data, dailyLimitHours: Math.max(1, Math.min(12, v)) });
 
   const achievements = [
     { id: 'first_step', name: 'First Step', emoji: '🌱', req: 1 },
@@ -119,6 +128,29 @@ const ScreenTimePage = () => {
             <Switch checked={data.shortsBlocker} onCheckedChange={toggleShorts} />
           </div>
         </div>
+
+        {/* Strict Read Mode */}
+        <Card className="glass-panel border-raid/30">
+          <CardHeader><CardTitle className="text-sm font-game">🔒 Strict Read Mode</CardTitle></CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs">Auto-block social, games & library when in-app time crosses the limit.</p>
+                <p className="text-[10px] text-muted-foreground mt-1">Only Tasks, Mentor, Revision & Journal stay open.</p>
+              </div>
+              <Switch checked={!!data.strictReadMode} onCheckedChange={toggleStrict} />
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">Daily in-app limit (hours):</span>
+              <Input
+                type="number" min={1} max={12}
+                value={data.dailyLimitHours ?? 4}
+                onChange={(e) => setLimit(Number(e.target.value))}
+                className="bg-secondary/50 w-20"
+              />
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Weekly Chart */}
         <Card className="glass-panel border-primary/20">
