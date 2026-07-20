@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Video, Users, Monitor, Copy, ExternalLink, Mic, MicOff, VideoOff, Send, DoorOpen, Loader2, PhoneCall, PhoneOff, Search, Share2, XCircle, Link as LinkIcon, Ban, UserX, ShieldOff, MoreVertical } from 'lucide-react';
+import { Video, Users, Monitor, Copy, ExternalLink, Mic, MicOff, VideoOff, Send, DoorOpen, Loader2, PhoneCall, PhoneOff, Search, Share2, XCircle, Link as LinkIcon, Ban, UserX, ShieldOff, MoreVertical, Pin, PinOff } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { useGame } from '@/hooks/useGame';
 import { useAuth } from '@/hooks/useAuth';
@@ -18,21 +18,66 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-const RemoteVideoTile = ({ peer }: { peer: RemotePeer }) => {
+const RemoteVideoTile = ({ peer, large, onPin, pinned }: { peer: RemotePeer; large?: boolean; onPin?: () => void; pinned?: boolean }) => {
   const ref = useRef<HTMLVideoElement>(null);
   useEffect(() => {
     if (ref.current && peer.stream) ref.current.srcObject = peer.stream;
   }, [peer.stream]);
   return (
-    <div className="relative aspect-video rounded-lg overflow-hidden bg-secondary/60 border border-border">
+    <div className={cn('relative rounded-lg overflow-hidden bg-secondary/60 border border-border group', large ? 'w-full h-full' : 'aspect-video')}>
       {peer.stream ? (
         <video ref={ref} autoPlay playsInline className="w-full h-full object-cover" />
       ) : (
         <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">Connecting…</div>
       )}
       <div className="absolute bottom-1 left-1 bg-background/70 rounded px-1.5 py-0.5 text-[10px] truncate max-w-[90%]">{peer.name}</div>
+      {onPin && (
+        <button
+          onClick={onPin}
+          className="absolute top-1 right-1 bg-background/80 hover:bg-background rounded p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+          title={pinned ? 'Unpin' : 'Pin'}
+        >
+          {pinned ? <PinOff className="w-3 h-3" /> : <Pin className="w-3 h-3" />}
+        </button>
+      )}
     </div>
   );
+};
+
+const LocalVideoTile = ({ stream, name, large, onPin, pinned }: { stream: MediaStream | null; name: string; large?: boolean; onPin?: () => void; pinned?: boolean }) => {
+  const ref = useRef<HTMLVideoElement>(null);
+  useEffect(() => { if (ref.current) ref.current.srcObject = stream; }, [stream]);
+  return (
+    <div className={cn('relative rounded-lg overflow-hidden bg-secondary/60 border border-primary/40 group', large ? 'w-full h-full' : 'aspect-video')}>
+      {stream ? (
+        <video ref={ref} autoPlay muted playsInline className="w-full h-full object-cover" />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">
+          <VideoOff className="w-6 h-6" />
+        </div>
+      )}
+      <div className="absolute bottom-1 left-1 bg-primary/70 rounded px-1.5 py-0.5 text-[10px] truncate max-w-[90%]">{name} (you)</div>
+      {onPin && (
+        <button onClick={onPin} className="absolute top-1 right-1 bg-background/80 hover:bg-background rounded p-1 opacity-0 group-hover:opacity-100 transition-opacity" title={pinned ? 'Unpin' : 'Pin'}>
+          {pinned ? <PinOff className="w-3 h-3" /> : <Pin className="w-3 h-3" />}
+        </button>
+      )}
+    </div>
+  );
+};
+
+// Stable guest identity across reloads for a device
+const getGuestId = () => {
+  try {
+    let g = localStorage.getItem('biro-guest-id');
+    if (!g) {
+      g = 'guest-' + (crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now());
+      localStorage.setItem('biro-guest-id', g);
+    }
+    return g;
+  } catch {
+    return 'guest-' + Math.random().toString(36).slice(2);
+  }
 };
 
 const supabase = _supabase as any;
@@ -69,18 +114,28 @@ const VirtualLibraryPage = () => {
   const [banDuration, setBanDuration] = useState<string>('forever');
   const [banReason, setBanReason] = useState('');
   const [isBanning, setIsBanning] = useState(false);
+  const [pinnedPeerId, setPinnedPeerId] = useState<string | null>(null);
+  const [guestId] = useState<string>(() => getGuestId());
+  const [guestName, setGuestName] = useState<string>(() => {
+    try { return localStorage.getItem('biro-guest-name') || 'Guest'; } catch { return 'Guest'; }
+  });
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const screenStreamRef = useRef<MediaStream | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const hostChannelRef = useRef<any>(null);
 
+  // Unified identity — auth users use their UUID, guests use device-stable id
+  const selfId = user?.id ?? guestId;
+  const selfName = user ? (profile.name || 'Student') : guestName;
+
   const { peers } = useWebRTCMesh({
-    roomKey: activeRoom?.id ?? null,
-    selfUserId: user?.id ?? null,
-    selfName: profile.name || 'Student',
+    // Key on room CODE so auth users and guests join the same mesh
+    roomKey: activeRoom?.code ?? null,
+    selfUserId: selfId,
+    selfName,
     localStream: callStream,
-    enabled: callActive && !!activeRoom && !!user,
+    enabled: callActive && !!activeRoom,
   });
 
   const stopMedia = useCallback(() => {
@@ -153,9 +208,12 @@ const VirtualLibraryPage = () => {
   }, [user, loadMessages]);
 
   useEffect(() => {
-    if (!activeRoom || !user) return;
-    if (isGuestRoom) return;
-    const channel = supabase.channel(`study-room-${activeRoom.id}`, { config: { presence: { key: user.id } } });
+    if (!activeRoom) return;
+    // Unified live channel keyed on room CODE so guests + auth users share presence,
+    // chat notifications, host broadcasts, and meeting-ended events.
+    const channel = supabase.channel(`study-room-live-${activeRoom.code}`, {
+      config: { presence: { key: selfId } },
+    });
     channel
       .on('presence', { event: 'sync' }, () => {
         const state = channel.presenceState();
@@ -166,43 +224,56 @@ const VirtualLibraryPage = () => {
         });
         setRoomUsers(users);
       })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'study_room_messages', filter: `room_id=eq.${activeRoom.id}` }, async (payload: any) => {
-        const { data: prof } = await supabase.from('profiles').select('name').eq('user_id', payload.new.sender_id).maybeSingle();
-        setMessages(prev => prev.some(m => m.id === payload.new.id) ? prev : [...prev, { ...payload.new, sender_name: prof?.name || 'Student' }]);
-      })
       .on('broadcast', { event: 'meeting-ended' }, () => {
         toast({ title: 'Meeting ended', description: 'The host ended this study room.' });
         void leaveRoom();
       })
       .on('broadcast', { event: 'force-mute' }, ({ payload }: any) => {
-        if (payload?.target !== user.id && payload?.target !== '*') return;
-        if (user.id === activeRoom.owner_id) return; // host exempt
+        if (payload?.target !== selfId && payload?.target !== '*') return;
+        if (user && user.id === activeRoom.owner_id) return; // host exempt
         streamRef.current?.getAudioTracks().forEach((t) => (t.enabled = false));
         callStream?.getAudioTracks().forEach((t) => (t.enabled = false));
         setMicOn(false);
         toast({ title: 'Muted by host', variant: 'destructive' });
       })
       .on('broadcast', { event: 'force-cam-off' }, ({ payload }: any) => {
-        if (payload?.target !== user.id && payload?.target !== '*') return;
-        if (user.id === activeRoom.owner_id) return; // host exempt
+        if (payload?.target !== selfId && payload?.target !== '*') return;
+        if (user && user.id === activeRoom.owner_id) return; // host exempt
         streamRef.current?.getVideoTracks().forEach((t) => (t.enabled = false));
         callStream?.getVideoTracks().forEach((t) => (t.enabled = false));
         setCameraOn(false);
         toast({ title: 'Camera turned off by host', variant: 'destructive' });
       })
       .on('broadcast', { event: 'kick' }, ({ payload }: any) => {
-        if (payload?.target !== user.id) return;
+        if (payload?.target !== selfId) return;
         toast({ title: 'Removed by host', description: payload?.banned ? 'You were banned from this room.' : 'You were removed.', variant: 'destructive' });
         void leaveRoom();
       })
       .subscribe(async (status: string) => {
         if (status === 'SUBSCRIBED') {
-          await channel.track({ name: profile.name || 'Student', avatar: profile.avatar || '👤', joinedAt: Date.now() });
+          await channel.track({
+            name: selfName,
+            avatar: user ? (profile.avatar || '👤') : '👥',
+            joinedAt: Date.now(),
+            isGuest: !user,
+          });
         }
       });
     hostChannelRef.current = channel;
     return () => { channel.untrack(); supabase.removeChannel(channel); };
-  }, [activeRoom, user, profile.name, profile.avatar, isGuestRoom, callStream]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeRoom?.code, selfId, selfName]);
+
+  // Separate postgres-changes listener for chat messages (auth users only)
+  useEffect(() => {
+    if (!activeRoom || !user || isGuestRoom) return;
+    const ch = supabase.channel(`study-room-msgs-${activeRoom.id}`);
+    ch.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'study_room_messages', filter: `room_id=eq.${activeRoom.id}` }, async (payload: any) => {
+      const { data: prof } = await supabase.from('profiles').select('name').eq('user_id', payload.new.sender_id).maybeSingle();
+      setMessages(prev => prev.some(m => m.id === payload.new.id) ? prev : [...prev, { ...payload.new, sender_name: prof?.name || 'Student' }]);
+    }).subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [activeRoom, user, isGuestRoom]);
 
   // Load my recent rooms for search list
   useEffect(() => {
@@ -216,17 +287,7 @@ const VirtualLibraryPage = () => {
     })();
   }, [user, activeRoom]);
 
-  // Guest-mode meeting-ended listener
-  useEffect(() => {
-    if (!activeRoom || !isGuestRoom) return;
-    const channel = supabase.channel(`study-room-guest-${activeRoom.code}`);
-    channel.on('broadcast', { event: 'meeting-ended' }, () => {
-      toast({ title: 'Meeting ended', description: 'The host ended this study room.' });
-      void leaveRoom();
-    }).subscribe();
-    return () => { supabase.removeChannel(channel); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeRoom, isGuestRoom]);
+  // (guest listener merged into unified live channel above)
 
   // Auto-join via ?join=CODE (Zoom-style deep link)
   useEffect(() => {
@@ -317,15 +378,10 @@ const VirtualLibraryPage = () => {
   const endMeeting = async () => {
     if (!activeRoom || !isOwner) return;
     if (!window.confirm('End this meeting for everyone?')) return;
+    // Broadcast on the already-subscribed unified live channel so every
+    // participant (auth + guest) receives it instantly.
     try {
-      const c1 = supabase.channel(`study-room-${activeRoom.id}`);
-      const c2 = supabase.channel(`study-room-guest-${activeRoom.code}`);
-      await new Promise<void>((resolve) => { c1.subscribe((s: string) => { if (s === 'SUBSCRIBED') resolve(); }); });
-      await c1.send({ type: 'broadcast', event: 'meeting-ended', payload: {} });
-      await new Promise<void>((resolve) => { c2.subscribe((s: string) => { if (s === 'SUBSCRIBED') resolve(); }); });
-      await c2.send({ type: 'broadcast', event: 'meeting-ended', payload: {} });
-      supabase.removeChannel(c1);
-      supabase.removeChannel(c2);
+      await hostChannelRef.current?.send({ type: 'broadcast', event: 'meeting-ended', payload: {} });
     } catch {}
     await supabase.from('study_rooms').update({ is_active: false }).eq('id', activeRoom.id);
     toast({ title: 'Meeting ended' });
@@ -548,13 +604,58 @@ const VirtualLibraryPage = () => {
 
         <div className="flex-1 grid lg:grid-cols-[1fr_340px] min-h-0">
           <div className="p-4 space-y-4 min-h-0 flex flex-col">
-            <div className="relative aspect-video rounded-xl overflow-hidden bg-secondary/40 border border-border flex items-center justify-center">
-              <video ref={videoRef} autoPlay muted playsInline className={cn('w-full h-full object-cover', !cameraOn && !screenOn && 'hidden')} />
-              {!cameraOn && !screenOn && <div className="text-center space-y-2"><VideoOff className="w-14 h-14 mx-auto text-muted-foreground" /><p className="text-sm text-muted-foreground">Camera off</p></div>}
-              <div className="absolute top-3 left-3 bg-background/80 rounded-lg px-3 py-1 font-mono text-sm">
-                {Math.floor(studySeconds / 3600).toString().padStart(2, '0')}:{Math.floor((studySeconds % 3600) / 60).toString().padStart(2, '0')}:{(studySeconds % 60).toString().padStart(2, '0')}
-              </div>
-            </div>
+            {/* Zoom-style spotlight: big pinned tile + horizontal strip of others */}
+            {(() => {
+              const pinnedPeer = pinnedPeerId ? peers.find(p => p.peerId === pinnedPeerId) : null;
+              const showLocalLarge = !pinnedPeer;
+              const stripPeers = pinnedPeer ? peers.filter(p => p.peerId !== pinnedPeer.peerId) : peers;
+              return (
+                <>
+                  <div className="relative aspect-video rounded-xl overflow-hidden bg-secondary/40 border border-border">
+                    {showLocalLarge ? (
+                      <>
+                        <video ref={videoRef} autoPlay muted playsInline className={cn('w-full h-full object-cover', !cameraOn && !screenOn && 'hidden')} />
+                        {!cameraOn && !screenOn && (
+                          <div className="w-full h-full flex flex-col items-center justify-center gap-2">
+                            <VideoOff className="w-14 h-14 text-muted-foreground" />
+                            <p className="text-sm text-muted-foreground">Camera off</p>
+                          </div>
+                        )}
+                        <div className="absolute bottom-2 left-2 bg-primary/70 rounded px-2 py-0.5 text-xs">{selfName} (you)</div>
+                      </>
+                    ) : (
+                      <RemoteVideoTile peer={pinnedPeer!} large onPin={() => setPinnedPeerId(null)} pinned />
+                    )}
+                    <div className="absolute top-3 left-3 bg-background/80 rounded-lg px-3 py-1 font-mono text-sm">
+                      {Math.floor(studySeconds / 3600).toString().padStart(2, '0')}:{Math.floor((studySeconds % 3600) / 60).toString().padStart(2, '0')}:{(studySeconds % 60).toString().padStart(2, '0')}
+                    </div>
+                  </div>
+                  {/* Strip of other participants */}
+                  {(stripPeers.length > 0 || pinnedPeer) && (
+                    <div className="flex gap-2 overflow-x-auto pb-1">
+                      {pinnedPeer && (
+                        <div className="w-40 shrink-0">
+                          <LocalVideoTile
+                            stream={cameraOn || screenOn ? (callStream || streamRef.current) : null}
+                            name={selfName}
+                            onPin={() => setPinnedPeerId(null)}
+                          />
+                        </div>
+                      )}
+                      {stripPeers.map((p) => (
+                        <div key={p.peerId} className="w-40 shrink-0">
+                          <RemoteVideoTile
+                            peer={p}
+                            onPin={() => setPinnedPeerId(p.peerId === pinnedPeerId ? null : p.peerId)}
+                            pinned={p.peerId === pinnedPeerId}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
+              );
+            })()}
 
             <div className="grid grid-cols-3 gap-2">
               <Button variant={cameraOn ? 'default' : 'outline'} onClick={toggleCamera} className="gap-2">{cameraOn ? <Video className="w-4 h-4" /> : <VideoOff className="w-4 h-4" />} Camera</Button>
@@ -570,13 +671,6 @@ const VirtualLibraryPage = () => {
               )}
             </div>
 
-            {callActive && peers.length > 0 && (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {peers.map((p) => (
-                  <RemoteVideoTile key={p.peerId} peer={p} />
-                ))}
-              </div>
-            )}
             {callActive && peers.length === 0 && (
               <div className="text-center text-xs text-muted-foreground py-2">Waiting for others to join the call…</div>
             )}
