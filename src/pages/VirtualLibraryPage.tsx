@@ -948,10 +948,29 @@ const VirtualLibraryPage = () => {
         <Dialog open={auditOpen} onOpenChange={setAuditOpen}>
           <DialogContent className="max-w-md">
             <DialogHeader><DialogTitle className="flex items-center gap-2"><ScrollText className="w-4 h-4" /> Host action log</DialogTitle></DialogHeader>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <Input value={auditSearch} onChange={(e) => setAuditSearch(e.target.value)} placeholder="Search target, action, reason…" className="h-8 text-xs" />
+              <div className="flex gap-2">
+                <Select value={auditFilter} onValueChange={setAuditFilter}>
+                  <SelectTrigger className="h-8 text-xs w-[130px]"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All actions</SelectItem>
+                    <SelectItem value="mute">Mute</SelectItem>
+                    <SelectItem value="mute_all">Mute all</SelectItem>
+                    <SelectItem value="cam_off">Cam off</SelectItem>
+                    <SelectItem value="cam_off_all">Cam off all</SelectItem>
+                    <SelectItem value="kick">Kick</SelectItem>
+                    <SelectItem value="ban">Ban</SelectItem>
+                    <SelectItem value="end_meeting">End meeting</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button variant="outline" size="sm" onClick={exportAuditCsv} disabled={filteredAuditRows.length === 0} className="gap-1 h-8"><Download className="w-3 h-3" /> CSV</Button>
+              </div>
+            </div>
             <ScrollArea className="max-h-[60vh] pr-2">
               <div className="space-y-2">
-                {auditRows.length === 0 && <p className="text-xs text-muted-foreground text-center py-6">No host actions logged yet.</p>}
-                {auditRows.map((row) => (
+                {filteredAuditRows.length === 0 && <p className="text-xs text-muted-foreground text-center py-6">{auditRows.length === 0 ? 'No host actions logged yet.' : 'No entries match your filter.'}</p>}
+                {filteredAuditRows.map((row) => (
                   <div key={row.id} className="rounded border border-border bg-secondary/30 p-2 text-xs">
                     <div className="flex items-center justify-between">
                       <span className="font-semibold uppercase tracking-wide text-[10px] text-primary">{row.action.replace(/_/g, ' ')}</span>
