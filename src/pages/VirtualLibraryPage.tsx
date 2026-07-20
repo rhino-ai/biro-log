@@ -671,13 +671,6 @@ const VirtualLibraryPage = () => {
               )}
             </div>
 
-            {callActive && peers.length > 0 && (
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                {peers.map((p) => (
-                  <RemoteVideoTile key={p.peerId} peer={p} />
-                ))}
-              </div>
-            )}
             {callActive && peers.length === 0 && (
               <div className="text-center text-xs text-muted-foreground py-2">Waiting for others to join the call…</div>
             )}
