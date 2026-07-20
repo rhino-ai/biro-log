@@ -689,6 +689,47 @@ export type Database = {
         }
         Relationships: []
       }
+      study_room_audit_log: {
+        Row: {
+          action: string
+          created_at: string
+          host_id: string
+          id: string
+          metadata: Json
+          room_id: string
+          target_id: string | null
+          target_name: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          host_id: string
+          id?: string
+          metadata?: Json
+          room_id: string
+          target_id?: string | null
+          target_name?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          host_id?: string
+          id?: string
+          metadata?: Json
+          room_id?: string
+          target_id?: string | null
+          target_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "study_room_audit_log_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "study_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       study_room_bans: {
         Row: {
           created_at: string
