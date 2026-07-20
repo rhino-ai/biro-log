@@ -32,6 +32,7 @@ import MentorTimelinePage from "./pages/MentorTimelinePage";
 import JoinInvitePage from "./pages/JoinInvitePage";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
+import { ReadModeGuard } from "@/components/system/ReadModeGuard";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 5 * 60 * 1000 } },
@@ -60,6 +61,7 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 const AppRoutes = () => (
+  <ReadModeGuard>
   <Routes>
     <Route path="/auth" element={<PublicRoute><AuthPage /></PublicRoute>} />
     <Route path="/join/:code" element={<JoinInvitePage />} />
@@ -88,6 +90,7 @@ const AppRoutes = () => (
     <Route path="/mentor-timeline" element={<ProtectedRoute><MentorTimelinePage /></ProtectedRoute>} />
     <Route path="*" element={<NotFound />} />
   </Routes>
+  </ReadModeGuard>
 );
 
 const GlobalErrorHandler = ({ children }: { children: React.ReactNode }) => {

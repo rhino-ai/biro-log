@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useSearchParams, Link } from 'react-router-dom';
 import { Header } from '@/components/layout/Header';
 import { BottomNav } from '@/components/layout/BottomNav';
 import { BackButton } from '@/components/layout/BackButton';
@@ -15,6 +16,8 @@ const QUOTES = [
 ];
 
 const VillainModePage = () => {
+  const [searchParams] = useSearchParams();
+  const locked = searchParams.get('locked') === '1';
   const [active, setActive] = useState(false);
   const [minutes, setMinutes] = useState(60);
   const [remaining, setRemaining] = useState(0);
@@ -86,6 +89,19 @@ const VillainModePage = () => {
       <Header />
       <main className="px-4 py-6 max-w-lg mx-auto space-y-6">
         <BackButton to="/" />
+        {locked && (
+          <div className="glass-panel rounded-2xl p-4 border border-red-700 bg-red-950/40 text-center space-y-2">
+            <p className="text-red-300 font-game text-sm">🔒 Strict Read Mode — Daily limit crossed</p>
+            <p className="text-red-200/80 text-xs">Social, games & library are locked. Only Tasks, Mentor, Revision & Journal remain.</p>
+            <div className="flex gap-2 justify-center pt-2">
+              <Link to="/tasks" className="text-xs underline text-red-300">Go to Tasks</Link>
+              <span className="text-red-500/40">•</span>
+              <Link to="/mentor" className="text-xs underline text-red-300">Ask Mentor</Link>
+              <span className="text-red-500/40">•</span>
+              <Link to="/screen-time" className="text-xs underline text-red-300">Settings</Link>
+            </div>
+          </div>
+        )}
         <div className="text-center">
           <Skull className="w-16 h-16 text-red-500 mx-auto mb-3" />
           <h1 className="font-game text-3xl text-red-500 tracking-wider">VILLAIN MODE</h1>
