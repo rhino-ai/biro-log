@@ -1841,6 +1841,8 @@ const VirtualLibraryPage = () => {
           </Card>
         )}
 
+        <DevicePermissionsCard />
+
         <div className="glass-panel rounded-xl p-4 border border-border space-y-2">
           <h3 className="font-game text-xs text-muted-foreground">Live Tools</h3>
           <div className="grid grid-cols-2 gap-2 text-xs">
