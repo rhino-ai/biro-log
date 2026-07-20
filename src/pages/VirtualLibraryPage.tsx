@@ -62,6 +62,36 @@ const VirtualLibraryPage = () => {
     setCameraOn(false);
     setMicOn(false);
     setScreenOn(false);
+    setCallStream(null);
+    setCallActive(false);
+  }, []);
+
+  const startCall = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      streamRef.current = stream;
+      setCallStream(stream);
+      setCameraOn(true);
+      setMicOn(true);
+      setCallActive(true);
+      if (videoRef.current) videoRef.current.srcObject = stream;
+      toast({ title: 'Live call started', description: 'Others in this room will connect automatically.' });
+    } catch (error) {
+      toast({ title: 'Call blocked', description: error instanceof Error ? error.message : 'Allow camera + mic.', variant: 'destructive' });
+    }
+  }, []);
+
+  const endCall = useCallback(() => {
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    screenStreamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    screenStreamRef.current = null;
+    setCallStream(null);
+    setCallActive(false);
+    setScreenOn(false);
+    setCameraOn(false);
+    setMicOn(false);
+    if (videoRef.current) videoRef.current.srcObject = null;
   }, []);
 
   useEffect(() => () => stopMedia(), [stopMedia]);
