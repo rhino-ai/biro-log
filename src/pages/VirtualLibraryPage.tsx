@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Video, Users, Monitor, Copy, ExternalLink, Mic, MicOff, VideoOff, Send, DoorOpen, Loader2, PhoneCall, PhoneOff, Search, Share2, XCircle, Link as LinkIcon, Ban, UserX, ShieldOff, MoreVertical, Pin, PinOff } from 'lucide-react';
+import { Video, Users, Monitor, Copy, ExternalLink, Mic, MicOff, VideoOff, Send, DoorOpen, Loader2, PhoneCall, PhoneOff, Search, Share2, XCircle, Link as LinkIcon, Ban, UserX, ShieldOff, MoreVertical, Pin, PinOff, MessageSquare, Wifi, WifiOff, ScrollText } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { useGame } from '@/hooks/useGame';
 import { useAuth } from '@/hooks/useAuth';
@@ -17,6 +17,30 @@ import { useWebRTCMesh, type RemotePeer } from '@/hooks/useWebRTCMesh';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+
+const connBadgeClasses = (s?: RTCPeerConnectionState) => {
+  switch (s) {
+    case 'connected': return { dot: 'bg-emerald-500', label: 'Good', icon: 'wifi' as const };
+    case 'connecting':
+    case 'new': return { dot: 'bg-amber-500 animate-pulse', label: 'Connecting', icon: 'wifi' as const };
+    case 'disconnected': return { dot: 'bg-amber-500', label: 'Weak', icon: 'wifi' as const };
+    case 'failed':
+    case 'closed': return { dot: 'bg-destructive', label: 'Lost', icon: 'wifi-off' as const };
+    default: return { dot: 'bg-muted-foreground', label: '—', icon: 'wifi' as const };
+  }
+};
+
+const ConnBadge = ({ state, compact }: { state?: RTCPeerConnectionState; compact?: boolean }) => {
+  const c = connBadgeClasses(state);
+  return (
+    <span className={cn('inline-flex items-center gap-1 rounded-full bg-background/80 backdrop-blur px-1.5 py-0.5', compact ? 'text-[9px]' : 'text-[10px]')} title={`Connection: ${c.label}`}>
+      <span className={cn('w-1.5 h-1.5 rounded-full', c.dot)} />
+      {c.icon === 'wifi' ? <Wifi className="w-2.5 h-2.5" /> : <WifiOff className="w-2.5 h-2.5" />}
+      {!compact && <span>{c.label}</span>}
+    </span>
+  );
+};
 
 const RemoteVideoTile = ({ peer, large, onPin, pinned }: { peer: RemotePeer; large?: boolean; onPin?: () => void; pinned?: boolean }) => {
   const ref = useRef<HTMLVideoElement>(null);
@@ -31,6 +55,7 @@ const RemoteVideoTile = ({ peer, large, onPin, pinned }: { peer: RemotePeer; lar
         <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">Connecting…</div>
       )}
       <div className="absolute bottom-1 left-1 bg-background/70 rounded px-1.5 py-0.5 text-[10px] truncate max-w-[90%]">{peer.name}</div>
+      <div className="absolute top-1 left-1"><ConnBadge state={peer.connectionState} compact={!large} /></div>
       {onPin && (
         <button
           onClick={onPin}
