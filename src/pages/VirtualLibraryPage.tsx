@@ -939,6 +939,7 @@ const VirtualLibraryPage = () => {
         if (videoTracks.length && anyLive) {
           videoTracks.forEach((t) => (t.enabled = !cameraOn));
           setCameraOn(!cameraOn);
+          if (!cameraOn) setPendingHostRequest((p) => ({ ...p, cam: false }));
           return;
         }
         // No live video track — acquire one and add to the call stream
@@ -951,6 +952,7 @@ const VirtualLibraryPage = () => {
           });
           setCallStream(new MediaStream(callStream.getTracks()));
           setCameraOn(true);
+          setPendingHostRequest((p) => ({ ...p, cam: false }));
         }
         return;
       }
@@ -965,8 +967,9 @@ const VirtualLibraryPage = () => {
       if (videoRef.current) videoRef.current.srcObject = stream;
       setCameraOn(true);
       if (stream.getAudioTracks().length) setMicOn(true);
+      setPendingHostRequest((p) => ({ ...p, cam: false }));
     } catch (error) {
-      toast({ title: 'Camera blocked', description: error instanceof Error ? error.message : 'Allow camera permission.', variant: 'destructive' });
+      setMediaError({ kind: 'camera', info: explainMediaError(error, 'camera'), retry: toggleCamera });
     }
   };
 
@@ -978,6 +981,7 @@ const VirtualLibraryPage = () => {
         if (audioTracks.length && anyLive) {
           audioTracks.forEach((t) => (t.enabled = !micOn));
           setMicOn(!micOn);
+          if (!micOn) setPendingHostRequest((p) => ({ ...p, mic: false }));
           return;
         }
         if (!micOn) {
@@ -988,6 +992,7 @@ const VirtualLibraryPage = () => {
           });
           setCallStream(new MediaStream(callStream.getTracks()));
           setMicOn(true);
+          setPendingHostRequest((p) => ({ ...p, mic: false }));
         }
         return;
       }
@@ -1001,8 +1006,9 @@ const VirtualLibraryPage = () => {
       if (cameraOn && videoRef.current) videoRef.current.srcObject = stream;
       setMicOn(true);
       if (stream.getVideoTracks().length) setCameraOn(true);
+      setPendingHostRequest((p) => ({ ...p, mic: false }));
     } catch (error) {
-      toast({ title: 'Mic blocked', description: error instanceof Error ? error.message : 'Allow microphone permission.', variant: 'destructive' });
+      setMediaError({ kind: 'mic', info: explainMediaError(error, 'mic'), retry: toggleMic });
     }
   };
 
