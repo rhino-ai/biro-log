@@ -68,6 +68,29 @@ serve(async (req) => {
       .eq("user_id", targetId)
       .maybeSingle();
 
+    // Fire-and-forget push notification to the newly added member.
+    try {
+      const [{ data: group }, { data: inviter }] = await Promise.all([
+        backend.from("chat_groups").select("name").eq("id", cleanGroupId).maybeSingle(),
+        backend.from("profiles").select("name").eq("user_id", user.id).maybeSingle(),
+      ]);
+      await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/send-push`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""}`,
+        },
+        body: JSON.stringify({
+          title: "Added to a group",
+          body: `${inviter?.name || "Someone"} added you to ${group?.name || "a group"}`,
+          url: "/friends",
+          tag: `invite-${cleanGroupId}`,
+          renotify: true,
+          user_ids: [targetId],
+        }),
+      });
+    } catch (_) { /* best-effort */ }
+
     return json({ ok: true, member: profile });
   } catch (error) {
     return json({ error: error instanceof Error ? error.message : "Could not invite member." }, 500);
