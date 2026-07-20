@@ -581,6 +581,13 @@ const VirtualLibraryPage = () => {
               <div className="text-center text-xs text-muted-foreground py-2">Waiting for others to join the call…</div>
             )}
 
+            {isOwner && (
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" onClick={muteAll} className="gap-1 text-xs"><MicOff className="w-3.5 h-3.5" /> Mute all</Button>
+                <Button variant="outline" size="sm" onClick={camOffAll} className="gap-1 text-xs"><VideoOff className="w-3.5 h-3.5" /> Cams off all</Button>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 overflow-y-auto pb-2">
               {roomUsers.map((ru) => (
                 <div key={ru.id} className={cn('glass-panel p-3 rounded-xl flex items-center gap-2 border', ru.id === user?.id ? 'border-primary/50' : 'border-border')}>
