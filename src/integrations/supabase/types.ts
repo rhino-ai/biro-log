@@ -1139,6 +1139,41 @@ export type Database = {
       }
     }
     Functions: {
+      admin_get_full_profile: {
+        Args: { _user_id: string }
+        Returns: {
+          avatar: string | null
+          avatar_url: string | null
+          coins: number | null
+          created_at: string | null
+          dream_college: string | null
+          dream_college_image: string | null
+          dream_marks_cbse: number | null
+          dream_marks_jee_advanced: number | null
+          dream_marks_jee_main: number | null
+          email: string | null
+          exam_date_cbse: string | null
+          exam_date_jee_advanced: string | null
+          exam_date_jee_main: string | null
+          id: string
+          invite_code: string | null
+          last_study_date: string | null
+          level: number | null
+          name: string
+          phone: string | null
+          streak: number | null
+          unique_id: string
+          updated_at: string | null
+          user_id: string
+          xp: number | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "profiles"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       admin_reschedule_push_cron: {
         Args: { _job_name?: string; _secret: string }
         Returns: undefined
@@ -1146,6 +1181,41 @@ export type Database = {
       generate_unique_code: {
         Args: { _len: number; _prefix: string }
         Returns: string
+      }
+      get_my_full_profile: {
+        Args: never
+        Returns: {
+          avatar: string | null
+          avatar_url: string | null
+          coins: number | null
+          created_at: string | null
+          dream_college: string | null
+          dream_college_image: string | null
+          dream_marks_cbse: number | null
+          dream_marks_jee_advanced: number | null
+          dream_marks_jee_main: number | null
+          email: string | null
+          exam_date_cbse: string | null
+          exam_date_jee_advanced: string | null
+          exam_date_jee_main: string | null
+          id: string
+          invite_code: string | null
+          last_study_date: string | null
+          level: number | null
+          name: string
+          phone: string | null
+          streak: number | null
+          unique_id: string
+          updated_at: string | null
+          user_id: string
+          xp: number | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "profiles"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       has_role: {
         Args: {
