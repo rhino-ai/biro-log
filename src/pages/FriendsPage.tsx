@@ -293,61 +293,176 @@ const FriendsPage = () => {
     await loadMessages(chat);
   };
 
-  const sendMessage = async () => {
-    const content = messageInput.trim();
-    if ((!content && !pendingAttachment) || !user || !activeChat || sendingMsg) return;
+  const sendMessage = async (opts?: { attachmentFile?: File; captionOverride?: string }) => {
+    const content = (opts?.captionOverride !== undefined ? opts.captionOverride : messageInput).trim();
+    const hasFile = !!opts?.attachmentFile;
+    if ((!content && !hasFile) || !user || !activeChat || sendingMsg) return;
     setSendingMsg(true);
-    setMessageInput('');
-    const attachment = pendingAttachment;
-    setPendingAttachment(null);
+    if (opts?.captionOverride === undefined) setMessageInput('');
+
+    const isDM = activeChat.kind === 'dm';
+    const shared = isDM ? sharedKeyRef.current : null;
+    const useE2EE = isDM && !!shared;
+
     const tempId = `tmp-${Date.now()}`;
     const optimistic: UIMessage = {
       id: tempId, sender_id: user.id, content, created_at: new Date().toISOString(), pending: true,
-      attachment_url: attachment?.url ?? null, attachment_type: attachment?.type ?? null, attachment_name: attachment?.name ?? null,
     };
+    if (opts?.attachmentFile) {
+      optimistic.attachment_name = opts.attachmentFile.name;
+      optimistic.attachment_type = opts.attachmentFile.type;
+    }
     appendMessage(optimistic);
+    if (useE2EE && content) setDecryptedText(prev => ({ ...prev, [tempId]: content }));
 
-    const payload: Record<string, any> = { content };
-    if (attachment) {
-      payload.attachment_url = attachment.url;
-      payload.attachment_type = attachment.type;
-      payload.attachment_name = attachment.name;
-    }
-    const request = activeChat.kind === 'dm'
-      ? supabase.from('direct_messages').insert({ sender_id: user.id, receiver_id: activeChat.id, ...payload }).select('id,sender_id,content,created_at,read_at,attachment_url,attachment_type,attachment_name').single()
-      : supabase.from('group_messages').insert({ group_id: activeChat.id, sender_id: user.id, ...payload }).select('id,sender_id,content,created_at,attachment_url,attachment_type,attachment_name').single();
+    try {
+      let payload: Record<string, any> = {};
 
-    const { data, error } = await request;
-    if (error) {
-      setChatMessages(prev => prev.map(m => m.id === tempId ? { ...m, pending: false, failed: true } : m));
-      toast({ title: 'Send failed', description: error.message, variant: 'destructive' });
-    } else {
+      // Upload file (encrypted if E2EE is available)
+      if (opts?.attachmentFile) {
+        const file = opts.attachmentFile;
+        if (file.size > 20 * 1024 * 1024) throw new Error('Max 20MB per file');
+        const ext = file.name.split('.').pop() || 'bin';
+        const rand = Math.random().toString(36).slice(2, 8);
+        const bytes = new Uint8Array(await file.arrayBuffer());
+
+        if (useE2EE && shared) {
+          const enc = await encryptFile(bytes);
+          const path = `chat/${user.id}/${Date.now()}-${rand}.${ext}.enc`;
+          const blob = new Blob([enc.ciphertext], { type: 'application/octet-stream' });
+          const { error: upErr } = await supabase.storage.from('chat-uploads').upload(path, blob, { contentType: 'application/octet-stream', upsert: false });
+          if (upErr) throw upErr;
+          // Wrap the file key with the DM shared key.
+          const wrapped = await encryptText(JSON.stringify({ k: enc.fileKey, n: enc.fileNonce, name: file.name, mime: file.type || 'application/octet-stream' }), shared);
+          payload.attachment_meta = { v: 2, path, size: file.size, keyCipher: wrapped.ciphertext, keyNonce: wrapped.nonce };
+          // Keep display-only hints in plaintext for the list preview (icon/name).
+          payload.attachment_name = file.name;
+          payload.attachment_type = file.type || 'application/octet-stream';
+        } else {
+          const path = `chat/${user.id}/${Date.now()}-${rand}.${ext}`;
+          const { error: upErr } = await supabase.storage.from('chat-uploads').upload(path, file, { contentType: file.type, upsert: false });
+          if (upErr) throw upErr;
+          // For non-E2EE (groups + DMs where peer key missing) store path in attachment_meta so
+          // signed URLs are always short-lived via chat-file-url.
+          payload.attachment_meta = { v: 1, path, name: file.name, mime: file.type || 'application/octet-stream', size: file.size };
+          payload.attachment_name = file.name;
+          payload.attachment_type = file.type || 'application/octet-stream';
+        }
+      }
+
+      // Encrypt / store text
+      if (useE2EE && shared) {
+        if (content) {
+          const { ciphertext, nonce } = await encryptText(content, shared);
+          payload.content = ciphertext;
+          payload.nonce = nonce;
+          payload.encrypted = true;
+        } else {
+          payload.content = '';
+          payload.encrypted = true;
+        }
+      } else {
+        payload.content = content;
+      }
+
+      const request = isDM
+        ? supabase.from('direct_messages').insert({ sender_id: user.id, receiver_id: activeChat.id, ...payload }).select('id,sender_id,content,created_at,read_at,attachment_url,attachment_type,attachment_name,encrypted,nonce,attachment_meta').single()
+        : supabase.from('group_messages').insert({ group_id: activeChat.id, sender_id: user.id, ...payload }).select('id,sender_id,content,created_at,attachment_url,attachment_type,attachment_name').single();
+
+      const { data, error } = await request;
+      if (error) throw error;
       setChatMessages(prev => prev.map(m => m.id === tempId ? { ...(data as UIMessage), pending: false } : m));
+      if (useE2EE && content && data?.id) setDecryptedText(prev => ({ ...prev, [data.id]: content }));
       void loadChats();
+    } catch (err: any) {
+      setChatMessages(prev => prev.map(m => m.id === tempId ? { ...m, pending: false, failed: true } : m));
+      toast({ title: 'Send failed', description: err?.message || 'Try again', variant: 'destructive' });
+    } finally {
+      setSendingMsg(false);
     }
-    setSendingMsg(false);
   };
 
-  const handleAttach = async (file: File) => {
-    if (!user) return;
+  /** Open the attachment composer preview when a file is chosen. */
+  const handleAttach = (file: File) => {
     if (file.size > 20 * 1024 * 1024) {
       toast({ title: 'File too large', description: 'Max 20MB.', variant: 'destructive' });
       return;
     }
-    setUploadingAttach(true);
+    const previewUrl = URL.createObjectURL(file);
+    const kind = classify(file.type || '', file.name);
+    setComposerPreview({ file, previewUrl, kind });
+    setComposerCaption(messageInput);
+  };
+
+  const confirmComposerSend = async () => {
+    if (!composerPreview) return;
+    setComposerSending(true);
     try {
-      const ext = file.name.split('.').pop() || 'bin';
-      const path = `chat/${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-      const { error: upErr } = await supabase.storage.from('chat-uploads').upload(path, file, { contentType: file.type, upsert: false });
-      if (upErr) throw upErr;
-      const { data: signed, error: signErr } = await supabase.storage.from('chat-uploads').createSignedUrl(path, 60 * 60 * 24 * 365);
-      if (signErr || !signed) throw signErr || new Error('Failed to sign URL');
-      setPendingAttachment({ url: signed.signedUrl, type: file.type || 'application/octet-stream', name: file.name });
-    } catch (err: any) {
-      toast({ title: 'Upload failed', description: err?.message || 'Try again.', variant: 'destructive' });
+      await sendMessage({ attachmentFile: composerPreview.file, captionOverride: composerCaption });
     } finally {
-      setUploadingAttach(false);
+      URL.revokeObjectURL(composerPreview.previewUrl);
+      setComposerPreview(null);
+      setComposerCaption('');
+      setComposerSending(false);
     }
+  };
+
+  const cancelComposer = () => {
+    if (composerPreview) URL.revokeObjectURL(composerPreview.previewUrl);
+    setComposerPreview(null);
+    setComposerCaption('');
+  };
+
+  /** Open a chat attachment full-screen. Decrypts if needed; requests short-lived URL. */
+  const openAttachment = async (msg: UIMessage) => {
+    if (!user || !activeChat) return;
+    const meta = msg.attachment_meta;
+    const name = msg.attachment_name || meta?.name || 'File';
+    const mime = msg.attachment_type || meta?.mime || '';
+    const kind: PreviewFile['kind'] = classify(mime, name);
+    setViewer({ url: null, name, kind, loading: true });
+
+    try {
+      const path: string | null = meta?.path || null;
+      let signedUrl: string | null = null;
+      if (path) {
+        const chatKind = activeChat.kind === 'dm' ? 'dm' : 'group';
+        const { data, error } = await supabase.functions.invoke('chat-file-url', {
+          body: { path, kind: chatKind, chatId: activeChat.id },
+        });
+        if (error || !data?.url) throw error || new Error('Could not fetch file URL');
+        signedUrl = data.url;
+      } else if (msg.attachment_url) {
+        // Legacy row — use the long-lived URL directly.
+        signedUrl = msg.attachment_url;
+      } else {
+        throw new Error('No attachment');
+      }
+
+      // Encrypted attachment — fetch, decrypt, wrap in blob URL.
+      if (meta?.v === 2 && meta.keyCipher && meta.keyNonce && sharedKeyRef.current && signedUrl) {
+        const res = await fetch(signedUrl);
+        if (!res.ok) throw new Error('Download failed');
+        const encBytes = new Uint8Array(await res.arrayBuffer());
+        const wrap = await decryptText(meta.keyCipher, meta.keyNonce, sharedKeyRef.current);
+        const { k, n, mime: m2, name: n2 } = JSON.parse(wrap);
+        const plain = await decryptFile(encBytes, k, n);
+        const blob = new Blob([plain], { type: m2 || mime || 'application/octet-stream' });
+        const objUrl = URL.createObjectURL(blob);
+        setViewer({ url: objUrl, name: n2 || name, kind: classify(m2 || mime, n2 || name), loading: false });
+        return;
+      }
+
+      setViewer({ url: signedUrl, name, kind, loading: false });
+    } catch (err: any) {
+      toast({ title: 'Could not open attachment', description: err?.message || 'Try again', variant: 'destructive' });
+      setViewer(null);
+    }
+  };
+
+  const closeViewer = () => {
+    if (viewer?.url && viewer.url.startsWith('blob:')) URL.revokeObjectURL(viewer.url);
+    setViewer(null);
   };
 
   const createGroup = async () => {
