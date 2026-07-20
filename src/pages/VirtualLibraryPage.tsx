@@ -139,11 +139,13 @@ const VirtualLibraryPage = () => {
     if (error) { toast({ title: 'Join failed', description: error.message, variant: 'destructive' }); return; }
     setActiveRoom(room);
     setMeetingId(room.code);
+    setIsGuestRoom(false);
     await loadMessages(room.id);
   }, [user, loadMessages]);
 
   useEffect(() => {
     if (!activeRoom || !user) return;
+    if (isGuestRoom) return;
     const channel = supabase.channel(`study-room-${activeRoom.id}`, { config: { presence: { key: user.id } } });
     channel
       .on('presence', { event: 'sync' }, () => {
@@ -159,13 +161,54 @@ const VirtualLibraryPage = () => {
         const { data: prof } = await supabase.from('profiles').select('name').eq('user_id', payload.new.sender_id).maybeSingle();
         setMessages(prev => prev.some(m => m.id === payload.new.id) ? prev : [...prev, { ...payload.new, sender_name: prof?.name || 'Student' }]);
       })
+      .on('broadcast', { event: 'meeting-ended' }, () => {
+        toast({ title: 'Meeting ended', description: 'The host ended this study room.' });
+        void leaveRoom();
+      })
       .subscribe(async (status: string) => {
         if (status === 'SUBSCRIBED') {
           await channel.track({ name: profile.name || 'Student', avatar: profile.avatar || '👤', joinedAt: Date.now() });
         }
       });
     return () => { channel.untrack(); supabase.removeChannel(channel); };
-  }, [activeRoom, user, profile.name, profile.avatar]);
+  }, [activeRoom, user, profile.name, profile.avatar, isGuestRoom]);
+
+  // Load my recent rooms for search list
+  useEffect(() => {
+    if (!user) return;
+    (async () => {
+      const { data: mem } = await supabase.from('study_room_members').select('room_id').eq('user_id', user.id).limit(50);
+      const ids = Array.from(new Set((mem || []).map((m: any) => m.room_id)));
+      if (!ids.length) { setMyRooms([]); return; }
+      const { data } = await supabase.from('study_rooms').select('id,code,title,owner_id,is_active,created_at').in('id', ids).order('created_at', { ascending: false });
+      setMyRooms((data || []) as StudyRoom[]);
+    })();
+  }, [user, activeRoom]);
+
+  // Guest-mode meeting-ended listener
+  useEffect(() => {
+    if (!activeRoom || !isGuestRoom) return;
+    const channel = supabase.channel(`study-room-guest-${activeRoom.code}`);
+    channel.on('broadcast', { event: 'meeting-ended' }, () => {
+      toast({ title: 'Meeting ended', description: 'The host ended this study room.' });
+      void leaveRoom();
+    }).subscribe();
+    return () => { supabase.removeChannel(channel); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeRoom, isGuestRoom]);
+
+  // Auto-join via ?join=CODE (Zoom-style deep link)
+  useEffect(() => {
+    if (autoJoinTried) return;
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('join');
+    if (!code) return;
+    setAutoJoinTried(true);
+    const clean = code.trim().toUpperCase();
+    setMeetingId(clean);
+    setTimeout(() => { void joinRoomWithCode(clean); }, 300);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, isGuest, autoJoinTried]);
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
