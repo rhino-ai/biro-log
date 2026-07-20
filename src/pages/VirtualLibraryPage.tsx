@@ -175,14 +175,16 @@ const VirtualLibraryPage = () => {
         void leaveRoom();
       })
       .on('broadcast', { event: 'force-mute' }, ({ payload }: any) => {
-        if (payload?.target !== user.id) return;
+        if (payload?.target !== user.id && payload?.target !== '*') return;
+        if (user.id === activeRoom.owner_id) return; // host exempt
         streamRef.current?.getAudioTracks().forEach((t) => (t.enabled = false));
         callStream?.getAudioTracks().forEach((t) => (t.enabled = false));
         setMicOn(false);
         toast({ title: 'Muted by host', variant: 'destructive' });
       })
       .on('broadcast', { event: 'force-cam-off' }, ({ payload }: any) => {
-        if (payload?.target !== user.id) return;
+        if (payload?.target !== user.id && payload?.target !== '*') return;
+        if (user.id === activeRoom.owner_id) return; // host exempt
         streamRef.current?.getVideoTracks().forEach((t) => (t.enabled = false));
         callStream?.getVideoTracks().forEach((t) => (t.enabled = false));
         setCameraOn(false);
