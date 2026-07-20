@@ -42,6 +42,167 @@ const ConnBadge = ({ state, compact }: { state?: RTCPeerConnectionState; compact
   );
 };
 
+// ============================================================
+// Device Permissions Card — lets users grant / release camera
+// and microphone access directly, and see live permission
+// status. Useful when another app is holding the device.
+// ============================================================
+const DevicePermissionsCard = () => {
+  const [camState, setCamState] = useState<'unknown' | 'granted' | 'denied' | 'prompt'>('unknown');
+  const [micState, setMicState] = useState<'unknown' | 'granted' | 'denied' | 'prompt'>('unknown');
+  const [devices, setDevices] = useState<{ cams: MediaDeviceInfo[]; mics: MediaDeviceInfo[] }>({ cams: [], mics: [] });
+  const [busy, setBusy] = useState<null | 'cam' | 'mic' | 'both' | 'release' | 'test'>(null);
+  const heldStreamRef = useRef<MediaStream | null>(null);
+
+  const refreshStatus = useCallback(async () => {
+    try {
+      const anyPerms = (navigator as any).permissions;
+      if (anyPerms?.query) {
+        try { const c = await anyPerms.query({ name: 'camera' as PermissionName }); setCamState(c.state as any); c.onchange = () => setCamState((c.state as any)); } catch { setCamState('unknown'); }
+        try { const m = await anyPerms.query({ name: 'microphone' as PermissionName }); setMicState(m.state as any); m.onchange = () => setMicState((m.state as any)); } catch { setMicState('unknown'); }
+      }
+      if (navigator.mediaDevices?.enumerateDevices) {
+        const list = await navigator.mediaDevices.enumerateDevices();
+        setDevices({
+          cams: list.filter((d) => d.kind === 'videoinput'),
+          mics: list.filter((d) => d.kind === 'audioinput'),
+        });
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => { refreshStatus(); }, [refreshStatus]);
+
+  const stopHeld = () => {
+    heldStreamRef.current?.getTracks().forEach((t) => t.stop());
+    heldStreamRef.current = null;
+  };
+
+  const request = async (kind: 'cam' | 'mic' | 'both') => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      toast({ title: 'Not supported', description: 'This browser does not expose camera/mic APIs. Try Chrome, Edge, or Safari.', variant: 'destructive' });
+      return;
+    }
+    setBusy(kind);
+    try {
+      const constraints: MediaStreamConstraints = { video: kind !== 'mic', audio: kind !== 'cam' };
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      // Immediately release — we only wanted the permission grant.
+      stream.getTracks().forEach((t) => t.stop());
+      toast({ title: 'Permission granted ✅', description: kind === 'both' ? 'Camera and microphone are ready.' : kind === 'cam' ? 'Camera is ready.' : 'Microphone is ready.' });
+      await refreshStatus();
+    } catch (err: any) {
+      const name = err?.name || 'Error';
+      const msg =
+        name === 'NotAllowedError' ? 'You blocked access. Tap the 🔒 lock icon in your address bar → set Camera/Microphone to Allow, then retry.' :
+        name === 'NotReadableError' ? 'Another app (Zoom, Meet, WhatsApp, Instagram, Camera) is using the device. Close it, then tap Release & Retry.' :
+        name === 'NotFoundError' ? 'No camera/mic detected. Plug one in or check device drivers.' :
+        name === 'OverconstrainedError' ? 'Your device does not support the requested settings. Try a different camera.' :
+        (err?.message || 'Could not access device.');
+      toast({ title: `${name}`, description: msg, variant: 'destructive' });
+      await refreshStatus();
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const releaseAndRetry = async () => {
+    setBusy('release');
+    try {
+      // Some browsers keep tracks alive briefly; force-stop any we hold.
+      stopHeld();
+      // Small delay to let the OS release the device before re-requesting.
+      await new Promise((r) => setTimeout(r, 400));
+      await request('both');
+    } finally { setBusy(null); }
+  };
+
+  const quickTest = async () => {
+    setBusy('test');
+    try {
+      const s = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      heldStreamRef.current = s;
+      // Hold for 2s so user can see indicator light, then release.
+      setTimeout(() => { stopHeld(); toast({ title: 'Test complete', description: 'Camera and mic worked. Device released.' }); }, 2000);
+      toast({ title: 'Testing devices…', description: 'Your camera light should turn on for 2s.' });
+      await refreshStatus();
+    } catch (err: any) {
+      toast({ title: 'Test failed', description: err?.message || 'Could not access device.', variant: 'destructive' });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const openBrowserSettings = () => {
+    toast({
+      title: 'Change permission',
+      description: 'Tap the 🔒 lock icon in the address bar (or app site info on mobile) → Permissions → set Camera & Microphone to Allow. Then tap Retry.',
+    });
+  };
+
+  const StatusPill = ({ label, state }: { label: string; state: string }) => {
+    const cls = state === 'granted' ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/40'
+      : state === 'denied' ? 'bg-destructive/20 text-destructive border-destructive/40'
+      : state === 'prompt' ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
+      : 'bg-muted/40 text-muted-foreground border-border';
+    return (
+      <span className={cn('inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px]', cls)}>
+        <span className="font-medium">{label}</span>
+        <span className="uppercase tracking-wide">{state}</span>
+      </span>
+    );
+  };
+
+  return (
+    <Card className="glass-panel border-primary/20">
+      <CardHeader>
+        <CardTitle className="text-sm font-game flex items-center gap-2">
+          <Settings className="w-4 h-4 text-primary" /> Camera & Mic Permissions
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="flex flex-wrap gap-2">
+          <StatusPill label="Camera" state={camState} />
+          <StatusPill label="Mic" state={micState} />
+          <span className="text-[10px] text-muted-foreground ml-auto self-center">
+            {devices.cams.length} cam · {devices.mics.length} mic detected
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2">
+          <Button size="sm" variant="outline" className="gap-1" disabled={busy === 'cam' || busy === 'both'} onClick={() => request('cam')}>
+            {busy === 'cam' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Video className="w-3.5 h-3.5" />}
+            Allow Camera
+          </Button>
+          <Button size="sm" variant="outline" className="gap-1" disabled={busy === 'mic' || busy === 'both'} onClick={() => request('mic')}>
+            {busy === 'mic' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Mic className="w-3.5 h-3.5" />}
+            Allow Microphone
+          </Button>
+          <Button size="sm" className="gap-1 col-span-2 bg-primary" disabled={busy === 'both'} onClick={() => request('both')}>
+            {busy === 'both' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+            Allow Both (Camera + Mic)
+          </Button>
+          <Button size="sm" variant="secondary" className="gap-1" disabled={busy === 'release'} onClick={releaseAndRetry}>
+            {busy === 'release' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+            Release & Retry
+          </Button>
+          <Button size="sm" variant="secondary" className="gap-1" disabled={busy === 'test'} onClick={quickTest}>
+            {busy === 'test' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Stethoscope className="w-3.5 h-3.5" />}
+            Quick Test (2s)
+          </Button>
+          <Button size="sm" variant="ghost" className="gap-1 col-span-2" onClick={openBrowserSettings}>
+            <LifeBuoy className="w-3.5 h-3.5" /> How to change (blocked?)
+          </Button>
+        </div>
+
+        <p className="text-[10px] text-muted-foreground leading-relaxed">
+          If another app (Zoom, Meet, WhatsApp, Instagram, Camera) is using your camera or mic, close it first — then tap <b>Release &amp; Retry</b>. On Android, also check <i>Settings → Apps → Chrome/Biro-log → Permissions</i>.
+        </p>
+      </CardContent>
+    </Card>
+  );
+};
+
 const RemoteVideoTile = ({ peer, large, onPin, pinned }: { peer: RemotePeer; large?: boolean; onPin?: () => void; pinned?: boolean }) => {
   const ref = useRef<HTMLVideoElement>(null);
   useEffect(() => {
@@ -1679,6 +1840,8 @@ const VirtualLibraryPage = () => {
             </CardContent>
           </Card>
         )}
+
+        <DevicePermissionsCard />
 
         <div className="glass-panel rounded-xl p-4 border border-border space-y-2">
           <h3 className="font-game text-xs text-muted-foreground">Live Tools</h3>
