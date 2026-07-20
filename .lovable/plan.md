@@ -1,57 +1,64 @@
-## Status vs. previous plan
+# Plan: True E2EE + Attachment Preview Panel + Locked Signed URLs
 
-**Done**
-- Phase 1 chat backend: group invite-code trigger, creator auto-membership, secure `social-search` / `create-chat-group` / `invite-group-member` edge functions, rate-limited invite RPC.
-- Phase 2 Friends UX: search by name/Biro-ID/invite/email, optimistic DM + group send, read receipts, realtime.
-- Phase 3 Virtual Library: persistent rooms, room chat, timer, camera/mic/screen controls, **real peer-to-peer WebRTC calls** (mesh via Supabase realtime signaling, STUN).
-- Push notifications (web + PWA) + 7 AM / 1 PM / 10 PM cron scheduler.
-- Mentor / Biro-Yaar: memory, time-awareness, PDF + audio (ElevenLabs Scribe) + video keyframe understanding, thinking blocks, reply quoting.
-- Chess: FEN undo history + force-AI move.
-- Security: private avatars bucket, admin-code edge function, redacted email/phone columns, activity-log lockdown, revoked anon listing on chat-uploads.
+Four related pieces. Ship in this order so each step is verifiable.
 
-**Remaining** (from the previous plan and follow-ups)
-1. Media sharing in social chat (Friends DMs + groups can't upload images/files yet).
-2. Invite links open a direct join flow (deep-link route `/join/:code`).
-3. BYO AI keys (per-user Gemini/OpenAI key stored server-side, used by mentor when set).
-4. OCR for screenshots into mentor memory.
-5. Strict screen-time read-mode enforcement (block navigation past limit).
-6. Full end-to-end QA sweep + bug fixes.
+## 1. True End-to-End Encryption (libsodium)
 
-Skipping unless you ask: full Google-Sheets parity beyond current formulas/zoom/dup, human-level video scene analysis, true client-side E2EE.
+**Keys**
+- On first sign-in per device, generate a libsodium `box` keypair (X25519). Private key stays in IndexedDB (never leaves device). Public key uploaded to a new `user_public_keys` table.
+- Each 1:1 DM derives a shared symmetric key via `crypto_box_beforenm(peerPub, myPriv)`.
+- Each group has a symmetric `group_key` (XChaCha20-Poly1305). When a member is added, an existing member wraps the group key with the new member's public key and writes it to `group_key_shares(group_id, user_id, wrapped_key, nonce)`. New joiners pull their wrapped copy and unwrap locally.
 
-## Execution order
+**Messages**
+- Client encrypts message text with the shared/group key → stores `ciphertext` + `nonce` in `direct_messages.content` / `group_messages.content` (base64). Server never sees plaintext.
+- Legacy plaintext rows stay readable; new rows are tagged `encryption_version=2`.
 
-### Step 1 — Chat media sharing
-- Reuse `chat-uploads` bucket. Add `attachment_url` + `attachment_type` columns (or JSON `metadata`) on `direct_messages` and `group_messages`.
-- Add image/file button in Friends chat composer using existing `ChatFileUpload` pattern.
-- Render inline thumbnails / file cards in message list.
+**Attachments (files encrypted before upload)**
+- Client generates a random 32-byte file key + nonce, encrypts the file bytes with XChaCha20-Poly1305, uploads the ciphertext blob to `chat-uploads`.
+- The file key + nonce + original filename/mime are encrypted with the chat's shared/group key and stored in the message row as `attachment_meta` (JSON, ciphertext).
+- On receive, client fetches the ciphertext blob, decrypts in-memory, creates a `blob:` URL for `<img>/<video>/<audio>/<embed>`.
 
-### Step 2 — Deep-link invite join
-- Add route `/join/:code`.
-- On mount: if signed in, call `join_group_by_invite` and redirect into the group; if guest, bounce through `/auth?next=/join/:code`.
-- "Copy invite link" in group settings now yields `https://…/join/GRPXXXX`.
+**What server sees**: only opaque ciphertext for messages and files. No admin, no DB dump, no leaked signed URL can decrypt without the recipient's device private key.
 
-### Step 3 — BYO AI keys
-- Table `user_api_keys(user_id, provider, key_ciphertext)` with RLS locked to owner + service_role.
-- Edge function `save-user-api-key` (encrypt with `ADMIN_STEP_TWO`-style project secret via WebCrypto) and `get-user-api-key` used server-side only.
-- `ai-mentor-chat` / `biro-yaar-chat`: if user has a Gemini key, call Gemini direct; else fall back to Lovable AI gateway.
-- Profile page: "My AI Keys" section with add/rotate/remove.
+**Trade-offs (called out honestly)**
+- Losing the device = losing message history unless the user exported/backed up their private key. Add a "Export encryption key" button in Profile.
+- Push notification bodies stay generic ("New message") — content stays on device.
+- OCR / mentor analysis of chat attachments won't work on E2EE chats (would need to decrypt server-side, defeating E2EE). Mentor uploads (separate flow) keep working as today.
 
-### Step 4 — OCR into mentor memory
-- Add optional Tesseract.js OCR in `ChatFileUpload` for image attachments; attach extracted text alongside the image so the mentor prompt sees it, and store it in `mentor_conversations.attachments`.
+## 2. Locked signed URLs
 
-### Step 5 — Strict read-mode enforcement
-- Add a `ReadModeGuard` provider that watches daily screen-time; when limit is breached and villain/read mode is on, redirect all non-essential routes to `/villain` and disable social/AI pages.
+- Drop 365-day signed URLs. Add edge function `chat-file-url` that:
+  - Verifies caller's JWT.
+  - Checks caller is sender/recipient (DM) or member (group) of the message that references this path.
+  - Returns a 60-second signed URL.
+- Client requests a fresh URL right before render/download. Even a leaked URL dies in a minute.
+- Combined with E2EE, the blob is also unreadable ciphertext even if downloaded.
 
-### Step 6 — QA sweep
-- Two-account manual walk of: signup → task → mentor plan → group create → invite by link → DM with image → library video call → push receipt → chess undo → villain mode.
-- Fix any regressions found; run `bunx tsgo --noEmit` and edge-function logs check.
+## 3. Attachment preview side panel (WhatsApp/TG-style)
 
-I'll implement Step 1 first, ship it, then move to Step 2, etc. Each step is a small verifiable slice so you can test as we go.
+- New `AttachmentPreviewPanel` component: right-side drawer on desktop, bottom sheet on mobile.
+- Opens automatically right after the user picks a file (before send), showing:
+  - Image → full preview + caption field
+  - Video → player + duration + caption
+  - PDF → first-page thumbnail + filename + caption
+  - Audio → waveform-ish bar + duration + caption
+- Buttons: `Send`, `Cancel`, optional `Add another`. Enter-to-send.
+- Also opens on tap of an existing attachment in the transcript for full-screen view + download.
+- Wired into `FriendsPage.tsx` (both DMs and groups). Composer's paperclip triggers the panel instead of sending immediately.
+
+## 4. Migration + rollout
+
+- New tables: `user_public_keys`, `group_key_shares`. GRANTs + RLS.
+- Non-breaking: old plaintext messages render as before. New sends are E2EE by default once both sides have public keys published.
+- If a peer has no public key yet (never logged in on new client), fall back to plaintext with an in-UI warning "This chat is not end-to-end encrypted until <name> opens the app once."
 
 ## Technical notes
 
-- All new tables get GRANTs + RLS + service_role access per project conventions.
-- Storage: reuse existing `chat-uploads` bucket; signed URLs for private items.
-- BYO keys: keys never returned to client; only used inside edge functions with `service_role`; decrypt in-function.
-- WebRTC already uses public STUN; for cross-NAT reliability we can add a TURN provider later — flagged, not blocking.
+- Library: `libsodium-wrappers-sumo` (~200KB gz, loads lazily on first chat open).
+- Storage: private key in IndexedDB under `biro-e2ee/priv-<userId>`.
+- Attachments still go to existing `chat-uploads` bucket, just as ciphertext blobs (`.enc` suffix).
+- `attachment_meta` schema: `{ v: 2, path, mime, name, size, keyCipher, keyNonce, fileNonce }`.
+- All crypto happens in a small `src/lib/e2ee.ts` module with unit-tested `encryptText/decryptText/encryptFile/decryptFile` helpers.
+- Backward compat: if `encryption_version` missing/1, render as plaintext (current behavior).
+
+This is ~1 focused build. I'll implement in the order above, verifying each slice before moving on. Approve and I'll start with the crypto module + key publishing, then wire it into DMs, then groups, then the preview panel and locked URLs.
