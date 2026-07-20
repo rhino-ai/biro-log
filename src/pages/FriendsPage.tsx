@@ -219,16 +219,27 @@ const FriendsPage = () => {
 
   const sendMessage = async () => {
     const content = messageInput.trim();
-    if (!content || !user || !activeChat || sendingMsg) return;
+    if ((!content && !pendingAttachment) || !user || !activeChat || sendingMsg) return;
     setSendingMsg(true);
     setMessageInput('');
+    const attachment = pendingAttachment;
+    setPendingAttachment(null);
     const tempId = `tmp-${Date.now()}`;
-    const optimistic: UIMessage = { id: tempId, sender_id: user.id, content, created_at: new Date().toISOString(), pending: true };
+    const optimistic: UIMessage = {
+      id: tempId, sender_id: user.id, content, created_at: new Date().toISOString(), pending: true,
+      attachment_url: attachment?.url ?? null, attachment_type: attachment?.type ?? null, attachment_name: attachment?.name ?? null,
+    };
     appendMessage(optimistic);
 
+    const payload: Record<string, any> = { content };
+    if (attachment) {
+      payload.attachment_url = attachment.url;
+      payload.attachment_type = attachment.type;
+      payload.attachment_name = attachment.name;
+    }
     const request = activeChat.kind === 'dm'
-      ? supabase.from('direct_messages').insert({ sender_id: user.id, receiver_id: activeChat.id, content }).select('id,sender_id,content,created_at,read_at').single()
-      : supabase.from('group_messages').insert({ group_id: activeChat.id, sender_id: user.id, content }).select('id,sender_id,content,created_at').single();
+      ? supabase.from('direct_messages').insert({ sender_id: user.id, receiver_id: activeChat.id, ...payload }).select('id,sender_id,content,created_at,read_at,attachment_url,attachment_type,attachment_name').single()
+      : supabase.from('group_messages').insert({ group_id: activeChat.id, sender_id: user.id, ...payload }).select('id,sender_id,content,created_at,attachment_url,attachment_type,attachment_name').single();
 
     const { data, error } = await request;
     if (error) {
@@ -239,6 +250,27 @@ const FriendsPage = () => {
       void loadChats();
     }
     setSendingMsg(false);
+  };
+
+  const handleAttach = async (file: File) => {
+    if (!user) return;
+    if (file.size > 20 * 1024 * 1024) {
+      toast({ title: 'File too large', description: 'Max 20MB.', variant: 'destructive' });
+      return;
+    }
+    setUploadingAttach(true);
+    try {
+      const ext = file.name.split('.').pop() || 'bin';
+      const path = `chat/${user.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const { error: upErr } = await supabase.storage.from('chat-uploads').upload(path, file, { contentType: file.type, upsert: false });
+      if (upErr) throw upErr;
+      const { data: pub } = supabase.storage.from('chat-uploads').getPublicUrl(path);
+      setPendingAttachment({ url: pub.publicUrl, type: file.type || 'application/octet-stream', name: file.name });
+    } catch (err: any) {
+      toast({ title: 'Upload failed', description: err?.message || 'Try again.', variant: 'destructive' });
+    } finally {
+      setUploadingAttach(false);
+    }
   };
 
   const createGroup = async () => {
