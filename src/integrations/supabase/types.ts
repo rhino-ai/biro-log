@@ -689,6 +689,47 @@ export type Database = {
         }
         Relationships: []
       }
+      study_room_bans: {
+        Row: {
+          created_at: string
+          expires_at: string | null
+          host_id: string
+          id: string
+          reason: string | null
+          room_id: string | null
+          scope: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string | null
+          host_id: string
+          id?: string
+          reason?: string | null
+          room_id?: string | null
+          scope?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string | null
+          host_id?: string
+          id?: string
+          reason?: string | null
+          room_id?: string | null
+          scope?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "study_room_bans_room_id_fkey"
+            columns: ["room_id"]
+            isOneToOne: false
+            referencedRelation: "study_rooms"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       study_room_members: {
         Row: {
           id: string
@@ -1054,6 +1095,10 @@ export type Database = {
       }
       is_group_member: {
         Args: { _group_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_study_room_banned: {
+        Args: { _room_id: string; _user_id: string }
         Returns: boolean
       }
       is_study_room_member: {
