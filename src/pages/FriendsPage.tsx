@@ -264,7 +264,7 @@ const FriendsPage = () => {
     if (!user) return;
     if (chat.kind === 'dm') {
       const { data, error } = await supabase.from('direct_messages')
-        .select('id,sender_id,content,created_at,read_at,attachment_url,attachment_type,attachment_name')
+        .select('id,sender_id,content,created_at,read_at,attachment_url,attachment_type,attachment_name,encrypted,nonce,attachment_meta')
         .or(`and(sender_id.eq.${user.id},receiver_id.eq.${chat.id}),and(sender_id.eq.${chat.id},receiver_id.eq.${user.id})`)
         .order('created_at', { ascending: true }).limit(250);
       if (error) toast({ title: 'Messages load failed', description: error.message, variant: 'destructive' });
