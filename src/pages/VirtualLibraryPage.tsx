@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Video, Users, Monitor, Copy, ExternalLink, Mic, MicOff, VideoOff, Send, DoorOpen, Loader2, PhoneCall, PhoneOff, Search, Share2, XCircle, Link as LinkIcon, Ban, UserX, ShieldOff, MoreVertical, Pin, PinOff, MessageSquare, Wifi, WifiOff, ScrollText } from 'lucide-react';
+import { Video, Users, Monitor, Copy, ExternalLink, Mic, MicOff, VideoOff, Send, DoorOpen, Loader2, PhoneCall, PhoneOff, Search, Share2, XCircle, Link as LinkIcon, Ban, UserX, ShieldOff, MoreVertical, Pin, PinOff, MessageSquare, Wifi, WifiOff, ScrollText, Download, Gauge } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { useGame } from '@/hooks/useGame';
 import { useAuth } from '@/hooks/useAuth';
@@ -152,6 +152,12 @@ const VirtualLibraryPage = () => {
   const [confirmEndOpen, setConfirmEndOpen] = useState(false);
   const [auditOpen, setAuditOpen] = useState(false);
   const [auditRows, setAuditRows] = useState<Array<{ id: string; action: string; target_name: string | null; created_at: string; metadata: any }>>([]);
+  const [auditFilter, setAuditFilter] = useState<string>('all');
+  const [auditSearch, setAuditSearch] = useState('');
+  const [bandwidthMode, setBandwidthMode] = useState<'auto' | 'low' | 'normal' | 'high'>(() => {
+    try { return (localStorage.getItem('biro-bw-mode') as any) || 'auto'; } catch { return 'auto'; }
+  });
+  useEffect(() => { try { localStorage.setItem('biro-bw-mode', bandwidthMode); } catch {} }, [bandwidthMode]);
   const [unreadChat, setUnreadChat] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -170,6 +176,7 @@ const VirtualLibraryPage = () => {
     selfName,
     localStream: callStream,
     enabled: callActive && !!activeRoom,
+    bandwidthMode,
   });
 
   // Overall self connection health = worst peer state (or 'connected' if no peers yet)
