@@ -424,23 +424,7 @@ const VirtualLibraryPage = () => {
     if (error) toast({ title: 'Message failed', description: error.message, variant: 'destructive' });
   };
 
-  if (isGuest) {
-    return (
-      <div className="min-h-screen bg-background pb-20">
-        <Header />
-        <main className="px-4 py-6 max-w-lg mx-auto space-y-6">
-          <BackButton to="/" />
-          <div className="glass-panel rounded-xl p-5 border border-primary/30 text-center space-y-3">
-            <Video className="w-12 h-12 mx-auto text-primary" />
-            <h1 className="font-game text-lg">Library rooms need sign-in</h1>
-            <p className="text-sm text-muted-foreground">Guest mode can explore, but live rooms, camera, chat, and study history need an account.</p>
-            <Button className="w-full" onClick={() => window.location.assign('/auth')}>Sign in</Button>
-          </div>
-        </main>
-        <BottomNav />
-      </div>
-    );
-  }
+  // Guests can join rooms via invite link — no gate here.
 
   if (activeRoom) {
     return (
@@ -449,11 +433,15 @@ const VirtualLibraryPage = () => {
           <div className="flex items-center gap-3 min-w-0">
             <Button variant="ghost" size="sm" onClick={leaveRoom} className="gap-1"><DoorOpen className="w-4 h-4" /> Leave</Button>
             <div className="min-w-0">
-              <div className="flex items-center gap-2"><Video className="w-4 h-4 text-accent" /><span className="font-game text-sm truncate">{activeRoom.title}</span></div>
+              <div className="flex items-center gap-2"><Video className="w-4 h-4 text-accent" /><span className="font-game text-sm truncate">{activeRoom.title}</span>{isGuestRoom && <span className="text-[9px] bg-accent/30 px-1.5 py-0.5 rounded">GUEST</span>}</div>
               <p className="text-[10px] text-muted-foreground">{activeRoom.code}</p>
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={copyId} className="gap-1"><Copy className="w-3 h-3" /> ID</Button>
+          <div className="flex items-center gap-1">
+            <Button variant="outline" size="sm" onClick={shareInviteLink} className="gap-1"><Share2 className="w-3 h-3" /> Share</Button>
+            <Button variant="outline" size="sm" onClick={copyId} className="gap-1"><Copy className="w-3 h-3" /> ID</Button>
+            {isOwner && <Button variant="destructive" size="sm" onClick={endMeeting} className="gap-1"><XCircle className="w-3 h-3" /> End</Button>}
+          </div>
         </div>
 
         <div className="flex-1 grid lg:grid-cols-[1fr_340px] min-h-0">
