@@ -832,8 +832,19 @@ const VirtualLibraryPage = () => {
             </div>
           </div>
 
-          <aside className="border-l border-border bg-card/40 min-h-0 flex flex-col">
+          <aside
+            className={cn(
+              'border-l border-border bg-card/95 backdrop-blur-xl min-h-0 flex-col',
+              // Desktop: inline column that shows/hides
+              chatOpen ? 'lg:flex' : 'lg:hidden',
+              // Mobile: full-screen overlay slide-in
+              chatOpen ? 'fixed inset-0 top-[57px] z-40 flex lg:static' : 'hidden',
+            )}
+          >
             <div className="p-3 border-b border-border flex items-center justify-between"><span className="font-game text-sm">Room Chat</span><span className="text-xs text-muted-foreground flex items-center gap-1"><Users className="w-3 h-3" /> {roomUsers.length}</span></div>
+            <div className="lg:hidden px-3 pb-2">
+              <Button variant="ghost" size="sm" onClick={() => setChatOpen(false)} className="w-full gap-2 text-xs"><XCircle className="w-3 h-3" /> Close chat</Button>
+            </div>
             <ScrollArea className="flex-1 p-3">
               <div className="space-y-3">
                 {isGuestRoom && (
@@ -856,6 +867,45 @@ const VirtualLibraryPage = () => {
             </div>
           </aside>
         </div>
+
+        <AlertDialog open={confirmEndOpen} onOpenChange={setConfirmEndOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2"><XCircle className="w-4 h-4 text-destructive" /> End meeting for everyone?</AlertDialogTitle>
+              <AlertDialogDescription>
+                All participants (including guests) will be disconnected immediately. This room will be marked ended.
+                {roomUsers.length > 1 && <> {roomUsers.length - 1} other participant(s) are in the room right now.</>}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Keep going</AlertDialogCancel>
+              <AlertDialogAction onClick={doEndMeeting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">End for everyone</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <Dialog open={auditOpen} onOpenChange={setAuditOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader><DialogTitle className="flex items-center gap-2"><ScrollText className="w-4 h-4" /> Host action log</DialogTitle></DialogHeader>
+            <ScrollArea className="max-h-[60vh] pr-2">
+              <div className="space-y-2">
+                {auditRows.length === 0 && <p className="text-xs text-muted-foreground text-center py-6">No host actions logged yet.</p>}
+                {auditRows.map((row) => (
+                  <div key={row.id} className="rounded border border-border bg-secondary/30 p-2 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold uppercase tracking-wide text-[10px] text-primary">{row.action.replace(/_/g, ' ')}</span>
+                      <span className="text-[10px] text-muted-foreground">{new Date(row.created_at).toLocaleString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' })}</span>
+                    </div>
+                    {row.target_name && <p className="text-[11px] mt-0.5">Target: <span className="font-medium">{row.target_name}</span></p>}
+                    {row.metadata && Object.keys(row.metadata).length > 0 && (
+                      <p className="text-[10px] text-muted-foreground mt-0.5 truncate">{Object.entries(row.metadata).map(([k, v]) => `${k}: ${String(v)}`).join(' • ')}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </DialogContent>
+        </Dialog>
 
         <Dialog open={!!banTarget} onOpenChange={(o) => !o && setBanTarget(null)}>
           <DialogContent className="max-w-sm">
