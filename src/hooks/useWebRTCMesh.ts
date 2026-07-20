@@ -16,6 +16,7 @@ export type RemotePeer = {
   userId: string;
   name: string;
   stream: MediaStream | null;
+  connectionState?: RTCPeerConnectionState;
 };
 
 type Options = {
@@ -99,6 +100,10 @@ export function useWebRTCMesh({ roomKey, selfUserId, selfName, localStream, enab
     };
 
     pc.onconnectionstatechange = () => {
+      setPeers((prev) => {
+        if (!prev[peerId]) return prev;
+        return { ...prev, [peerId]: { ...prev[peerId], connectionState: pc.connectionState } };
+      });
       if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
         cleanupPeer(peerId);
       }
@@ -106,7 +111,7 @@ export function useWebRTCMesh({ roomKey, selfUserId, selfName, localStream, enab
 
     setPeers((prev) => ({
       ...prev,
-      [peerId]: prev[peerId] || { peerId, userId, name, stream: null },
+      [peerId]: prev[peerId] || { peerId, userId, name, stream: null, connectionState: 'new' },
     }));
 
     return pc;

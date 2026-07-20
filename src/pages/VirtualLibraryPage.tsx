@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Video, Users, Monitor, Copy, ExternalLink, Mic, MicOff, VideoOff, Send, DoorOpen, Loader2, PhoneCall, PhoneOff, Search, Share2, XCircle, Link as LinkIcon, Ban, UserX, ShieldOff, MoreVertical, Pin, PinOff } from 'lucide-react';
+import { Video, Users, Monitor, Copy, ExternalLink, Mic, MicOff, VideoOff, Send, DoorOpen, Loader2, PhoneCall, PhoneOff, Search, Share2, XCircle, Link as LinkIcon, Ban, UserX, ShieldOff, MoreVertical, Pin, PinOff, MessageSquare, Wifi, WifiOff, ScrollText } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { useGame } from '@/hooks/useGame';
 import { useAuth } from '@/hooks/useAuth';
@@ -17,6 +17,30 @@ import { useWebRTCMesh, type RemotePeer } from '@/hooks/useWebRTCMesh';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+
+const connBadgeClasses = (s?: RTCPeerConnectionState) => {
+  switch (s) {
+    case 'connected': return { dot: 'bg-emerald-500', label: 'Good', icon: 'wifi' as const };
+    case 'connecting':
+    case 'new': return { dot: 'bg-amber-500 animate-pulse', label: 'Connecting', icon: 'wifi' as const };
+    case 'disconnected': return { dot: 'bg-amber-500', label: 'Weak', icon: 'wifi' as const };
+    case 'failed':
+    case 'closed': return { dot: 'bg-destructive', label: 'Lost', icon: 'wifi-off' as const };
+    default: return { dot: 'bg-muted-foreground', label: '—', icon: 'wifi' as const };
+  }
+};
+
+const ConnBadge = ({ state, compact }: { state?: RTCPeerConnectionState; compact?: boolean }) => {
+  const c = connBadgeClasses(state);
+  return (
+    <span className={cn('inline-flex items-center gap-1 rounded-full bg-background/80 backdrop-blur px-1.5 py-0.5', compact ? 'text-[9px]' : 'text-[10px]')} title={`Connection: ${c.label}`}>
+      <span className={cn('w-1.5 h-1.5 rounded-full', c.dot)} />
+      {c.icon === 'wifi' ? <Wifi className="w-2.5 h-2.5" /> : <WifiOff className="w-2.5 h-2.5" />}
+      {!compact && <span>{c.label}</span>}
+    </span>
+  );
+};
 
 const RemoteVideoTile = ({ peer, large, onPin, pinned }: { peer: RemotePeer; large?: boolean; onPin?: () => void; pinned?: boolean }) => {
   const ref = useRef<HTMLVideoElement>(null);
@@ -31,6 +55,7 @@ const RemoteVideoTile = ({ peer, large, onPin, pinned }: { peer: RemotePeer; lar
         <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs">Connecting…</div>
       )}
       <div className="absolute bottom-1 left-1 bg-background/70 rounded px-1.5 py-0.5 text-[10px] truncate max-w-[90%]">{peer.name}</div>
+      <div className="absolute top-1 left-1"><ConnBadge state={peer.connectionState} compact={!large} /></div>
       {onPin && (
         <button
           onClick={onPin}
@@ -119,6 +144,15 @@ const VirtualLibraryPage = () => {
   const [guestName, setGuestName] = useState<string>(() => {
     try { return localStorage.getItem('biro-guest-name') || 'Guest'; } catch { return 'Guest'; }
   });
+  const [chatOpen, setChatOpen] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    // Default: open on desktop, collapsed on mobile
+    return window.matchMedia('(min-width: 1024px)').matches;
+  });
+  const [confirmEndOpen, setConfirmEndOpen] = useState(false);
+  const [auditOpen, setAuditOpen] = useState(false);
+  const [auditRows, setAuditRows] = useState<Array<{ id: string; action: string; target_name: string | null; created_at: string; metadata: any }>>([]);
+  const [unreadChat, setUnreadChat] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const screenStreamRef = useRef<MediaStream | null>(null);
@@ -137,6 +171,44 @@ const VirtualLibraryPage = () => {
     localStream: callStream,
     enabled: callActive && !!activeRoom,
   });
+
+  // Overall self connection health = worst peer state (or 'connected' if no peers yet)
+  const overallConn: RTCPeerConnectionState = (() => {
+    if (!callActive) return 'new';
+    if (peers.length === 0) return 'connecting';
+    const states = peers.map((p) => p.connectionState || 'new');
+    if (states.some((s) => s === 'failed' || s === 'closed')) return 'failed';
+    if (states.some((s) => s === 'disconnected')) return 'disconnected';
+    if (states.every((s) => s === 'connected')) return 'connected';
+    return 'connecting';
+  })();
+
+  // Persist spotlight selection per room
+  const spotlightKey = activeRoom ? `biro-spotlight-${activeRoom.code}` : '';
+  useEffect(() => {
+    if (!activeRoom) return;
+    try {
+      const saved = localStorage.getItem(spotlightKey);
+      if (saved) setPinnedPeerId(saved);
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeRoom?.code]);
+  useEffect(() => {
+    if (!spotlightKey) return;
+    try {
+      if (pinnedPeerId) localStorage.setItem(spotlightKey, pinnedPeerId);
+      else localStorage.removeItem(spotlightKey);
+    } catch {}
+  }, [pinnedPeerId, spotlightKey]);
+  // Auto-unpin if pinned peer left the mesh
+  useEffect(() => {
+    if (pinnedPeerId && !peers.some((p) => p.peerId === pinnedPeerId)) setPinnedPeerId(null);
+  }, [peers, pinnedPeerId]);
+
+  // Track unread chat messages while panel is closed
+  useEffect(() => {
+    if (chatOpen) setUnreadChat(0);
+  }, [chatOpen, messages.length]);
 
   const stopMedia = useCallback(() => {
     streamRef.current?.getTracks().forEach((track) => track.stop());
@@ -270,10 +342,15 @@ const VirtualLibraryPage = () => {
     const ch = supabase.channel(`study-room-msgs-${activeRoom.id}`);
     ch.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'study_room_messages', filter: `room_id=eq.${activeRoom.id}` }, async (payload: any) => {
       const { data: prof } = await supabase.from('profiles').select('name').eq('user_id', payload.new.sender_id).maybeSingle();
-      setMessages(prev => prev.some(m => m.id === payload.new.id) ? prev : [...prev, { ...payload.new, sender_name: prof?.name || 'Student' }]);
+      setMessages(prev => {
+        if (prev.some(m => m.id === payload.new.id)) return prev;
+        // Bump unread if chat panel is closed and message is from someone else
+        if (!chatOpen && payload.new.sender_id !== user.id) setUnreadChat((n) => n + 1);
+        return [...prev, { ...payload.new, sender_name: prof?.name || 'Student' }];
+      });
     }).subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, [activeRoom, user, isGuestRoom]);
+  }, [activeRoom, user, isGuestRoom, chatOpen]);
 
   // Load my recent rooms for search list
   useEffect(() => {
@@ -377,15 +454,41 @@ const VirtualLibraryPage = () => {
 
   const endMeeting = async () => {
     if (!activeRoom || !isOwner) return;
-    if (!window.confirm('End this meeting for everyone?')) return;
-    // Broadcast on the already-subscribed unified live channel so every
-    // participant (auth + guest) receives it instantly.
+    setConfirmEndOpen(true);
+  };
+
+  const doEndMeeting = async () => {
+    if (!activeRoom || !isOwner) return;
+    setConfirmEndOpen(false);
     try {
       await hostChannelRef.current?.send({ type: 'broadcast', event: 'meeting-ended', payload: {} });
     } catch {}
     await supabase.from('study_rooms').update({ is_active: false }).eq('id', activeRoom.id);
-    toast({ title: 'Meeting ended' });
+    await logAudit('end_meeting');
+    toast({ title: 'Meeting ended for everyone' });
     await leaveRoom();
+  };
+
+  const logAudit = async (action: string, target?: RoomUser | null, metadata: any = {}) => {
+    if (!isOwner || !activeRoom || !user) return;
+    if (activeRoom.id.startsWith('guest-')) return;
+    try {
+      await supabase.from('study_room_audit_log').insert({
+        room_id: activeRoom.id,
+        host_id: user.id,
+        action,
+        target_id: target?.id ?? null,
+        target_name: target?.name ?? null,
+        metadata,
+      });
+    } catch {}
+  };
+
+  const openAuditLog = async () => {
+    if (!isOwner || !activeRoom) return;
+    setAuditOpen(true);
+    const { data } = await supabase.from('study_room_audit_log').select('id,action,target_name,created_at,metadata').eq('room_id', activeRoom.id).order('created_at', { ascending: false }).limit(100);
+    setAuditRows((data as any[]) || []);
   };
 
   const hostBroadcast = async (event: string, payload: any) => {
@@ -397,24 +500,28 @@ const VirtualLibraryPage = () => {
   const muteMember = async (target: RoomUser) => {
     if (!isOwner) return;
     await hostBroadcast('force-mute', { target: target.id });
+    await logAudit('mute', target);
     toast({ title: `Muted ${target.name}` });
   };
 
   const camOffMember = async (target: RoomUser) => {
     if (!isOwner) return;
     await hostBroadcast('force-cam-off', { target: target.id });
+    await logAudit('cam_off', target);
     toast({ title: `Cam off ${target.name}` });
   };
 
   const muteAll = async () => {
     if (!isOwner) return;
     await hostBroadcast('force-mute', { target: '*' });
+    await logAudit('mute_all');
     toast({ title: 'Muted everyone' });
   };
 
   const camOffAll = async () => {
     if (!isOwner) return;
     await hostBroadcast('force-cam-off', { target: '*' });
+    await logAudit('cam_off_all');
     toast({ title: 'Cameras off for everyone' });
   };
 
@@ -422,6 +529,7 @@ const VirtualLibraryPage = () => {
     if (!isOwner || !activeRoom) return;
     await hostBroadcast('kick', { target: target.id, banned: false });
     await supabase.from('study_room_members').delete().eq('room_id', activeRoom.id).eq('user_id', target.id);
+    await logAudit('kick', target);
     toast({ title: `Removed ${target.name}` });
   };
 
@@ -452,6 +560,7 @@ const VirtualLibraryPage = () => {
     if (error) { toast({ title: 'Ban failed', description: error.message, variant: 'destructive' }); return; }
     await hostBroadcast('kick', { target: banTarget.id, banned: true });
     await supabase.from('study_room_members').delete().eq('room_id', activeRoom.id).eq('user_id', banTarget.id);
+    await logAudit('ban', banTarget, { scope: banScope, duration: banDuration, reason: banReason.trim() || null });
     toast({ title: `Banned ${banTarget.name}`, description: banScope === 'host_all' ? 'From all your rooms' : 'From this room' });
     setBanTarget(null);
     setBanReason('');
@@ -592,17 +701,35 @@ const VirtualLibraryPage = () => {
             <Button variant="ghost" size="sm" onClick={leaveRoom} className="gap-1"><DoorOpen className="w-4 h-4" /> Leave</Button>
             <div className="min-w-0">
               <div className="flex items-center gap-2"><Video className="w-4 h-4 text-accent" /><span className="font-game text-sm truncate">{activeRoom.title}</span>{isGuestRoom && <span className="text-[9px] bg-accent/30 px-1.5 py-0.5 rounded">GUEST</span>}</div>
-              <p className="text-[10px] text-muted-foreground">{activeRoom.code}</p>
+              <div className="flex items-center gap-2">
+                <p className="text-[10px] text-muted-foreground">{activeRoom.code}</p>
+                {callActive && <ConnBadge state={overallConn} />}
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-1">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setChatOpen((v) => !v)}
+              className="gap-1 relative lg:hidden"
+              aria-label="Toggle chat"
+            >
+              <MessageSquare className="w-3 h-3" /> Chat
+              {unreadChat > 0 && !chatOpen && (
+                <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-[9px] rounded-full min-w-[16px] h-4 px-1 flex items-center justify-center">
+                  {unreadChat > 9 ? '9+' : unreadChat}
+                </span>
+              )}
+            </Button>
             <Button variant="outline" size="sm" onClick={shareInviteLink} className="gap-1"><Share2 className="w-3 h-3" /> Share</Button>
             <Button variant="outline" size="sm" onClick={copyId} className="gap-1"><Copy className="w-3 h-3" /> ID</Button>
+            {isOwner && <Button variant="outline" size="sm" onClick={openAuditLog} className="gap-1 hidden sm:inline-flex"><ScrollText className="w-3 h-3" /> Log</Button>}
             {isOwner && <Button variant="destructive" size="sm" onClick={endMeeting} className="gap-1"><XCircle className="w-3 h-3" /> End</Button>}
           </div>
         </div>
 
-        <div className="flex-1 grid lg:grid-cols-[1fr_340px] min-h-0">
+        <div className={cn('flex-1 grid min-h-0', chatOpen ? 'lg:grid-cols-[1fr_340px]' : 'lg:grid-cols-1')}>
           <div className="p-4 space-y-4 min-h-0 flex flex-col">
             {/* Zoom-style spotlight: big pinned tile + horizontal strip of others */}
             {(() => {
@@ -705,8 +832,19 @@ const VirtualLibraryPage = () => {
             </div>
           </div>
 
-          <aside className="border-l border-border bg-card/40 min-h-0 flex flex-col">
+          <aside
+            className={cn(
+              'border-l border-border bg-card/95 backdrop-blur-xl min-h-0 flex-col',
+              // Desktop: inline column that shows/hides
+              chatOpen ? 'lg:flex' : 'lg:hidden',
+              // Mobile: full-screen overlay slide-in
+              chatOpen ? 'fixed inset-0 top-[57px] z-40 flex lg:static' : 'hidden',
+            )}
+          >
             <div className="p-3 border-b border-border flex items-center justify-between"><span className="font-game text-sm">Room Chat</span><span className="text-xs text-muted-foreground flex items-center gap-1"><Users className="w-3 h-3" /> {roomUsers.length}</span></div>
+            <div className="lg:hidden px-3 pb-2">
+              <Button variant="ghost" size="sm" onClick={() => setChatOpen(false)} className="w-full gap-2 text-xs"><XCircle className="w-3 h-3" /> Close chat</Button>
+            </div>
             <ScrollArea className="flex-1 p-3">
               <div className="space-y-3">
                 {isGuestRoom && (
@@ -729,6 +867,45 @@ const VirtualLibraryPage = () => {
             </div>
           </aside>
         </div>
+
+        <AlertDialog open={confirmEndOpen} onOpenChange={setConfirmEndOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2"><XCircle className="w-4 h-4 text-destructive" /> End meeting for everyone?</AlertDialogTitle>
+              <AlertDialogDescription>
+                All participants (including guests) will be disconnected immediately. This room will be marked ended.
+                {roomUsers.length > 1 && <> {roomUsers.length - 1} other participant(s) are in the room right now.</>}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Keep going</AlertDialogCancel>
+              <AlertDialogAction onClick={doEndMeeting} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">End for everyone</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
+        <Dialog open={auditOpen} onOpenChange={setAuditOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader><DialogTitle className="flex items-center gap-2"><ScrollText className="w-4 h-4" /> Host action log</DialogTitle></DialogHeader>
+            <ScrollArea className="max-h-[60vh] pr-2">
+              <div className="space-y-2">
+                {auditRows.length === 0 && <p className="text-xs text-muted-foreground text-center py-6">No host actions logged yet.</p>}
+                {auditRows.map((row) => (
+                  <div key={row.id} className="rounded border border-border bg-secondary/30 p-2 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold uppercase tracking-wide text-[10px] text-primary">{row.action.replace(/_/g, ' ')}</span>
+                      <span className="text-[10px] text-muted-foreground">{new Date(row.created_at).toLocaleString([], { hour: '2-digit', minute: '2-digit', month: 'short', day: 'numeric' })}</span>
+                    </div>
+                    {row.target_name && <p className="text-[11px] mt-0.5">Target: <span className="font-medium">{row.target_name}</span></p>}
+                    {row.metadata && Object.keys(row.metadata).length > 0 && (
+                      <p className="text-[10px] text-muted-foreground mt-0.5 truncate">{Object.entries(row.metadata).map(([k, v]) => `${k}: ${String(v)}`).join(' • ')}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </DialogContent>
+        </Dialog>
 
         <Dialog open={!!banTarget} onOpenChange={(o) => !o && setBanTarget(null)}>
           <DialogContent className="max-w-sm">
