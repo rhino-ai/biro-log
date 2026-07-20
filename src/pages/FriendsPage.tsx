@@ -8,7 +8,9 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Users, MessageCircle, Plus, Search, UserPlus, Send, ArrowLeft, Link2, Loader2, CheckCheck, MailPlus, Paperclip, FileIcon, X as XIcon } from 'lucide-react';
+import { Users, MessageCircle, Plus, Search, UserPlus, Send, ArrowLeft, Link2, Loader2, CheckCheck, MailPlus, Paperclip, FileIcon, X as XIcon, Info, Camera } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { GroupInfoPanel } from '@/components/chat/GroupInfoPanel';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { supabase as _supabase } from '@/integrations/supabase/client';
@@ -27,7 +29,7 @@ type Profile = {
 
 type ChatItem =
   | { kind: 'dm'; id: string; peer: Profile; lastMessage?: string; lastAt?: string }
-  | { kind: 'group'; id: string; name: string; icon: string | null; invite_code: string | null; memberCount: number; lastMessage?: string; lastAt?: string };
+  | { kind: 'group'; id: string; name: string; icon: string | null; avatar_url: string | null; description: string | null; invite_code: string | null; memberCount: number; lastMessage?: string; lastAt?: string };
 
 type UIMessage = {
   id: string;
@@ -61,6 +63,12 @@ const FriendsPage = () => {
   const [showInviteMember, setShowInviteMember] = useState(false);
   const [groupName, setGroupName] = useState('');
   const [groupIcon, setGroupIcon] = useState('👥');
+  const [groupDesc, setGroupDesc] = useState('');
+  const [groupPhotoFile, setGroupPhotoFile] = useState<File | null>(null);
+  const [groupPhotoPreview, setGroupPhotoPreview] = useState<string | null>(null);
+  const [creatingGroup, setCreatingGroup] = useState(false);
+  const [showGroupInfo, setShowGroupInfo] = useState(false);
+  const groupPhotoRef = useRef<HTMLInputElement>(null);
   const [joinCode, setJoinCode] = useState('');
   const [inviteTarget, setInviteTarget] = useState('');
   const [pendingAttachment, setPendingAttachment] = useState<{ url: string; type: string; name: string } | null>(null);
@@ -114,7 +122,7 @@ const FriendsPage = () => {
     let groupItems: ChatItem[] = [];
     if (groupIds.length) {
       const [{ data: groups }, { data: members }, { data: lastMsgs }] = await Promise.all([
-        supabase.from('chat_groups').select('id,name,icon,invite_code').in('id', groupIds),
+        supabase.from('chat_groups').select('id,name,icon,avatar_url,description,invite_code').in('id', groupIds),
         supabase.from('group_members').select('group_id,user_id').in('group_id', groupIds),
         supabase.from('group_messages').select('group_id,content,created_at').in('group_id', groupIds).order('created_at', { ascending: false }).limit(500),
       ]);
@@ -127,6 +135,8 @@ const FriendsPage = () => {
         id: g.id,
         name: g.name,
         icon: g.icon,
+        avatar_url: g.avatar_url,
+        description: g.description,
         invite_code: g.invite_code,
         memberCount: (members || []).filter((m: any) => m.group_id === g.id).length,
         lastMessage: lastByGroup.get(g.id)?.content,
@@ -279,16 +289,38 @@ const FriendsPage = () => {
 
   const createGroup = async () => {
     if (!groupName.trim() || !user) return;
+    setCreatingGroup(true);
     const { data, error } = await supabase.functions.invoke('create-chat-group', { body: { name: groupName.trim(), icon: groupIcon.trim() || '👥' } });
     if (error) {
+      setCreatingGroup(false);
       toast({ title: 'Group create failed', description: error.message, variant: 'destructive' });
       return;
     }
     const group = data.group;
-    const chat: ChatItem = { kind: 'group', id: group.id, name: group.name, icon: group.icon, invite_code: group.invite_code, memberCount: 1 };
+    let avatar_url: string | null = null;
+    // Save description + photo if provided
+    if (groupDesc.trim() || groupPhotoFile) {
+      if (groupPhotoFile) {
+        try {
+          const ext = groupPhotoFile.name.split('.').pop() || 'jpg';
+          const path = `chat/${user.id}/group-${group.id}-${Date.now()}.${ext}`;
+          const { error: upErr } = await supabase.storage.from('chat-uploads').upload(path, groupPhotoFile, { contentType: groupPhotoFile.type, upsert: false });
+          if (!upErr) {
+            const { data: signed } = await supabase.storage.from('chat-uploads').createSignedUrl(path, 60 * 60 * 24 * 365 * 5);
+            avatar_url = signed?.signedUrl || null;
+          }
+        } catch { /* ignore */ }
+      }
+      await supabase.from('chat_groups').update({ description: groupDesc.trim() || null, avatar_url }).eq('id', group.id);
+    }
+    const chat: ChatItem = { kind: 'group', id: group.id, name: group.name, icon: group.icon, avatar_url, description: groupDesc.trim() || null, invite_code: group.invite_code, memberCount: 1 };
     setShowCreateGroup(false);
     setGroupName('');
     setGroupIcon('👥');
+    setGroupDesc('');
+    setGroupPhotoFile(null);
+    setGroupPhotoPreview(null);
+    setCreatingGroup(false);
     setActiveChat(chat);
     setChatMessages([]);
     toast({ title: 'Group created', description: `Invite code: ${group.invite_code}` });
@@ -308,8 +340,8 @@ const FriendsPage = () => {
     setShowAddDialog(false);
     await loadChats();
     if (data?.groupId) {
-      const { data: group } = await supabase.from('chat_groups').select('id,name,icon,invite_code').eq('id', data.groupId).maybeSingle();
-      if (group) setActiveChat({ kind: 'group', id: group.id, name: group.name, icon: group.icon, invite_code: group.invite_code, memberCount: 1 });
+      const { data: group } = await supabase.from('chat_groups').select('id,name,icon,avatar_url,description,invite_code').eq('id', data.groupId).maybeSingle();
+      if (group) setActiveChat({ kind: 'group', id: group.id, name: group.name, icon: group.icon, avatar_url: group.avatar_url, description: group.description, invite_code: group.invite_code, memberCount: 1 });
     }
   };
 
