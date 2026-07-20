@@ -34,6 +34,8 @@ import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 import { ReadModeGuard } from "@/components/system/ReadModeGuard";
 import { useInAppPushSound } from "@/hooks/useInAppPushSound";
+import { useNavigate } from "react-router-dom";
+import { initNative } from "@/lib/native";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 5 * 60 * 1000 } },
@@ -63,6 +65,10 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
 
 const AppRoutes = () => {
   useInAppPushSound();
+  const navigate = useNavigate();
+  useEffect(() => {
+    initNative((path) => navigate(path));
+  }, [navigate]);
   return (
   <ReadModeGuard>
   <Routes>
