@@ -1256,6 +1256,36 @@ const VirtualLibraryPage = () => {
               <Button variant={screenOn ? 'default' : 'outline'} onClick={toggleScreen} className="gap-2"><Monitor className="w-4 h-4" /> Screen</Button>
             </div>
 
+            {(pendingHostRequest.mic || pendingHostRequest.cam) && (
+              <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 p-2 flex items-center gap-2 text-xs">
+                <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
+                <div className="flex-1">
+                  <p className="font-semibold text-amber-500">Host is asking you to turn on</p>
+                  <p className="text-muted-foreground">
+                    {pendingHostRequest.mic && pendingHostRequest.cam ? 'Mic and camera' : pendingHostRequest.mic ? 'Mic' : 'Camera'} — tap the button below.
+                  </p>
+                </div>
+                <Button size="sm" variant="outline" className="h-7 text-[11px]" onClick={async () => {
+                  if (pendingHostRequest.mic) await toggleMic();
+                  if (pendingHostRequest.cam) await toggleCamera();
+                }}>Turn on</Button>
+              </div>
+            )}
+
+            {callActive && (
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" onClick={emergencyRestore} disabled={isRestoring} className="gap-1 text-xs">
+                  {isRestoring ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LifeBuoy className="w-3.5 h-3.5" />} Restore controls
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setMediaError({ kind: 'both', info: {
+                  title: 'How to unblock camera / mic',
+                  reason: 'Some Android phones (Vivo, MIUI, OneUI) block camera or mic per-app. If you keep seeing "could not start video source" this is usually the cause.',
+                  fix: '1. Tap the lock icon in the browser address bar → Site settings → allow Camera + Microphone.\n2. Open phone Settings → Apps → your browser → Permissions → allow Camera + Microphone.\n3. Force-stop any other app using the camera (Zoom, WhatsApp, Instagram).\n4. Come back to this page and hit Restore controls.',
+                  code: 'help',
+                }, retry: emergencyRestore })} className="gap-1 text-xs"><Settings className="w-3.5 h-3.5" /> Fix permissions</Button>
+              </div>
+            )}
+
             {callActive && micOn && (
               <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
                 <Mic className="w-3 h-3 shrink-0" />
