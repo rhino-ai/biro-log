@@ -100,8 +100,10 @@ export type Database = {
       }
       chat_groups: {
         Row: {
+          avatar_url: string | null
           created_at: string
           created_by: string
+          description: string | null
           icon: string | null
           id: string
           invite_code: string | null
@@ -109,8 +111,10 @@ export type Database = {
           name: string
         }
         Insert: {
+          avatar_url?: string | null
           created_at?: string
           created_by: string
+          description?: string | null
           icon?: string | null
           id?: string
           invite_code?: string | null
@@ -118,8 +122,10 @@ export type Database = {
           name: string
         }
         Update: {
+          avatar_url?: string | null
           created_at?: string
           created_by?: string
+          description?: string | null
           icon?: string | null
           id?: string
           invite_code?: string | null
@@ -307,6 +313,41 @@ export type Database = {
           xp_per_level?: number
         }
         Relationships: []
+      }
+      group_bans: {
+        Row: {
+          banned_at: string
+          banned_by: string
+          group_id: string
+          id: string
+          reason: string | null
+          user_id: string
+        }
+        Insert: {
+          banned_at?: string
+          banned_by: string
+          group_id: string
+          id?: string
+          reason?: string | null
+          user_id: string
+        }
+        Update: {
+          banned_at?: string
+          banned_by?: string
+          group_id?: string
+          id?: string
+          reason?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_bans_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "chat_groups"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       group_invite_attempts: {
         Row: {
@@ -957,6 +998,14 @@ export type Database = {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      is_group_admin: {
+        Args: { _group_id: string; _user_id: string }
+        Returns: boolean
+      }
+      is_group_banned: {
+        Args: { _group_id: string; _user_id: string }
         Returns: boolean
       }
       is_group_creator: {
