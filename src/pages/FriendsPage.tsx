@@ -437,17 +437,24 @@ const FriendsPage = () => {
     const dm = activeChat.kind === 'dm' ? activeChat : null;
     const title = group ? group.name : dm?.peer.name || 'Chat';
     const avatar = group ? (group.icon || '👥') : (dm?.peer.avatar || '👤');
+    const groupPhoto = group?.avatar_url || null;
     return (
       <div className="fixed inset-0 z-50 flex flex-col bg-background">
         <div className="flex items-center justify-between p-3 border-b border-border bg-card/95 backdrop-blur-xl">
-          <div className="flex items-center gap-3 min-w-0">
+          <button
+            className="flex items-center gap-3 min-w-0 text-left flex-1 hover:opacity-80 active:opacity-70 transition-opacity"
+            onClick={() => { if (group) setShowGroupInfo(true); }}
+            disabled={!group}
+          >
             <Button variant="ghost" size="icon" onClick={() => setActiveChat(null)}><ArrowLeft className="w-5 h-5" /></Button>
-            <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-xl shrink-0">{avatar}</div>
+            <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-xl shrink-0 overflow-hidden">
+              {groupPhoto ? <img src={groupPhoto} alt={title} className="w-full h-full object-cover" /> : avatar}
+            </div>
             <div className="min-w-0">
               <h3 className="font-game text-sm truncate">{title}</h3>
               {group ? <p className="text-[10px] text-muted-foreground">{group.memberCount} members • {group.invite_code || 'code creating...'}</p> : <p className="text-[10px] text-muted-foreground">Lvl {dm?.peer.level || 0} • {dm?.peer.xp || 0} XP</p>}
             </div>
-          </div>
+          </button>
           {group && (
             <div className="flex items-center gap-1">
               <Dialog open={showInviteMember} onOpenChange={setShowInviteMember}>
@@ -461,9 +468,21 @@ const FriendsPage = () => {
                 </DialogContent>
               </Dialog>
               <Button variant="ghost" size="icon" onClick={() => copyInvite(group.invite_code)} title="Copy invite link"><Link2 className="w-4 h-4" /></Button>
+              <Button variant="ghost" size="icon" onClick={() => setShowGroupInfo(true)} title="Group info"><Info className="w-4 h-4" /></Button>
             </div>
           )}
         </div>
+        {group && (
+          <GroupInfoPanel
+            groupId={group.id}
+            open={showGroupInfo}
+            onOpenChange={setShowGroupInfo}
+            onUpdated={(patch) => {
+              setActiveChat(prev => prev && isGroupChat(prev) ? { ...prev, ...patch } as ChatItem : prev);
+              void loadChats();
+            }}
+          />
+        )}
 
         <ScrollArea className="flex-1 p-4">
           <div className="space-y-3 pb-4">
