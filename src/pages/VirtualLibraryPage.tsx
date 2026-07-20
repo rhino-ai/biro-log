@@ -854,9 +854,22 @@ const VirtualLibraryPage = () => {
     try {
       if (callActive && callStream) {
         const videoTracks = callStream.getVideoTracks();
-        if (videoTracks.length) {
+        const anyLive = videoTracks.some((t) => t.readyState === 'live');
+        if (videoTracks.length && anyLive) {
           videoTracks.forEach((t) => (t.enabled = !cameraOn));
           setCameraOn(!cameraOn);
+          return;
+        }
+        // No live video track — acquire one and add to the call stream
+        if (!cameraOn) {
+          const fresh = await navigator.mediaDevices.getUserMedia({ video: true });
+          fresh.getVideoTracks().forEach((t) => {
+            // remove any dead track first
+            callStream.getVideoTracks().forEach((old) => { try { callStream.removeTrack(old); } catch {} });
+            callStream.addTrack(t);
+          });
+          setCallStream(new MediaStream(callStream.getTracks()));
+          setCameraOn(true);
         }
         return;
       }
@@ -880,9 +893,20 @@ const VirtualLibraryPage = () => {
     try {
       if (callActive && callStream) {
         const audioTracks = callStream.getAudioTracks();
-        if (audioTracks.length) {
+        const anyLive = audioTracks.some((t) => t.readyState === 'live');
+        if (audioTracks.length && anyLive) {
           audioTracks.forEach((t) => (t.enabled = !micOn));
           setMicOn(!micOn);
+          return;
+        }
+        if (!micOn) {
+          const fresh = await navigator.mediaDevices.getUserMedia({ audio: true });
+          fresh.getAudioTracks().forEach((t) => {
+            callStream.getAudioTracks().forEach((old) => { try { callStream.removeTrack(old); } catch {} });
+            callStream.addTrack(t);
+          });
+          setCallStream(new MediaStream(callStream.getTracks()));
+          setMicOn(true);
         }
         return;
       }
