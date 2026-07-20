@@ -378,15 +378,10 @@ const VirtualLibraryPage = () => {
   const endMeeting = async () => {
     if (!activeRoom || !isOwner) return;
     if (!window.confirm('End this meeting for everyone?')) return;
+    // Broadcast on the already-subscribed unified live channel so every
+    // participant (auth + guest) receives it instantly.
     try {
-      const c1 = supabase.channel(`study-room-${activeRoom.id}`);
-      const c2 = supabase.channel(`study-room-guest-${activeRoom.code}`);
-      await new Promise<void>((resolve) => { c1.subscribe((s: string) => { if (s === 'SUBSCRIBED') resolve(); }); });
-      await c1.send({ type: 'broadcast', event: 'meeting-ended', payload: {} });
-      await new Promise<void>((resolve) => { c2.subscribe((s: string) => { if (s === 'SUBSCRIBED') resolve(); }); });
-      await c2.send({ type: 'broadcast', event: 'meeting-ended', payload: {} });
-      supabase.removeChannel(c1);
-      supabase.removeChannel(c2);
+      await hostChannelRef.current?.send({ type: 'broadcast', event: 'meeting-ended', payload: {} });
     } catch {}
     await supabase.from('study_rooms').update({ is_active: false }).eq('id', activeRoom.id);
     toast({ title: 'Meeting ended' });
