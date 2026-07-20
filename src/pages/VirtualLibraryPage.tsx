@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Video, Users, Monitor, Copy, ExternalLink, Mic, MicOff, VideoOff, Send, DoorOpen, Loader2, PhoneCall, PhoneOff, Search, Share2, XCircle, Link as LinkIcon, Ban, UserX, ShieldOff, MoreVertical, Pin, PinOff, MessageSquare, Wifi, WifiOff, ScrollText, Download, Gauge } from 'lucide-react';
+import { Video, Users, Monitor, Copy, ExternalLink, Mic, MicOff, VideoOff, Send, DoorOpen, Loader2, PhoneCall, PhoneOff, Search, Share2, XCircle, Link as LinkIcon, Ban, UserX, ShieldOff, MoreVertical, Pin, PinOff, MessageSquare, Wifi, WifiOff, ScrollText, Download, Gauge, Activity, Stethoscope, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { useGame } from '@/hooks/useGame';
 import { useAuth } from '@/hooks/useAuth';
@@ -56,6 +56,11 @@ const RemoteVideoTile = ({ peer, large, onPin, pinned }: { peer: RemotePeer; lar
       )}
       <div className="absolute bottom-1 left-1 bg-background/70 rounded px-1.5 py-0.5 text-[10px] truncate max-w-[90%]">{peer.name}</div>
       <div className="absolute top-1 left-1"><ConnBadge state={peer.connectionState} compact={!large} /></div>
+      {peer.reconnecting && (
+        <div className="absolute inset-x-0 top-0 bg-amber-500/80 text-black text-[10px] py-0.5 text-center flex items-center justify-center gap-1">
+          <Loader2 className="w-3 h-3 animate-spin" /> Reconnecting…
+        </div>
+      )}
       {onPin && (
         <button
           onClick={onPin}
@@ -106,6 +111,49 @@ const getGuestId = () => {
 };
 
 const supabase = _supabase as any;
+
+// Live microphone input level meter (0..1) driven by an AnalyserNode.
+const useMicLevel = (stream: MediaStream | null) => {
+  const [level, setLevel] = useState(0);
+  useEffect(() => {
+    if (!stream || stream.getAudioTracks().length === 0) { setLevel(0); return; }
+    let ctx: AudioContext | null = null;
+    let raf = 0;
+    try {
+      ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      const src = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 512;
+      src.connect(analyser);
+      const buf = new Uint8Array(analyser.frequencyBinCount);
+      const tick = () => {
+        analyser.getByteTimeDomainData(buf);
+        let peak = 0;
+        for (let i = 0; i < buf.length; i++) {
+          const v = Math.abs(buf[i] - 128) / 128;
+          if (v > peak) peak = v;
+        }
+        setLevel(peak);
+        raf = requestAnimationFrame(tick);
+      };
+      tick();
+    } catch {}
+    return () => { cancelAnimationFrame(raf); try { ctx?.close(); } catch {} };
+  }, [stream]);
+  return level;
+};
+
+const LevelBar = ({ value, label }: { value: number; label?: string }) => (
+  <div className="w-full">
+    {label && <div className="text-[10px] text-muted-foreground mb-0.5">{label}</div>}
+    <div className="w-full h-2 rounded bg-secondary overflow-hidden">
+      <div
+        className={cn('h-full transition-all', value > 0.6 ? 'bg-destructive' : value > 0.15 ? 'bg-emerald-500' : 'bg-amber-500')}
+        style={{ width: `${Math.min(100, Math.round(value * 140))}%` }}
+      />
+    </div>
+  </div>
+);
 
 type StudyRoom = { id: string; code: string; title: string; owner_id: string; is_active: boolean; created_at: string };
 type RoomUser = { id: string; name: string; avatar: string | null; joinedAt: number };
@@ -159,6 +207,20 @@ const VirtualLibraryPage = () => {
   });
   useEffect(() => { try { localStorage.setItem('biro-bw-mode', bandwidthMode); } catch {} }, [bandwidthMode]);
   const [unreadChat, setUnreadChat] = useState(0);
+  // Diagnostics + preflight
+  const [diagOpen, setDiagOpen] = useState(false);
+  const [diagRows, setDiagRows] = useState<Array<any>>([]);
+  const [preflightOpen, setPreflightOpen] = useState(false);
+  const [preflightStream, setPreflightStream] = useState<MediaStream | null>(null);
+  const [preflightResult, setPreflightResult] = useState<{
+    mic: 'pending' | 'ok' | 'fail' | 'silent';
+    cam: 'pending' | 'ok' | 'fail';
+    net: 'pending' | 'ok' | 'fail';
+    micErr?: string; camErr?: string; netErr?: string;
+  }>({ mic: 'pending', cam: 'pending', net: 'pending' });
+  const preflightVideoRef = useRef<HTMLVideoElement>(null);
+  const preflightMicLevel = useMicLevel(preflightStream);
+  const liveMicLevel = useMicLevel(callActive ? callStream : null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const screenStreamRef = useRef<MediaStream | null>(null);
@@ -169,7 +231,7 @@ const VirtualLibraryPage = () => {
   const selfId = user?.id ?? guestId;
   const selfName = user ? (profile.name || 'Student') : guestName;
 
-  const { peers } = useWebRTCMesh({
+  const { peers, getDiagnostics } = useWebRTCMesh({
     // Key on room CODE so auth users and guests join the same mesh
     roomKey: activeRoom?.code ?? null,
     selfUserId: selfId,
@@ -178,6 +240,32 @@ const VirtualLibraryPage = () => {
     enabled: callActive && !!activeRoom,
     bandwidthMode,
   });
+
+  // Poll diagnostics while dialog is open
+  useEffect(() => {
+    if (!diagOpen) return;
+    let cancelled = false;
+    const tick = async () => {
+      const rows = await getDiagnostics();
+      if (!cancelled) setDiagRows(rows);
+    };
+    void tick();
+    const iv = setInterval(tick, 2000);
+    return () => { cancelled = true; clearInterval(iv); };
+  }, [diagOpen, getDiagnostics]);
+
+  // Toast on reconnect transitions
+  const prevReconnectRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    const now = new Set(peers.filter((p) => p.reconnecting).map((p) => p.peerId));
+    peers.forEach((p) => {
+      const was = prevReconnectRef.current.has(p.peerId);
+      const is = now.has(p.peerId);
+      if (!was && is) toast({ title: `Reconnecting to ${p.name}…` });
+      if (was && !is && p.connectionState === 'connected') toast({ title: `Reconnected to ${p.name}` });
+    });
+    prevReconnectRef.current = now;
+  }, [peers]);
 
   // Overall self connection health = worst peer state (or 'connected' if no peers yet)
   const overallConn: RTCPeerConnectionState = (() => {
@@ -532,6 +620,91 @@ const VirtualLibraryPage = () => {
     URL.revokeObjectURL(url);
   };
 
+  const exportAuditJson = () => {
+    const payload = {
+      room_code: activeRoom?.code,
+      room_title: activeRoom?.title,
+      exported_at: new Date().toISOString(),
+      filter: { action: auditFilter, search: auditSearch || null },
+      count: filteredAuditRows.length,
+      rows: filteredAuditRows.map((r) => ({
+        id: r.id,
+        timestamp: new Date(r.created_at).toISOString(),
+        action: r.action,
+        target: r.target_name || null,
+        metadata: r.metadata || {},
+      })),
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `host-audit-${activeRoom?.code || 'room'}-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
+  // ---- One-click preflight self-test ----
+  const stopPreflight = useCallback(() => {
+    preflightStream?.getTracks().forEach((t) => t.stop());
+    setPreflightStream(null);
+  }, [preflightStream]);
+
+  const runPreflight = async () => {
+    setPreflightOpen(true);
+    setPreflightResult({ mic: 'pending', cam: 'pending', net: 'pending' });
+    // Mic + Cam
+    let stream: MediaStream | null = null;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      setPreflightStream(stream);
+      if (preflightVideoRef.current) preflightVideoRef.current.srcObject = stream;
+      setPreflightResult((r) => ({ ...r, cam: stream!.getVideoTracks().length > 0 ? 'ok' : 'fail', mic: stream!.getAudioTracks().length > 0 ? 'ok' : 'fail' }));
+    } catch (e: any) {
+      setPreflightResult((r) => ({ ...r, cam: 'fail', mic: 'fail', camErr: e?.message, micErr: e?.message }));
+    }
+    // After ~3s check if any mic level detected
+    setTimeout(() => {
+      setPreflightResult((r) => {
+        if (r.mic !== 'ok') return r;
+        return { ...r, mic: preflightMicLevel > 0.02 ? 'ok' : 'silent' };
+      });
+    }, 3200);
+    // Network / ICE reachability
+    try {
+      const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
+      pc.createDataChannel('probe');
+      const gathered: string[] = [];
+      pc.onicecandidate = (ev) => { if (ev.candidate) gathered.push(ev.candidate.candidate); };
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+      await new Promise<void>((resolve) => {
+        const t = setTimeout(resolve, 4000);
+        pc.onicegatheringstatechange = () => { if (pc.iceGatheringState === 'complete') { clearTimeout(t); resolve(); } };
+      });
+      const hasSrflx = gathered.some((c) => c.includes(' srflx '));
+      pc.close();
+      setPreflightResult((r) => ({ ...r, net: hasSrflx ? 'ok' : 'fail', netErr: hasSrflx ? undefined : 'No STUN reflexive candidate — NAT/firewall may block WebRTC.' }));
+    } catch (e: any) {
+      setPreflightResult((r) => ({ ...r, net: 'fail', netErr: e?.message }));
+    }
+  };
+
+  useEffect(() => {
+    // Once mic level is confirmed non-silent, upgrade result live
+    if (!preflightOpen) return;
+    if (preflightResult.mic === 'silent' && preflightMicLevel > 0.02) {
+      setPreflightResult((r) => ({ ...r, mic: 'ok' }));
+    }
+  }, [preflightMicLevel, preflightOpen, preflightResult.mic]);
+
+  useEffect(() => {
+    if (!preflightOpen) stopPreflight();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preflightOpen]);
+
   const hostBroadcast = async (event: string, payload: any) => {
     const ch = hostChannelRef.current;
     if (!ch) return;
@@ -786,6 +959,8 @@ const VirtualLibraryPage = () => {
               </PopoverContent>
             </Popover>
             {isOwner && <Button variant="outline" size="sm" onClick={openAuditLog} className="gap-1 hidden sm:inline-flex"><ScrollText className="w-3 h-3" /> Log</Button>}
+            <Button variant="outline" size="sm" onClick={runPreflight} className="gap-1 hidden sm:inline-flex" title="Run a mic / camera / network self-test"><Stethoscope className="w-3 h-3" /> Test</Button>
+            {callActive && <Button variant="outline" size="sm" onClick={() => setDiagOpen(true)} className="gap-1 hidden sm:inline-flex" title="Network diagnostics"><Activity className="w-3 h-3" /> Diag</Button>}
             {isOwner && <Button variant="destructive" size="sm" onClick={endMeeting} className="gap-1"><XCircle className="w-3 h-3" /> End</Button>}
           </div>
         </div>
@@ -850,6 +1025,14 @@ const VirtualLibraryPage = () => {
               <Button variant={micOn ? 'default' : 'outline'} onClick={toggleMic} className="gap-2">{micOn ? <Mic className="w-4 h-4" /> : <MicOff className="w-4 h-4" />} Mic</Button>
               <Button variant={screenOn ? 'default' : 'outline'} onClick={toggleScreen} className="gap-2"><Monitor className="w-4 h-4" /> Screen</Button>
             </div>
+
+            {callActive && micOn && (
+              <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                <Mic className="w-3 h-3 shrink-0" />
+                <LevelBar value={liveMicLevel} />
+                <span className="w-8 text-right tabular-nums">{Math.round(liveMicLevel * 100)}%</span>
+              </div>
+            )}
 
             <div className="grid grid-cols-1">
               {callActive ? (
@@ -965,6 +1148,7 @@ const VirtualLibraryPage = () => {
                   </SelectContent>
                 </Select>
                 <Button variant="outline" size="sm" onClick={exportAuditCsv} disabled={filteredAuditRows.length === 0} className="gap-1 h-8"><Download className="w-3 h-3" /> CSV</Button>
+                <Button variant="outline" size="sm" onClick={exportAuditJson} disabled={filteredAuditRows.length === 0} className="gap-1 h-8"><Download className="w-3 h-3" /> JSON</Button>
               </div>
             </div>
             <ScrollArea className="max-h-[60vh] pr-2">
@@ -1029,9 +1213,82 @@ const VirtualLibraryPage = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <Dialog open={diagOpen} onOpenChange={setDiagOpen}>
+          <DialogContent className="max-w-md">
+            <DialogHeader><DialogTitle className="flex items-center gap-2"><Activity className="w-4 h-4" /> Network diagnostics</DialogTitle></DialogHeader>
+            <ScrollArea className="max-h-[60vh] pr-2">
+              <div className="space-y-2">
+                {diagRows.length === 0 && <p className="text-xs text-muted-foreground text-center py-6">No peers connected yet.</p>}
+                {diagRows.map((r) => (
+                  <div key={r.peerId} className="rounded border border-border bg-secondary/30 p-2 text-xs space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold truncate">{r.name}</span>
+                      <ConnBadge state={r.connectionState} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
+                      <span>RTT</span><span className="text-right tabular-nums text-foreground">{r.rttMs != null ? `${Math.round(r.rttMs)} ms` : '—'}</span>
+                      <span>Loss</span><span className="text-right tabular-nums text-foreground">{r.packetLossPct != null ? `${r.packetLossPct.toFixed(2)}%` : '—'}</span>
+                      <span>Jitter</span><span className="text-right tabular-nums text-foreground">{r.jitterMs != null ? `${r.jitterMs.toFixed(0)} ms` : '—'}</span>
+                      <span>Out</span><span className="text-right tabular-nums text-foreground">{r.outboundKbps != null ? `${r.outboundKbps} kbps` : '—'}</span>
+                      <span>In</span><span className="text-right tabular-nums text-foreground">{r.inboundKbps != null ? `${r.inboundKbps} kbps` : '—'}</span>
+                      <span>Audio</span><span className="text-right tabular-nums text-foreground">{r.remoteAudioLevel != null ? `${Math.round(r.remoteAudioLevel * 100)}%` : '—'}</span>
+                    </div>
+                    {r.remoteAudioLevel != null && <LevelBar value={r.remoteAudioLevel} />}
+                  </div>
+                ))}
+                <p className="text-[10px] text-muted-foreground text-center pt-1">Updates every 2s • bitrate mode: <span className="capitalize">{bandwidthMode}</span></p>
+              </div>
+            </ScrollArea>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={preflightOpen} onOpenChange={setPreflightOpen}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader><DialogTitle className="flex items-center gap-2"><Stethoscope className="w-4 h-4" /> Device self-test</DialogTitle></DialogHeader>
+            <div className="space-y-3">
+              <div className="aspect-video rounded-lg overflow-hidden bg-secondary/60 border border-border">
+                <video ref={preflightVideoRef} autoPlay muted playsInline className="w-full h-full object-cover" />
+              </div>
+              <div className="flex items-center gap-2 text-xs">
+                <Mic className="w-3.5 h-3.5 shrink-0" />
+                <LevelBar value={preflightMicLevel} />
+                <span className="w-10 text-right tabular-nums">{Math.round(preflightMicLevel * 100)}%</span>
+              </div>
+              <div className="space-y-1.5 text-xs">
+                {([
+                  ['Camera', preflightResult.cam, preflightResult.camErr],
+                  ['Microphone', preflightResult.mic, preflightResult.micErr],
+                  ['Network (STUN)', preflightResult.net, preflightResult.netErr],
+                ] as const).map(([label, state, err]) => (
+                  <div key={label} className="flex items-center justify-between rounded border border-border bg-secondary/30 px-2 py-1.5">
+                    <span>{label}</span>
+                    <span className={cn('inline-flex items-center gap-1',
+                      state === 'ok' ? 'text-emerald-500' :
+                      state === 'silent' ? 'text-amber-500' :
+                      state === 'fail' ? 'text-destructive' : 'text-muted-foreground')}>
+                      {state === 'ok' && <CheckCircle2 className="w-3.5 h-3.5" />}
+                      {state === 'silent' && <AlertTriangle className="w-3.5 h-3.5" />}
+                      {state === 'fail' && <XCircle className="w-3.5 h-3.5" />}
+                      {state === 'pending' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                      <span className="capitalize">{state === 'silent' ? 'No sound detected' : state}</span>
+                    </span>
+                    {err && <span className="hidden">{err}</span>}
+                  </div>
+                ))}
+                {preflightResult.netErr && <p className="text-[10px] text-muted-foreground">{preflightResult.netErr}</p>}
+              </div>
+            </div>
+            <DialogFooter className="gap-2">
+              <Button variant="ghost" onClick={() => setPreflightOpen(false)}>Close</Button>
+              <Button onClick={runPreflight} className="gap-2"><Stethoscope className="w-4 h-4" /> Re-run</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }
+
 
   return (
     <div className="min-h-screen bg-background pb-20">
