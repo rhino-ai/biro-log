@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Video, Users, Monitor, Copy, ExternalLink, Mic, MicOff, VideoOff, Send, DoorOpen, Loader2, PhoneCall, PhoneOff, Search, Share2, XCircle, Link as LinkIcon, Ban, UserX, ShieldOff, MoreVertical, Pin, PinOff, MessageSquare, Wifi, WifiOff, ScrollText, Download, Gauge, Activity, Stethoscope, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { Video, Users, Monitor, Copy, ExternalLink, Mic, MicOff, VideoOff, Send, DoorOpen, Loader2, PhoneCall, PhoneOff, Search, Share2, XCircle, Link as LinkIcon, Ban, UserX, ShieldOff, MoreVertical, Pin, PinOff, MessageSquare, Wifi, WifiOff, ScrollText, Download, Gauge, Activity, Stethoscope, CheckCircle2, AlertTriangle, ArrowLeft, RefreshCw, LifeBuoy, Settings } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { useGame } from '@/hooks/useGame';
 import { useAuth } from '@/hooks/useAuth';
@@ -112,6 +112,74 @@ const getGuestId = () => {
 
 const supabase = _supabase as any;
 
+// Interpret a MediaDevices / getUserMedia error into human, actionable info.
+type MediaErrKind = 'camera' | 'mic' | 'both';
+type MediaErrInfo = {
+  title: string;
+  reason: string;
+  fix: string;
+  code: string;
+};
+const explainMediaError = (err: unknown, kind: MediaErrKind): MediaErrInfo => {
+  const anyErr = err as any;
+  const name: string = anyErr?.name || '';
+  const message: string = anyErr?.message || String(err ?? '');
+  const dev = kind === 'camera' ? 'camera' : kind === 'mic' ? 'microphone' : 'camera & microphone';
+  const base = (reason: string, fix: string, code = name || 'Error') => ({
+    title: `${dev[0].toUpperCase()}${dev.slice(1)} blocked`,
+    reason,
+    fix,
+    code,
+  });
+  if (name === 'NotAllowedError' || /permission|denied/i.test(message)) {
+    return base(
+      `Permission was denied for your ${dev}.`,
+      `Tap the lock/permissions icon in your browser's address bar → set ${dev} to "Allow", then hit Retry. On Vivo / MIUI / OneUI, also enable ${dev} for your browser under phone Settings → Apps → Permissions.`,
+      name || 'NotAllowedError',
+    );
+  }
+  if (name === 'NotFoundError' || /not found|no device/i.test(message)) {
+    return base(
+      `No ${dev} was detected on this device.`,
+      `Plug in / enable your ${dev} and try again. If it's built-in, restart the browser and phone Bluetooth headset (if any) that might be capturing it.`,
+      name || 'NotFoundError',
+    );
+  }
+  if (name === 'NotReadableError' || /could not start|in use|hardware|track start/i.test(message)) {
+    return base(
+      `Your ${dev} is being used by another app (e.g. WhatsApp, Instagram, another browser tab, or the Zoom app).`,
+      `Close every other app / tab that might be using the ${dev} — including background apps in the recent-apps tray — then tap Retry. On Vivo you may also need to force-stop the browser and re-open this link.`,
+      name || 'NotReadableError',
+    );
+  }
+  if (name === 'OverconstrainedError' || /constrain/i.test(message)) {
+    return base(
+      `The requested ${dev} settings aren't supported by this device.`,
+      `Tap Retry — we'll ask for default settings. If it still fails, switch to a different camera in your browser's site settings.`,
+      name || 'OverconstrainedError',
+    );
+  }
+  if (name === 'SecurityError' || /secure|https/i.test(message)) {
+    return base(
+      `This browser only allows ${dev} access over HTTPS.`,
+      `Open the app from the https:// address — not http:// or a direct IP.`,
+      name || 'SecurityError',
+    );
+  }
+  if (name === 'AbortError') {
+    return base(
+      `${dev} start was aborted by the system.`,
+      `Retry once. If it keeps failing, restart your browser or phone.`,
+      name,
+    );
+  }
+  return base(
+    message || 'Unknown media error.',
+    `Try again. If it keeps failing, restart the browser or phone and re-open the invite link.`,
+    name || 'Error',
+  );
+};
+
 // Live microphone input level meter (0..1) driven by an AnalyserNode.
 const useMicLevel = (stream: MediaStream | null) => {
   const [level, setLevel] = useState(0);
@@ -207,6 +275,12 @@ const VirtualLibraryPage = () => {
   });
   useEffect(() => { try { localStorage.setItem('biro-bw-mode', bandwidthMode); } catch {} }, [bandwidthMode]);
   const [unreadChat, setUnreadChat] = useState(0);
+  // Media error dialog — shows reason + fix + retry buttons on getUserMedia failures
+  const [mediaError, setMediaError] = useState<{ kind: MediaErrKind; info: MediaErrInfo; retry: () => Promise<void> } | null>(null);
+  // Host-issued turn-on requests that couldn't be honored automatically (device
+  // has no live track). Cleared once the user grants the ask via a button tap.
+  const [pendingHostRequest, setPendingHostRequest] = useState<{ mic?: boolean; cam?: boolean }>({});
+  const [isRestoring, setIsRestoring] = useState(false);
   // Diagnostics + preflight
   const [diagOpen, setDiagOpen] = useState(false);
   const [diagRows, setDiagRows] = useState<Array<any>>([]);
@@ -329,7 +403,8 @@ const VirtualLibraryPage = () => {
       if (videoRef.current) videoRef.current.srcObject = stream;
       toast({ title: 'Live call started', description: 'Others in this room will connect automatically.' });
     } catch (error) {
-      toast({ title: 'Call blocked', description: error instanceof Error ? error.message : 'Allow camera + mic.', variant: 'destructive' });
+      const info = explainMediaError(error, 'both');
+      setMediaError({ kind: 'both', info, retry: startCall });
     }
   }, []);
 
@@ -415,11 +490,14 @@ const VirtualLibraryPage = () => {
         if (payload?.target !== selfId && payload?.target !== '*') return;
         if (user && user.id === activeRoom.owner_id) return;
         const tracks = callStream?.getAudioTracks() || streamRef.current?.getAudioTracks() || [];
-        if (tracks.length) {
+        const live = tracks.filter((t) => t.readyState === 'live');
+        if (live.length) {
           tracks.forEach((t) => (t.enabled = true));
           setMicOn(true);
+          setPendingHostRequest((p) => ({ ...p, mic: false }));
           toast({ title: 'Host asked you to unmute — mic is on' });
         } else {
+          setPendingHostRequest((p) => ({ ...p, mic: true }));
           toast({ title: 'Host is asking you to unmute', description: 'Tap the Mic button to turn it on.' });
         }
       })
@@ -427,11 +505,14 @@ const VirtualLibraryPage = () => {
         if (payload?.target !== selfId && payload?.target !== '*') return;
         if (user && user.id === activeRoom.owner_id) return;
         const tracks = callStream?.getVideoTracks() || streamRef.current?.getVideoTracks() || [];
-        if (tracks.length) {
+        const live = tracks.filter((t) => t.readyState === 'live');
+        if (live.length) {
           tracks.forEach((t) => (t.enabled = true));
           setCameraOn(true);
+          setPendingHostRequest((p) => ({ ...p, cam: false }));
           toast({ title: 'Host asked you to turn camera on — camera is on' });
         } else {
+          setPendingHostRequest((p) => ({ ...p, cam: true }));
           toast({ title: 'Host is asking you to turn on camera', description: 'Tap the Camera button to enable it.' });
         }
       })
@@ -858,6 +939,7 @@ const VirtualLibraryPage = () => {
         if (videoTracks.length && anyLive) {
           videoTracks.forEach((t) => (t.enabled = !cameraOn));
           setCameraOn(!cameraOn);
+          if (!cameraOn) setPendingHostRequest((p) => ({ ...p, cam: false }));
           return;
         }
         // No live video track — acquire one and add to the call stream
@@ -870,6 +952,7 @@ const VirtualLibraryPage = () => {
           });
           setCallStream(new MediaStream(callStream.getTracks()));
           setCameraOn(true);
+          setPendingHostRequest((p) => ({ ...p, cam: false }));
         }
         return;
       }
@@ -884,8 +967,9 @@ const VirtualLibraryPage = () => {
       if (videoRef.current) videoRef.current.srcObject = stream;
       setCameraOn(true);
       if (stream.getAudioTracks().length) setMicOn(true);
+      setPendingHostRequest((p) => ({ ...p, cam: false }));
     } catch (error) {
-      toast({ title: 'Camera blocked', description: error instanceof Error ? error.message : 'Allow camera permission.', variant: 'destructive' });
+      setMediaError({ kind: 'camera', info: explainMediaError(error, 'camera'), retry: toggleCamera });
     }
   };
 
@@ -897,6 +981,7 @@ const VirtualLibraryPage = () => {
         if (audioTracks.length && anyLive) {
           audioTracks.forEach((t) => (t.enabled = !micOn));
           setMicOn(!micOn);
+          if (!micOn) setPendingHostRequest((p) => ({ ...p, mic: false }));
           return;
         }
         if (!micOn) {
@@ -907,6 +992,7 @@ const VirtualLibraryPage = () => {
           });
           setCallStream(new MediaStream(callStream.getTracks()));
           setMicOn(true);
+          setPendingHostRequest((p) => ({ ...p, mic: false }));
         }
         return;
       }
@@ -920,8 +1006,9 @@ const VirtualLibraryPage = () => {
       if (cameraOn && videoRef.current) videoRef.current.srcObject = stream;
       setMicOn(true);
       if (stream.getVideoTracks().length) setCameraOn(true);
+      setPendingHostRequest((p) => ({ ...p, mic: false }));
     } catch (error) {
-      toast({ title: 'Mic blocked', description: error instanceof Error ? error.message : 'Allow microphone permission.', variant: 'destructive' });
+      setMediaError({ kind: 'mic', info: explainMediaError(error, 'mic'), retry: toggleMic });
     }
   };
 
@@ -980,6 +1067,73 @@ const VirtualLibraryPage = () => {
     const { error } = await supabase.from('study_room_messages').insert({ room_id: activeRoom.id, sender_id: user.id, content });
     if (error) toast({ title: 'Message failed', description: error.message, variant: 'destructive' });
   };
+
+  // Emergency restore — stop everything, re-request camera + mic, rebuild the
+  // call stream. Fixes stuck / dead tracks on flaky Android devices (Vivo,
+  // MIUI, OneUI) without having to leave and rejoin the room.
+  const emergencyRestore = useCallback(async () => {
+    setIsRestoring(true);
+    try {
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      screenStreamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+      screenStreamRef.current = null;
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      streamRef.current = stream;
+      setCallStream(stream);
+      setCameraOn(true);
+      setMicOn(true);
+      setScreenOn(false);
+      setCallActive(true);
+      if (videoRef.current) videoRef.current.srcObject = stream;
+      setPendingHostRequest({});
+      toast({ title: 'Controls restored', description: 'Camera + mic have been re-acquired.' });
+    } catch (error) {
+      setMediaError({ kind: 'both', info: explainMediaError(error, 'both'), retry: emergencyRestore });
+    } finally {
+      setIsRestoring(false);
+    }
+  }, []);
+
+  // Auto re-acquire on focus: when the tab regains focus and we're supposed to
+  // be on-camera / on-mic but tracks are dead, silently rebuild the stream.
+  useEffect(() => {
+    if (!callActive) return;
+    const rehydrate = async () => {
+      if (document.visibilityState !== 'visible') return;
+      if (!cameraOn && !micOn) return;
+      const s = callStream;
+      const needVideo = cameraOn && !(s?.getVideoTracks().some((t) => t.readyState === 'live'));
+      const needAudio = micOn && !(s?.getAudioTracks().some((t) => t.readyState === 'live'));
+      if (!needVideo && !needAudio) return;
+      try {
+        const fresh = await navigator.mediaDevices.getUserMedia({ video: needVideo, audio: needAudio });
+        if (s) {
+          if (needVideo) {
+            s.getVideoTracks().forEach((old) => { try { s.removeTrack(old); } catch {} });
+            fresh.getVideoTracks().forEach((t) => s.addTrack(t));
+          }
+          if (needAudio) {
+            s.getAudioTracks().forEach((old) => { try { s.removeTrack(old); } catch {} });
+            fresh.getAudioTracks().forEach((t) => s.addTrack(t));
+          }
+          setCallStream(new MediaStream(s.getTracks()));
+        } else {
+          setCallStream(fresh);
+          streamRef.current = fresh;
+        }
+      } catch {
+        // Silent — user will see mic/cam off state and can tap to retry.
+      }
+    };
+    const onVis = () => { void rehydrate(); };
+    document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('focus', onVis);
+    return () => {
+      document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener('focus', onVis);
+    };
+  }, [callActive, cameraOn, micOn, callStream]);
 
   // Guests can join rooms via invite link — no gate here.
 
@@ -1102,6 +1256,36 @@ const VirtualLibraryPage = () => {
               <Button variant={screenOn ? 'default' : 'outline'} onClick={toggleScreen} className="gap-2"><Monitor className="w-4 h-4" /> Screen</Button>
             </div>
 
+            {(pendingHostRequest.mic || pendingHostRequest.cam) && (
+              <div className="rounded-lg border border-amber-500/50 bg-amber-500/10 p-2 flex items-center gap-2 text-xs">
+                <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
+                <div className="flex-1">
+                  <p className="font-semibold text-amber-500">Host is asking you to turn on</p>
+                  <p className="text-muted-foreground">
+                    {pendingHostRequest.mic && pendingHostRequest.cam ? 'Mic and camera' : pendingHostRequest.mic ? 'Mic' : 'Camera'} — tap the button below.
+                  </p>
+                </div>
+                <Button size="sm" variant="outline" className="h-7 text-[11px]" onClick={async () => {
+                  if (pendingHostRequest.mic) await toggleMic();
+                  if (pendingHostRequest.cam) await toggleCamera();
+                }}>Turn on</Button>
+              </div>
+            )}
+
+            {callActive && (
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" onClick={emergencyRestore} disabled={isRestoring} className="gap-1 text-xs">
+                  {isRestoring ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <LifeBuoy className="w-3.5 h-3.5" />} Restore controls
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setMediaError({ kind: 'both', info: {
+                  title: 'How to unblock camera / mic',
+                  reason: 'Some Android phones (Vivo, MIUI, OneUI) block camera or mic per-app. If you keep seeing "could not start video source" this is usually the cause.',
+                  fix: '1. Tap the lock icon in the browser address bar → Site settings → allow Camera + Microphone.\n2. Open phone Settings → Apps → your browser → Permissions → allow Camera + Microphone.\n3. Force-stop any other app using the camera (Zoom, WhatsApp, Instagram).\n4. Come back to this page and hit Restore controls.',
+                  code: 'help',
+                }, retry: emergencyRestore })} className="gap-1 text-xs"><Settings className="w-3.5 h-3.5" /> Fix permissions</Button>
+              </div>
+            )}
+
             {callActive && micOn && (
               <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
                 <Mic className="w-3 h-3 shrink-0" />
@@ -1165,9 +1349,27 @@ const VirtualLibraryPage = () => {
               chatOpen ? 'fixed inset-0 top-[57px] z-40 flex lg:static' : 'hidden',
             )}
           >
-            <div className="p-3 border-b border-border flex items-center justify-between"><span className="font-game text-sm">Room Chat</span><span className="text-xs text-muted-foreground flex items-center gap-1"><Users className="w-3 h-3" /> {roomUsers.length}</span></div>
-            <div className="lg:hidden px-3 pb-2">
-              <Button variant="ghost" size="sm" onClick={() => setChatOpen(false)} className="w-full gap-2 text-xs"><XCircle className="w-3 h-3" /> Close chat</Button>
+            <div className="p-3 border-b border-border flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setChatOpen(false)}
+                className="lg:hidden h-8 w-8 shrink-0"
+                aria-label="Back to room"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </Button>
+              <span className="font-game text-sm flex-1">Room Chat</span>
+              <span className="text-xs text-muted-foreground flex items-center gap-1"><Users className="w-3 h-3" /> {roomUsers.length}</span>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setChatOpen(false)}
+                className="hidden lg:inline-flex h-8 w-8 shrink-0"
+                aria-label="Close chat"
+              >
+                <XCircle className="w-4 h-4" />
+              </Button>
             </div>
             <ScrollArea className="flex-1 p-3">
               <div className="space-y-3">
@@ -1362,6 +1564,57 @@ const VirtualLibraryPage = () => {
             <DialogFooter className="gap-2">
               <Button variant="ghost" onClick={() => setPreflightOpen(false)}>Close</Button>
               <Button onClick={runPreflight} className="gap-2"><Stethoscope className="w-4 h-4" /> Re-run</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={!!mediaError} onOpenChange={(open) => { if (!open) setMediaError(null); }}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-destructive"><AlertTriangle className="w-5 h-5" /> {mediaError?.info.title}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 text-sm">
+              <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3">
+                <p className="text-xs font-semibold text-destructive uppercase tracking-wide mb-1">Why it failed</p>
+                <p>{mediaError?.info.reason}</p>
+                {mediaError?.info.code && mediaError.info.code !== 'help' && (
+                  <p className="text-[10px] text-muted-foreground mt-1">Code: {mediaError.info.code}</p>
+                )}
+              </div>
+              <div className="rounded-lg border border-border bg-secondary/40 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide mb-1">How to fix</p>
+                <p className="whitespace-pre-line text-xs leading-relaxed">{mediaError?.info.fix}</p>
+              </div>
+            </div>
+            <DialogFooter className="gap-2">
+              <Button variant="ghost" onClick={() => setMediaError(null)}>Dismiss</Button>
+              <Button
+                variant="outline"
+                className="gap-1"
+                onClick={async () => {
+                  // Best-effort: nudge the browser permission prompt again.
+                  try {
+                    const anyPerms = (navigator as any).permissions;
+                    if (anyPerms?.query) {
+                      await anyPerms.query({ name: 'camera' as PermissionName }).catch(() => {});
+                      await anyPerms.query({ name: 'microphone' as PermissionName }).catch(() => {});
+                    }
+                  } catch {}
+                  toast({ title: 'Permission prompt', description: 'If nothing happens, tap the lock icon in your address bar to change permissions.' });
+                }}
+              >
+                <Settings className="w-4 h-4" /> Open permission
+              </Button>
+              <Button
+                className="gap-1"
+                onClick={async () => {
+                  const r = mediaError?.retry;
+                  setMediaError(null);
+                  await r?.();
+                }}
+              >
+                <RefreshCw className="w-4 h-4" /> Retry
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
