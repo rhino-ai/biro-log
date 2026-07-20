@@ -88,17 +88,30 @@ self.addEventListener('fetch', (event) => {
 self.addEventListener('push', (event) => {
   const data = event.data?.json() || {};
   const title = data.title || 'Biro-log Reminder';
+  const isChat = typeof data.tag === 'string' && (data.tag.startsWith('dm-') || data.tag.startsWith('grp-') || data.tag.startsWith('invite-') || data.tag.startsWith('chat-'));
   const options = {
     body: data.body || 'You have a task reminder!',
     icon: data.icon || '/pwa-192x192.png',
     badge: data.badge || '/pwa-192x192.png',
-    vibrate: [200, 100, 200],
+    vibrate: isChat ? [300, 120, 300, 120, 300] : [200, 100, 200],
     tag: data.tag || 'default',
+    renotify: data.renotify !== false,
+    silent: false,
+    timestamp: Date.now(),
     data: { url: data.url || '/' },
     requireInteraction: !!data.requireInteraction,
   };
-  
-  event.waitUntil(self.registration.showNotification(title, options));
+
+  event.waitUntil((async () => {
+    // If the app is open & focused on the target, skip the OS notification
+    // and just ping the client so it can play an in-app sound.
+    const wins = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const focused = wins.find((w) => w.focused);
+    if (focused) {
+      try { focused.postMessage({ type: 'push', payload: { title, body: options.body, url: options.data.url, tag: options.tag } }); } catch {}
+    }
+    await self.registration.showNotification(title, options);
+  })());
 });
 
 // Handle notification clicks

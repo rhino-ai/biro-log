@@ -374,6 +374,15 @@ const FriendsPage = () => {
       setChatMessages(prev => prev.map(m => m.id === tempId ? { ...(data as UIMessage), pending: false } : m));
       if (useE2EE && content && data?.id) setDecryptedText(prev => ({ ...prev, [data.id]: content }));
       void loadChats();
+      // Fan out push notification like WhatsApp/Telegram. Best-effort — don't block UI on failure.
+      try {
+        const preview = useE2EE && content ? '🔒 New message' : (content || '');
+        void supabase.functions.invoke('notify-chat', {
+          body: isDM
+            ? { type: 'dm', receiverId: activeChat.id, preview, hasAttachment: !!payload.attachment_url || !!payload.attachment_meta }
+            : { type: 'group', groupId: activeChat.id, preview, hasAttachment: !!payload.attachment_url || !!payload.attachment_meta },
+        });
+      } catch {}
     } catch (err: any) {
       setChatMessages(prev => prev.map(m => m.id === tempId ? { ...m, pending: false, failed: true } : m));
       toast({ title: 'Send failed', description: err?.message || 'Try again', variant: 'destructive' });

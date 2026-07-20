@@ -33,6 +33,7 @@ import JoinInvitePage from "./pages/JoinInvitePage";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 import { ReadModeGuard } from "@/components/system/ReadModeGuard";
+import { useInAppPushSound } from "@/hooks/useInAppPushSound";
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 5 * 60 * 1000 } },
@@ -60,7 +61,9 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-const AppRoutes = () => (
+const AppRoutes = () => {
+  useInAppPushSound();
+  return (
   <ReadModeGuard>
   <Routes>
     <Route path="/auth" element={<PublicRoute><AuthPage /></PublicRoute>} />
@@ -91,7 +94,8 @@ const AppRoutes = () => (
     <Route path="*" element={<NotFound />} />
   </Routes>
   </ReadModeGuard>
-);
+  );
+};
 
 const GlobalErrorHandler = ({ children }: { children: React.ReactNode }) => {
   useEffect(() => {

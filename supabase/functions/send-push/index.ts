@@ -19,6 +19,7 @@ interface PushPayload {
   tag?: string;
   icon?: string;
   requireInteraction?: boolean;
+  renotify?: boolean;
 }
 
 Deno.serve(async (req) => {
@@ -34,6 +35,7 @@ Deno.serve(async (req) => {
       tag: body.tag ? String(body.tag) : undefined,
       icon: body.icon ? String(body.icon) : undefined,
       requireInteraction: !!body.requireInteraction,
+      renotify: body.renotify !== false,
     };
 
     // Target: explicit user_ids from a trusted service caller, otherwise the JWT user.
