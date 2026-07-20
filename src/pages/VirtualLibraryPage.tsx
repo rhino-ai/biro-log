@@ -1068,6 +1068,73 @@ const VirtualLibraryPage = () => {
     if (error) toast({ title: 'Message failed', description: error.message, variant: 'destructive' });
   };
 
+  // Emergency restore — stop everything, re-request camera + mic, rebuild the
+  // call stream. Fixes stuck / dead tracks on flaky Android devices (Vivo,
+  // MIUI, OneUI) without having to leave and rejoin the room.
+  const emergencyRestore = useCallback(async () => {
+    setIsRestoring(true);
+    try {
+      streamRef.current?.getTracks().forEach((t) => t.stop());
+      screenStreamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+      screenStreamRef.current = null;
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      streamRef.current = stream;
+      setCallStream(stream);
+      setCameraOn(true);
+      setMicOn(true);
+      setScreenOn(false);
+      setCallActive(true);
+      if (videoRef.current) videoRef.current.srcObject = stream;
+      setPendingHostRequest({});
+      toast({ title: 'Controls restored', description: 'Camera + mic have been re-acquired.' });
+    } catch (error) {
+      setMediaError({ kind: 'both', info: explainMediaError(error, 'both'), retry: emergencyRestore });
+    } finally {
+      setIsRestoring(false);
+    }
+  }, []);
+
+  // Auto re-acquire on focus: when the tab regains focus and we're supposed to
+  // be on-camera / on-mic but tracks are dead, silently rebuild the stream.
+  useEffect(() => {
+    if (!callActive) return;
+    const rehydrate = async () => {
+      if (document.visibilityState !== 'visible') return;
+      if (!cameraOn && !micOn) return;
+      const s = callStream;
+      const needVideo = cameraOn && !(s?.getVideoTracks().some((t) => t.readyState === 'live'));
+      const needAudio = micOn && !(s?.getAudioTracks().some((t) => t.readyState === 'live'));
+      if (!needVideo && !needAudio) return;
+      try {
+        const fresh = await navigator.mediaDevices.getUserMedia({ video: needVideo, audio: needAudio });
+        if (s) {
+          if (needVideo) {
+            s.getVideoTracks().forEach((old) => { try { s.removeTrack(old); } catch {} });
+            fresh.getVideoTracks().forEach((t) => s.addTrack(t));
+          }
+          if (needAudio) {
+            s.getAudioTracks().forEach((old) => { try { s.removeTrack(old); } catch {} });
+            fresh.getAudioTracks().forEach((t) => s.addTrack(t));
+          }
+          setCallStream(new MediaStream(s.getTracks()));
+        } else {
+          setCallStream(fresh);
+          streamRef.current = fresh;
+        }
+      } catch {
+        // Silent — user will see mic/cam off state and can tap to retry.
+      }
+    };
+    const onVis = () => { void rehydrate(); };
+    document.addEventListener('visibilitychange', onVis);
+    window.addEventListener('focus', onVis);
+    return () => {
+      document.removeEventListener('visibilitychange', onVis);
+      window.removeEventListener('focus', onVis);
+    };
+  }, [callActive, cameraOn, micOn, callStream]);
+
   // Guests can join rooms via invite link — no gate here.
 
   if (activeRoom) {
