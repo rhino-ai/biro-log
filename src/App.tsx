@@ -90,7 +90,7 @@ const AppRoutes = () => {
     <Route path="/wellness" element={<ProtectedRoute><WellnessPage /></ProtectedRoute>} />
     <Route path="/screen-time" element={<ProtectedRoute><ScreenTimePage /></ProtectedRoute>} />
     <Route path="/analytics" element={<ProtectedRoute><AnalyticsPage /></ProtectedRoute>} />
-    <Route path="/virtual-library" element={<ProtectedRoute><VirtualLibraryPage /></ProtectedRoute>} />
+    <Route path="/virtual-library" element={<VirtualLibraryPage />} />
     <Route path="/feedback" element={<ProtectedRoute><FeedbackPage /></ProtectedRoute>} />
     <Route path="/journal" element={<ProtectedRoute><JournalPage /></ProtectedRoute>} />
     <Route path="/trackers" element={<ProtectedRoute><TrackersPage /></ProtectedRoute>} />
