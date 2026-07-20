@@ -331,9 +331,9 @@ const FriendsPage = () => {
 
   const copyInvite = async (code: string | null) => {
     if (!code) { toast({ title: 'Invite code missing', variant: 'destructive' }); return; }
-    const link = `${window.location.origin}/friends?join=${encodeURIComponent(code)}`;
+    const link = `${window.location.origin}/join/${encodeURIComponent(code)}`;
     await navigator.clipboard.writeText(link);
-    toast({ title: 'Invite link copied' });
+    toast({ title: 'Invite link copied', description: 'Share it — recipients auto-join.' });
   };
 
   useEffect(() => {
