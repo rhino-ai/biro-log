@@ -144,6 +144,15 @@ const VirtualLibraryPage = () => {
   const [guestName, setGuestName] = useState<string>(() => {
     try { return localStorage.getItem('biro-guest-name') || 'Guest'; } catch { return 'Guest'; }
   });
+  const [chatOpen, setChatOpen] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    // Default: open on desktop, collapsed on mobile
+    return window.matchMedia('(min-width: 1024px)').matches;
+  });
+  const [confirmEndOpen, setConfirmEndOpen] = useState(false);
+  const [auditOpen, setAuditOpen] = useState(false);
+  const [auditRows, setAuditRows] = useState<Array<{ id: string; action: string; target_name: string | null; created_at: string; metadata: any }>>([]);
+  const [unreadChat, setUnreadChat] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const screenStreamRef = useRef<MediaStream | null>(null);
@@ -162,6 +171,44 @@ const VirtualLibraryPage = () => {
     localStream: callStream,
     enabled: callActive && !!activeRoom,
   });
+
+  // Overall self connection health = worst peer state (or 'connected' if no peers yet)
+  const overallConn: RTCPeerConnectionState = (() => {
+    if (!callActive) return 'new';
+    if (peers.length === 0) return 'connecting';
+    const states = peers.map((p) => p.connectionState || 'new');
+    if (states.some((s) => s === 'failed' || s === 'closed')) return 'failed';
+    if (states.some((s) => s === 'disconnected')) return 'disconnected';
+    if (states.every((s) => s === 'connected')) return 'connected';
+    return 'connecting';
+  })();
+
+  // Persist spotlight selection per room
+  const spotlightKey = activeRoom ? `biro-spotlight-${activeRoom.code}` : '';
+  useEffect(() => {
+    if (!activeRoom) return;
+    try {
+      const saved = localStorage.getItem(spotlightKey);
+      if (saved) setPinnedPeerId(saved);
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeRoom?.code]);
+  useEffect(() => {
+    if (!spotlightKey) return;
+    try {
+      if (pinnedPeerId) localStorage.setItem(spotlightKey, pinnedPeerId);
+      else localStorage.removeItem(spotlightKey);
+    } catch {}
+  }, [pinnedPeerId, spotlightKey]);
+  // Auto-unpin if pinned peer left the mesh
+  useEffect(() => {
+    if (pinnedPeerId && !peers.some((p) => p.peerId === pinnedPeerId)) setPinnedPeerId(null);
+  }, [peers, pinnedPeerId]);
+
+  // Track unread chat messages while panel is closed
+  useEffect(() => {
+    if (chatOpen) setUnreadChat(0);
+  }, [chatOpen, messages.length]);
 
   const stopMedia = useCallback(() => {
     streamRef.current?.getTracks().forEach((track) => track.stop());
@@ -402,15 +449,41 @@ const VirtualLibraryPage = () => {
 
   const endMeeting = async () => {
     if (!activeRoom || !isOwner) return;
-    if (!window.confirm('End this meeting for everyone?')) return;
-    // Broadcast on the already-subscribed unified live channel so every
-    // participant (auth + guest) receives it instantly.
+    setConfirmEndOpen(true);
+  };
+
+  const doEndMeeting = async () => {
+    if (!activeRoom || !isOwner) return;
+    setConfirmEndOpen(false);
     try {
       await hostChannelRef.current?.send({ type: 'broadcast', event: 'meeting-ended', payload: {} });
     } catch {}
     await supabase.from('study_rooms').update({ is_active: false }).eq('id', activeRoom.id);
-    toast({ title: 'Meeting ended' });
+    await logAudit('end_meeting');
+    toast({ title: 'Meeting ended for everyone' });
     await leaveRoom();
+  };
+
+  const logAudit = async (action: string, target?: RoomUser | null, metadata: any = {}) => {
+    if (!isOwner || !activeRoom || !user) return;
+    if (activeRoom.id.startsWith('guest-')) return;
+    try {
+      await supabase.from('study_room_audit_log').insert({
+        room_id: activeRoom.id,
+        host_id: user.id,
+        action,
+        target_id: target?.id ?? null,
+        target_name: target?.name ?? null,
+        metadata,
+      });
+    } catch {}
+  };
+
+  const openAuditLog = async () => {
+    if (!isOwner || !activeRoom) return;
+    setAuditOpen(true);
+    const { data } = await supabase.from('study_room_audit_log').select('id,action,target_name,created_at,metadata').eq('room_id', activeRoom.id).order('created_at', { ascending: false }).limit(100);
+    setAuditRows((data as any[]) || []);
   };
 
   const hostBroadcast = async (event: string, payload: any) => {
@@ -422,24 +495,28 @@ const VirtualLibraryPage = () => {
   const muteMember = async (target: RoomUser) => {
     if (!isOwner) return;
     await hostBroadcast('force-mute', { target: target.id });
+    await logAudit('mute', target);
     toast({ title: `Muted ${target.name}` });
   };
 
   const camOffMember = async (target: RoomUser) => {
     if (!isOwner) return;
     await hostBroadcast('force-cam-off', { target: target.id });
+    await logAudit('cam_off', target);
     toast({ title: `Cam off ${target.name}` });
   };
 
   const muteAll = async () => {
     if (!isOwner) return;
     await hostBroadcast('force-mute', { target: '*' });
+    await logAudit('mute_all');
     toast({ title: 'Muted everyone' });
   };
 
   const camOffAll = async () => {
     if (!isOwner) return;
     await hostBroadcast('force-cam-off', { target: '*' });
+    await logAudit('cam_off_all');
     toast({ title: 'Cameras off for everyone' });
   };
 
@@ -447,6 +524,7 @@ const VirtualLibraryPage = () => {
     if (!isOwner || !activeRoom) return;
     await hostBroadcast('kick', { target: target.id, banned: false });
     await supabase.from('study_room_members').delete().eq('room_id', activeRoom.id).eq('user_id', target.id);
+    await logAudit('kick', target);
     toast({ title: `Removed ${target.name}` });
   };
 
@@ -477,6 +555,7 @@ const VirtualLibraryPage = () => {
     if (error) { toast({ title: 'Ban failed', description: error.message, variant: 'destructive' }); return; }
     await hostBroadcast('kick', { target: banTarget.id, banned: true });
     await supabase.from('study_room_members').delete().eq('room_id', activeRoom.id).eq('user_id', banTarget.id);
+    await logAudit('ban', banTarget, { scope: banScope, duration: banDuration, reason: banReason.trim() || null });
     toast({ title: `Banned ${banTarget.name}`, description: banScope === 'host_all' ? 'From all your rooms' : 'From this room' });
     setBanTarget(null);
     setBanReason('');
