@@ -1567,6 +1567,57 @@ const VirtualLibraryPage = () => {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+        <Dialog open={!!mediaError} onOpenChange={(open) => { if (!open) setMediaError(null); }}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-destructive"><AlertTriangle className="w-5 h-5" /> {mediaError?.info.title}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-3 text-sm">
+              <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3">
+                <p className="text-xs font-semibold text-destructive uppercase tracking-wide mb-1">Why it failed</p>
+                <p>{mediaError?.info.reason}</p>
+                {mediaError?.info.code && mediaError.info.code !== 'help' && (
+                  <p className="text-[10px] text-muted-foreground mt-1">Code: {mediaError.info.code}</p>
+                )}
+              </div>
+              <div className="rounded-lg border border-border bg-secondary/40 p-3">
+                <p className="text-xs font-semibold uppercase tracking-wide mb-1">How to fix</p>
+                <p className="whitespace-pre-line text-xs leading-relaxed">{mediaError?.info.fix}</p>
+              </div>
+            </div>
+            <DialogFooter className="gap-2">
+              <Button variant="ghost" onClick={() => setMediaError(null)}>Dismiss</Button>
+              <Button
+                variant="outline"
+                className="gap-1"
+                onClick={async () => {
+                  // Best-effort: nudge the browser permission prompt again.
+                  try {
+                    const anyPerms = (navigator as any).permissions;
+                    if (anyPerms?.query) {
+                      await anyPerms.query({ name: 'camera' as PermissionName }).catch(() => {});
+                      await anyPerms.query({ name: 'microphone' as PermissionName }).catch(() => {});
+                    }
+                  } catch {}
+                  toast({ title: 'Permission prompt', description: 'If nothing happens, tap the lock icon in your address bar to change permissions.' });
+                }}
+              >
+                <Settings className="w-4 h-4" /> Open permission
+              </Button>
+              <Button
+                className="gap-1"
+                onClick={async () => {
+                  const r = mediaError?.retry;
+                  setMediaError(null);
+                  await r?.();
+                }}
+              >
+                <RefreshCw className="w-4 h-4" /> Retry
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     );
   }
