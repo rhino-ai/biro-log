@@ -10,6 +10,16 @@ Deno.serve(async (req) => {
     const secret = Deno.env.get("CRON_SECRET");
     if (!secret) throw new Error("CRON_SECRET not configured");
 
+    // Require the shared secret in the request header. Prevents anonymous callers
+    // from triggering cron rescheduling from the internet.
+    const provided = req.headers.get("x-cron-secret") || "";
+    if (provided.length !== secret.length || provided !== secret) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
