@@ -44,6 +44,7 @@ Deno.serve(async (req) => {
     let text = preview || (hasAttachment ? "📎 Attachment" : "New message");
     let url = "/friends";
     let tag = `chat-${Date.now()}`;
+    let activeChatId: string | null = null;
 
     if (type === "dm") {
       const receiverId = String(body.receiverId || "");
@@ -51,6 +52,7 @@ Deno.serve(async (req) => {
       targetIds = [receiverId];
       title = senderName;
       tag = `dm-${senderId}`;
+      activeChatId = `dm:${senderId}`;
     } else if (type === "group") {
       const groupId = String(body.groupId || "");
       if (!/^[0-9a-f-]{36}$/i.test(groupId)) return json({ error: "bad group" }, 400);
@@ -63,6 +65,7 @@ Deno.serve(async (req) => {
       text = `${senderName}: ${text}`;
       url = "/friends";
       tag = `grp-${groupId}`;
+      activeChatId = `group:${groupId}`;
     } else if (type === "group_invite") {
       const groupId = String(body.groupId || "");
       const targetId = String(body.targetId || "");
@@ -78,6 +81,28 @@ Deno.serve(async (req) => {
     }
 
     if (targetIds.length === 0) return json({ ok: true, sent: 0 });
+
+    // Suppress push for recipients who are actively viewing this exact chat
+    // AND have had a device heartbeat in the last 30s (i.e. app is foregrounded).
+    if (activeChatId) {
+      const cutoff = new Date(Date.now() - 30_000).toISOString();
+      const { data: activeUsers } = await admin
+        .from("chat_preferences")
+        .select("user_id, viewing_chat_id")
+        .in("user_id", targetIds)
+        .eq("viewing_chat_id", activeChatId);
+      const activeIds = new Set((activeUsers || []).map((r: any) => r.user_id));
+      if (activeIds.size > 0) {
+        const { data: fresh } = await admin
+          .from("push_subscriptions")
+          .select("user_id")
+          .in("user_id", Array.from(activeIds))
+          .gte("last_active_at", cutoff);
+        const skip = new Set((fresh || []).map((r: any) => r.user_id));
+        targetIds = targetIds.filter((id) => !skip.has(id));
+      }
+      if (targetIds.length === 0) return json({ ok: true, sent: 0, skipped: "viewing" });
+    }
 
     const r = await fetch(`${SUPABASE_URL}/functions/v1/send-push`, {
       method: "POST",

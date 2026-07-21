@@ -26,7 +26,7 @@ const TEMPLATES: Template[] = [
   { emoji: '🚫', title: 'No reels day', type: 'daily' },
 ];
 
-export const HabitTemplates = () => {
+export const HabitTemplates = ({ compact = false }: { compact?: boolean } = {}) => {
   const { addTask, jungles } = useGame();
 
   const apply = (t: Template) => {
@@ -40,6 +40,22 @@ export const HabitTemplates = () => {
     });
     toast({ title: 'Habit added ✅', description: t.title });
   };
+
+  if (compact) {
+    return (
+      <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+        {TEMPLATES.map((t) => (
+          <button
+            key={t.title}
+            onClick={() => apply(t)}
+            className="shrink-0 text-xs px-3 py-1.5 rounded-full bg-secondary/60 hover:bg-primary/20 border border-white/10 hover:border-primary/40 whitespace-nowrap transition"
+          >
+            <span className="mr-1">{t.emoji}</span>{t.title}
+          </button>
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="glass-panel rounded-2xl p-4 border border-primary/20 space-y-3">

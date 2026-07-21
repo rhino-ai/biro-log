@@ -86,7 +86,33 @@ Deno.serve(async (req) => {
       results[t.tag] = await r.json().catch(() => ({ status: r.status }));
     }
 
-    return new Response(JSON.stringify({ ok: true, ist: `${h}:${m}`, users: userIds.length, results }), {
+    // ---- Task reminders ----
+    // Pick up any tasks whose remind_at has passed and that haven't been notified yet.
+    const { data: dueTasks } = await admin
+      .from("user_tasks")
+      .select("id, user_id, title")
+      .lte("remind_at", new Date().toISOString())
+      .is("reminded_at", null)
+      .eq("completed", false)
+      .limit(200);
+    let taskRemindersSent = 0;
+    for (const dt of (dueTasks || []) as Array<{ id: string; user_id: string; title: string }>) {
+      const r = await fetch(`${SUPABASE_URL}/functions/v1/send-push`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${SERVICE_KEY}` },
+        body: JSON.stringify({
+          title: "⏰ Task reminder",
+          body: dt.title,
+          url: "/tasks",
+          tag: `task-${dt.id}`,
+          user_ids: [dt.user_id],
+        }),
+      }).catch(() => null);
+      if (r) taskRemindersSent++;
+      await admin.from("user_tasks").update({ reminded_at: new Date().toISOString() }).eq("id", dt.id);
+    }
+
+    return new Response(JSON.stringify({ ok: true, ist: `${h}:${m}`, users: userIds.length, results, taskRemindersSent }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e: any) {

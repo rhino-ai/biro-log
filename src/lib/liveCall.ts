@@ -1,6 +1,7 @@
 // Tiny global store for the active Virtual Library call so App-level UI
 // (floating "You are live" banner + Picture-in-Picture) works after the
 // user navigates away from /virtual-library while their camera/mic are on.
+import { LiveCallNotifier, isNativeAndroid } from '@/lib/nativePlugins';
 
 type Listener = () => void;
 
@@ -30,6 +31,16 @@ export const liveCall = {
   },
   set(patch: Partial<LiveCallState>) {
     Object.assign(state, patch);
+    // Fire native foreground service notification on Android so the "You are LIVE"
+    // banner survives the tab being backgrounded / the OS moving the app off screen.
+    try {
+      if (state.active && isNativeAndroid()) {
+        LiveCallNotifier.start({
+          roomName: state.roomName || 'Study Room',
+          roomCode: state.roomCode || '',
+        }).catch(() => {});
+      }
+    } catch {}
     listeners.forEach((l) => l());
   },
   clear() {
@@ -39,6 +50,7 @@ export const liveCall = {
     state.stream = null;
     state.onLeave = null;
     state.onOpenRoom = null;
+    try { if (isNativeAndroid()) LiveCallNotifier.stop().catch(() => {}); } catch {}
     listeners.forEach((l) => l());
   },
   subscribe(fn: Listener) {

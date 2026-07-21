@@ -108,6 +108,45 @@ const FriendsPage = () => {
     void ensureKeypair(user.id).catch(() => {});
   }, [user]);
 
+  // ---- Push-suppression presence ----
+  // Tell the backend which chat is currently open so notify-chat can suppress
+  // duplicate pushes for messages the user is already reading. Also heartbeat
+  // push_subscriptions.last_active_at every 20s while the tab is focused so
+  // notify-chat knows the app is truly in the foreground.
+  useEffect(() => {
+    if (!user) return;
+    const viewingId = activeChat
+      ? (activeChat.kind === 'dm' ? `dm:${activeChat.id}` : `group:${activeChat.id}`)
+      : null;
+    (supabase as any)
+      .from('chat_preferences')
+      .upsert({ user_id: user.id, viewing_chat_id: viewingId }, { onConflict: 'user_id' })
+      .then(() => {}, () => {});
+    return () => {
+      (supabase as any)
+        .from('chat_preferences')
+        .update({ viewing_chat_id: null })
+        .eq('user_id', user.id)
+        .then(() => {}, () => {});
+    };
+  }, [user, activeChat]);
+
+  useEffect(() => {
+    if (!user) return;
+    const beat = async () => {
+      if (document.hidden) return;
+      await (supabase as any)
+        .from('push_subscriptions')
+        .update({ last_active_at: new Date().toISOString() })
+        .eq('user_id', user.id);
+    };
+    beat();
+    const iv = window.setInterval(beat, 20_000);
+    const onVis = () => { if (!document.hidden) beat(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => { window.clearInterval(iv); document.removeEventListener('visibilitychange', onVis); };
+  }, [user]);
+
   // When opening a DM, derive the shared key with the peer (or fall back to plaintext).
   useEffect(() => {
     sharedKeyRef.current = null;

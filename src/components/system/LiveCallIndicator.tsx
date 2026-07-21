@@ -55,12 +55,41 @@ export function LiveCallIndicator() {
     if (!state.active) return;
     const onVis = () => {
       if (document.hidden) {
-        // fire a single-shot heads-up toast (visible when they return)
         toast.warning("You are still LIVE in the study room — camera & mic are being shared.");
+        // Fire a real OS-level notification so the alert survives the tab hiding.
+        try {
+          if ("Notification" in window && Notification.permission === "granted") {
+            const n = new Notification("🔴 You are LIVE", {
+              body: `Camera & mic are still sharing in ${state.roomName || "the study room"}. Tap to return.`,
+              tag: "biro-live-call",
+              requireInteraction: true,
+              icon: "/icon-192.png",
+            });
+            n.onclick = () => {
+              window.focus();
+              n.close();
+              if (state.onOpenRoom) state.onOpenRoom();
+              else navigate("/virtual-library");
+            };
+          } else if ("Notification" in window && Notification.permission === "default") {
+            Notification.requestPermission().catch(() => {});
+          }
+        } catch {}
       }
     };
     document.addEventListener("visibilitychange", onVis);
     return () => document.removeEventListener("visibilitychange", onVis);
+  }, [state.active, state.roomName, state.onOpenRoom, navigate]);
+
+  // Ask for notification permission the moment a call starts, so the tab-hide
+  // path can actually fire an OS-level "You are LIVE" alert.
+  useEffect(() => {
+    if (!state.active) return;
+    try {
+      if ("Notification" in window && Notification.permission === "default") {
+        Notification.requestPermission().catch(() => {});
+      }
+    } catch {}
   }, [state.active]);
 
   const onLibraryPage = location.pathname.startsWith("/virtual-library");
