@@ -209,7 +209,7 @@ export function useWebRTCMesh({ roomKey, selfUserId, selfName, localStream, enab
     const myPeerId = peerIdRef.current;
 
     const channel = supabase.channel(`webrtc-${roomKey}`, {
-      config: { broadcast: { self: false, ack: false } },
+      config: { broadcast: { self: false, ack: false }, private: true },
     });
     channelRef.current = channel;
 

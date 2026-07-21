@@ -615,7 +615,7 @@ const VirtualLibraryPage = () => {
     // Unified live channel keyed on room CODE so guests + auth users share presence,
     // chat notifications, host broadcasts, and meeting-ended events.
     const channel = supabase.channel(`study-room-live-${activeRoom.code}`, {
-      config: { presence: { key: selfId } },
+      config: { presence: { key: selfId }, private: true },
     });
     channel
       .on('presence', { event: 'sync' }, () => {

@@ -1178,6 +1178,10 @@ export type Database = {
         Args: { _job_name?: string; _secret: string }
         Returns: undefined
       }
+      can_use_study_room_topic: {
+        Args: { _topic: string; _uid: string }
+        Returns: boolean
+      }
       generate_unique_code: {
         Args: { _len: number; _prefix: string }
         Returns: string
@@ -1250,6 +1254,10 @@ export type Database = {
       }
       join_group_by_invite: { Args: { _code: string }; Returns: string }
       join_study_room_by_code: { Args: { _code: string }; Returns: string }
+      realtime_room_code_from_topic: {
+        Args: { _topic: string }
+        Returns: string
+      }
       shares_group_with_user: {
         Args: { _profile_user_id: string; _viewer_id: string }
         Returns: boolean
