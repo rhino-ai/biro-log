@@ -831,6 +831,9 @@ const VirtualLibraryPage = () => {
       window.history.replaceState({}, '', next);
     }
   };
+  // Keep the ref pointing at the latest leaveRoom so the LiveCallIndicator
+  // (mounted app-wide) can end the call from anywhere.
+  leaveRoomRef.current = leaveRoom;
 
   const isOwner = !!(activeRoom && user && activeRoom.owner_id === user.id);
 
