@@ -14,7 +14,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { HabitTemplates } from '@/components/game/HabitTemplates';
+import { PushToggle } from '@/components/PushToggle';
 import { scheduleReminder } from '@/lib/taskReminders';
+import { scheduleLocalReminder, ensureNotificationPermission } from '@/lib/localReminders';
 import { toast } from '@/hooks/use-toast';
 
 const ringtones = [
@@ -58,6 +60,9 @@ const TasksPage = () => {
     if (quickReminder) {
       const remindAt = new Date(quickReminder);
       if (!isNaN(remindAt.getTime()) && remindAt.getTime() > Date.now()) {
+        // Immediate, precise local notification (no server delay).
+        await ensureNotificationPermission();
+        scheduleLocalReminder({ title: `⏰ ${title}`, body: 'Task reminder', url: '/tasks', at: remindAt.getTime() });
         const { error } = await scheduleReminder({ title, remindAt, jungleId: jungles[0]?.id || 'general', type: quickType });
         if (!error) toast({ title: '⏰ Reminder set', description: format(remindAt, 'PP p') });
       }
@@ -78,6 +83,9 @@ const TasksPage = () => {
       const [hh, mm] = newTask.alarmTime.split(':').map(Number);
       const d = new Date(newTask.dueDate); d.setHours(hh || 9, mm || 0, 0, 0);
       if (d.getTime() > Date.now()) {
+        ensureNotificationPermission().then(() => {
+          scheduleLocalReminder({ title: `⏰ ${newTask.title}`, body: 'Task reminder', url: '/tasks', at: d.getTime() });
+        });
         scheduleReminder({ title: newTask.title, remindAt: d, jungleId: newTask.jungleId || 'general', type: newTask.type }).catch(() => {});
       }
     }
@@ -219,6 +227,9 @@ const TasksPage = () => {
 
         {/* Templates as prominent chips */}
         <HabitTemplates compact />
+
+        {/* Notification enable card — required for task reminders */}
+        <PushToggle />
 
         {view === 'list' && (
           <>
