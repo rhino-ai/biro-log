@@ -585,6 +585,8 @@ const VirtualLibraryPage = () => {
 
   useEffect(() => () => stopMedia(), [stopMedia]);
 
+  const leaveRoomRef = useRef<null | (() => Promise<void> | void)>(null);
+
   // Sync the app-wide "You are LIVE" indicator so the floating banner + PiP
   // keep working after the user navigates away from this page.
   useEffect(() => {
