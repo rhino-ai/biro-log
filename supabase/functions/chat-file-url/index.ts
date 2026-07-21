@@ -34,19 +34,35 @@ Deno.serve(async (req) => {
     const chatId = String(body.chatId || "").trim();
 
     if (!path || !chatId) return json({ error: "Missing path/chatId" }, 400);
+    // Strict UUID validation prevents PostgREST filter injection via .or() strings.
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!UUID_RE.test(chatId)) return json({ error: "Bad chatId" }, 400);
+    if (!UUID_RE.test(userId)) return json({ error: "Unauthorized" }, 401);
     // Basic path safety: no leading slash, no ..
     if (path.startsWith("/") || path.includes("..")) return json({ error: "Bad path" }, 400);
+    if (path.length > 512) return json({ error: "Bad path" }, 400);
 
     const admin = createClient(supabaseUrl, serviceKey);
 
     // Authorize: caller must be a party to a message referencing this path.
     if (chatKind === "dm") {
-      const { data: rows } = await admin
-        .from("direct_messages")
-        .select("id,sender_id,receiver_id,attachment_url,attachment_meta")
-        .or(`and(sender_id.eq.${userId},receiver_id.eq.${chatId}),and(sender_id.eq.${chatId},receiver_id.eq.${userId})`)
-        .limit(500);
-      if (!rows?.some((r: any) => refMatchesPath(r, path))) {
+      // Two parameterized queries — no interpolated .or() filter, no injection surface.
+      const [{ data: sent }, { data: recv }] = await Promise.all([
+        admin
+          .from("direct_messages")
+          .select("id,sender_id,receiver_id,attachment_url,attachment_meta")
+          .eq("sender_id", userId)
+          .eq("receiver_id", chatId)
+          .limit(500),
+        admin
+          .from("direct_messages")
+          .select("id,sender_id,receiver_id,attachment_url,attachment_meta")
+          .eq("sender_id", chatId)
+          .eq("receiver_id", userId)
+          .limit(500),
+      ]);
+      const rows = [...(sent || []), ...(recv || [])];
+      if (!rows.some((r: any) => refMatchesPath(r, path))) {
         return json({ error: "Forbidden" }, 403);
       }
     } else {
