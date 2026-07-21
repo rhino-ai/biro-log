@@ -33,6 +33,7 @@ import JoinInvitePage from "./pages/JoinInvitePage";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 import { ReadModeGuard } from "@/components/system/ReadModeGuard";
+import { LiveCallIndicator } from "@/components/system/LiveCallIndicator";
 import { useInAppPushSound } from "@/hooks/useInAppPushSound";
 import { useNavigate } from "react-router-dom";
 import { initNative } from "@/lib/native";
@@ -123,6 +124,7 @@ const App = () => (
             <Toaster />
             <Sonner />
             <AppRoutes />
+            <LiveCallIndicator />
           </TooltipProvider>
         </AuthProvider>
       </BrowserRouter>
