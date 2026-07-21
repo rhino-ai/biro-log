@@ -1,99 +1,65 @@
-## Scope (from your answers)
+# Already shipped this turn (push notifications)
 
-1. **Real per-app screen time** — Android native + iOS shortcut
-2. **Live-call indicator** — Android foreground-service notification + web system notification when tab hides
-3. **Task UX** — faster add, drag-reorder + inline edit, prominent templates, weekly/monthly view, task reminders as push
-4. **Message push** — only when app is closed/backgrounded
+- **Instant local browser notification** when you add a task with a reminder — fires at the exact minute via a service-worker `showNotification`, no server delay. Survives reloads (re-armed from localStorage on app boot + tab focus).
+- **Server cron sped up from every 15 min to every 1 min**, so if the phone is offline the server push still arrives within ~60s.
+- **Enable-Notifications card** added to the Tasks page so it's obvious when permission isn't granted (this was your real 20:22 bug — `push_subscriptions` was empty; the browser never asked to send pushes).
 
----
-
-## 1. Screen Time (native + web fallback)
-
-**Android (Capacitor plugin)**
-- Add a small custom Capacitor plugin `UsageStatsPlugin` (Kotlin) exposing:
-  - `hasPermission()` — checks `AppOpsManager` for `PACKAGE_USAGE_STATS`
-  - `requestPermission()` — deep-links to `Settings.ACTION_USAGE_ACCESS_SETTINGS`
-  - `getDailyUsage({ days })` — returns `[{ packageName, appName, minutes, date }]` via `UsageStatsManager.queryUsageStats`
-- Update `ScreenTimePage.tsx`:
-  - New "Real device usage" section (shown only when `Capacitor.isNativePlatform()` and platform is Android)
-  - Big **"Grant Usage Access"** button → deep-link; live status pill (Granted / Not granted)
-  - Once granted: replace the simulated `weekData` with real per-day totals, and list the top apps with real per-app minutes
-- iOS: add an **"Open iOS Screen Time"** button that calls `App-Prefs:SCREEN_TIME` via `App.openUrl` (iOS blocks reading, so this just deep-links to Settings)
-- Web/PWA: keep the existing in-app tracker but relabel it "In-app time" so it's not misleading
-
-**Files**
-- `android/app/src/main/java/app/lovable/.../UsageStatsPlugin.kt` (new)
-- Register plugin in `MainActivity.java`
-- `src/lib/usageStats.ts` — TS wrapper with web fallback
-- `src/pages/ScreenTimePage.tsx` — new "Device Usage" section
-- `ANDROID.md` — document the permission
+You need to tap **Enable** on that new card once — that's the missing step. After that, close the app entirely and add a task 1 min in the future to confirm.
 
 ---
 
-## 2. Live-call indicator (foreground service + web notification)
+# Next: Trackers = real spreadsheet + full nav reorg
 
-**Android foreground service**
-- Add `CallForegroundService` (Kotlin) that shows a persistent low-priority notification:
-  - Title: "You are LIVE in <room name>"
-  - Actions: `Return to room` (deep-links back), `Leave call`
-  - Started when `liveCall.active` becomes true; stopped on `clear()`
-- Small Capacitor plugin `LiveCallNotifier`: `start({ roomName, roomCode })`, `stop()`
-- Manifest permissions: `FOREGROUND_SERVICE`, `POST_NOTIFICATIONS` (13+), `WAKE_LOCK`
+## 1. Trackers page — real Google Sheets clone
 
-**Web / PWA**
-- In `LiveCallIndicator.tsx`, when the tab is hidden and a call is active, show a real **Notification API** notification (not just a toast) with the room name and a "Return" action that focuses the tab. Keep the current in-app red banner for when the tab is visible.
+Replace the current tracker view with a proper grid component.
 
-**Files**
-- `src/components/system/LiveCallIndicator.tsx` — add Notification API branch, wire native start/stop
-- `src/lib/liveCall.ts` — call `LiveCallNotifier.start/stop` in `set/clear`
-- `android/.../CallForegroundService.kt`, `LiveCallNotifierPlugin.kt` (new)
+**Grid editing**
+- Click a cell to select; arrow keys / Tab / Shift+Tab / Enter / Shift+Enter to navigate.
+- Double-click or F2 to enter edit mode; Escape cancels; Enter commits and moves down.
+- Shift+arrow to extend a range selection; Ctrl/Cmd+C, Ctrl/Cmd+V, Ctrl/Cmd+X for copy/cut/paste across ranges (TSV clipboard so it round-trips with real Google Sheets).
+- Ctrl/Cmd+Z / Ctrl/Cmd+Shift+Z for undo/redo (bounded history stack).
+- Delete / Backspace clears selected range.
 
----
+**Formulas + references**
+- Cell references `A1`, `B12`; ranges `A1:A10`, `A:A`, `1:1`.
+- Built-ins: `SUM`, `AVERAGE`/`AVG`, `MIN`, `MAX`, `COUNT`, `COUNTA`, `IF`, `AND`, `OR`, `NOT`, `ROUND`, `ABS`, `CONCAT`, `LEN`, `LEFT`, `RIGHT`, `MID`, `LOWER`, `UPPER`, `TODAY`, `NOW`.
+- Auto-recalc on any edit via a topological pass over the dep graph.
+- Circular-ref detection → shows `#CIRC!` in that cell only.
+- Error surfacing: `#ERROR!`, `#REF!`, `#DIV/0!`, `#NAME?`.
 
-## 3. Task system upgrade
+**Multiple sheets + freeze**
+- Sheet tabs at the bottom (add / rename / delete / reorder via drag).
+- Cross-sheet refs like `Sheet2!A1` and `'My Sheet'!B2:B10`.
+- Frozen header row and frozen first column (toggle in a View menu).
+- Column resize by dragging the header edge; row height auto-fit.
 
-- **Faster add**: one-line composer at the top of `TasksPage` (title only + Enter to save). Time / priority / templates collapse behind a "…" affordance.
-- **Templates prominent**: pinned chip row above the composer with the top habit templates (Morning routine, Focus block, Revision, Sleep by 11) — one tap adds a full pre-filled task.
-- **Drag reorder + inline edit**: `@dnd-kit/sortable` on the task list, tap-title-to-edit inline (no modal).
-- **Weekly / Monthly views**: new tab switcher `Today | Week | Month`:
-  - Week: 7-column grid grouped by day-of-week
-  - Month: calendar grid with task dots per day and a bottom sheet on tap
-  - Recurring tasks (`repeat: daily|weekly|monthly`) expand into the correct cells
-- **Task reminders (push)**: add `remind_at TIMESTAMPTZ` column on `user_tasks`; `push-scheduler` picks up any task with `remind_at <= now() AND reminded_at IS NULL` and sends push via existing `send-push` pipeline; sets `reminded_at`.
+**Storage**
+- Persist per user in a `tracker_sheets` table (name + sheet-JSON blob) with strict RLS (`auth.uid() = user_id`). Debounced 1s auto-save, offline queue when signed out.
 
-**Files**
-- `src/pages/TasksPage.tsx` — rewrite composer, add view switcher, dnd, inline edit
-- `src/components/game/HabitTemplates.tsx` — expose a compact chip variant
-- Migration: `ALTER TABLE user_tasks ADD COLUMN remind_at TIMESTAMPTZ, reminded_at TIMESTAMPTZ`
-- `supabase/functions/push-scheduler/index.ts` — add task-reminder pass
+**Under the hood**
+- Ship a small in-house engine (~500 LOC) rather than pulling a heavy grid library — same feel as Google Sheets for the ops above, and it stays fast on mobile.
+- Mobile: pinch to zoom, tap-hold to select range, long-press header for column menu.
 
----
+## 2. Navigation reorganization
 
-## 4. Message push only when backgrounded
+**Home dashboard tiles** — group into four clearly labeled sections with sticky section headers:
+- Study: Tasks, Revision, Trackers, Guide, Analytics
+- Wellness: Journal, Wellness, Screen Time, Villain Mode
+- Social: Friends, Virtual Library, Leaderboard, Biro-yaar
+- Tools: Mind Games, Mentor, Feedback, Profile
 
-- Client sets an app-wide "app is focused" flag; `notify-chat` already fires on new messages — we gate delivery by checking that the recipient is not the active viewer of that chat (existing tracking in `chat_preferences.last_seen_at`) and only sends when `document.hidden` was the last state or `last_seen_at > 60s ago`.
-- Simpler and reliable: in `notify-chat`, skip push if the recipient's `push_subscriptions.last_active_at` is within the last 30 seconds AND they are viewing the same chat (write `chat_preferences.viewing_chat_id` from the client while the chat is open, clear on unmount / blur).
+**Bottom nav** — keep 5 slots but re-label for clarity: Home / Tasks / Mentor / Games / Social. (Wellness moves into the Home "Wellness" section since it's not a per-tap destination.)
 
-**Files**
-- Migration: `chat_preferences.viewing_chat_id UUID`, `push_subscriptions.last_active_at TIMESTAMPTZ`
-- `src/hooks/useChatStorage.ts` — write/clear `viewing_chat_id`; heartbeat `last_active_at` every 20s while focused
-- `supabase/functions/notify-chat/index.ts` — skip when actively viewing
+**Tasks page tabs** — collapse the two tab rows into one segmented control: `Today · Week · Month · All` at the top; filters (Daily / Weekly / Monthly) become a single dropdown next to the search icon.
 
----
+**Reversible**
+- All three changes are gated behind a `nav_layout` setting (`v2` default, `legacy` opt-out) stored in the game store. If you ever say "put the old layout back," it's a one-line flip — no re-implementation needed.
 
-## Order of execution
+## Order of work
 
-1. DB migration (task columns + chat presence columns) — needs your approval
-2. Backend: `push-scheduler` task pass + `notify-chat` gating
-3. Frontend: Tasks page rewrite (composer, dnd, week/month, reminders)
-4. Live-call web Notification API branch + `ScreenTimePage` rename/relabel
-5. Capacitor native plugins (UsageStats + LiveCallNotifier + foreground service) — you'll need to `git pull` + `npx cap sync` + rebuild the Android app for these to activate
+1. Trackers spreadsheet grid + engine + storage.
+2. Nav reorg (home sections, bottom-nav relabel, tasks tab collapse) behind `nav_layout` toggle.
+3. QA pass on both.
 
----
-
-## Caveats you should know
-
-- **iOS screen time is unreadable** by any third-party app — Apple policy. Only the deep-link button is possible.
-- **Android usage stats permission** requires the user to enable "Usage access" manually in system settings; it can't be granted from an in-app prompt.
-- **Web PWA "You are LIVE" while tab is closed**: browsers freeze background JS. The Notification API fires at the moment of tab-hide; while fully closed, only the native Android build can keep the persistent alert.
-- Native pieces (plugins, foreground service) will only run after you `git pull` → `npm install` → `npx cap sync android` → rebuild.
+Estimated ~1 build turn each — I'll ship Trackers first since it's the larger, more visible change.
