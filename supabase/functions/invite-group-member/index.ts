@@ -43,14 +43,29 @@ serve(async (req) => {
     if (!targetId) {
       const cleanQuery = String(query ?? "").trim();
       if (cleanQuery.length < 2 || cleanQuery.length > 120) return json({ error: "Enter a valid user ID, name, invite code, or email." }, 400);
-      let lookup = backend
-        .from("profiles")
-        .select("user_id")
-        .or(`unique_id.eq.${cleanQuery.toUpperCase()},invite_code.eq.${cleanQuery.toUpperCase()},name.ilike.${cleanQuery}`)
-        .limit(1);
-      if (cleanQuery.includes("@")) lookup = backend.from("profiles").select("user_id").ilike("email", cleanQuery).limit(1);
-      const { data: found, error: lookupError } = await lookup.maybeSingle();
-      if (lookupError) throw lookupError;
+      // Reject PostgREST filter metacharacters. Prevents .or() / .ilike() injection.
+      if (/[,()"'\\]/.test(cleanQuery)) return json({ error: "Invalid characters in search." }, 400);
+      const upper = cleanQuery.toUpperCase();
+      const isEmail = cleanQuery.includes("@");
+      // Escape PostgREST ilike wildcards so user input can't turn a name lookup into a wildcard sweep.
+      const escLike = cleanQuery.replace(/[%_*]/g, (m) => "\\" + m);
+      let found: { user_id: string } | null = null;
+      if (isEmail) {
+        const { data, error } = await backend.from("profiles").select("user_id").ilike("email", escLike).limit(1).maybeSingle();
+        if (error) throw error;
+        found = data;
+      } else {
+        // Try each field with its own parameterized query — no interpolated .or() string.
+        for (const attempt of [
+          () => backend.from("profiles").select("user_id").eq("unique_id", upper).limit(1).maybeSingle(),
+          () => backend.from("profiles").select("user_id").eq("invite_code", upper).limit(1).maybeSingle(),
+          () => backend.from("profiles").select("user_id").ilike("name", escLike).limit(1).maybeSingle(),
+        ]) {
+          const { data, error } = await attempt();
+          if (error) throw error;
+          if (data) { found = data; break; }
+        }
+      }
       targetId = found?.user_id ?? "";
     }
 

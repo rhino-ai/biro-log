@@ -18,6 +18,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Popover, PopoverTrigger, PopoverContent } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { liveCall } from '@/lib/liveCall';
 
 const connBadgeClasses = (s?: RTCPeerConnectionState) => {
   switch (s) {
@@ -584,6 +585,26 @@ const VirtualLibraryPage = () => {
 
   useEffect(() => () => stopMedia(), [stopMedia]);
 
+  const leaveRoomRef = useRef<null | (() => Promise<void> | void)>(null);
+
+  // Sync the app-wide "You are LIVE" indicator so the floating banner + PiP
+  // keep working after the user navigates away from this page.
+  useEffect(() => {
+    if (callActive && callStream && activeRoom) {
+      liveCall.set({
+        active: true,
+        roomCode: activeRoom.code,
+        roomName: activeRoom.title || `Room ${activeRoom.code}`,
+        stream: callStream,
+        onLeave: () => { void leaveRoomRef.current?.(); },
+        onOpenRoom: null,
+      });
+    } else {
+      liveCall.clear();
+    }
+    return () => { liveCall.clear(); };
+  }, [callActive, callStream, activeRoom?.code, activeRoom?.title]);
+
   useEffect(() => {
     let interval: ReturnType<typeof setInterval> | undefined;
     if (activeRoom) interval = setInterval(() => setStudySeconds(prev => prev + 1), 1000);
@@ -810,6 +831,9 @@ const VirtualLibraryPage = () => {
       window.history.replaceState({}, '', next);
     }
   };
+  // Keep the ref pointing at the latest leaveRoom so the LiveCallIndicator
+  // (mounted app-wide) can end the call from anywhere.
+  leaveRoomRef.current = leaveRoom;
 
   const isOwner = !!(activeRoom && user && activeRoom.owner_id === user.id);
 
