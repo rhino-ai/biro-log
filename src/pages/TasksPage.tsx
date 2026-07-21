@@ -14,6 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { HabitTemplates } from '@/components/game/HabitTemplates';
+import { PushToggle } from '@/components/PushToggle';
 import { scheduleReminder } from '@/lib/taskReminders';
 import { scheduleLocalReminder, ensureNotificationPermission } from '@/lib/localReminders';
 import { toast } from '@/hooks/use-toast';
@@ -226,6 +227,9 @@ const TasksPage = () => {
 
         {/* Templates as prominent chips */}
         <HabitTemplates compact />
+
+        {/* Notification enable card — required for task reminders */}
+        <PushToggle />
 
         {view === 'list' && (
           <>
