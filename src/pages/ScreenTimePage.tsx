@@ -8,6 +8,9 @@ import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
+import { usageStats, type AppUsage } from '@/lib/usageStats';
+import { Capacitor } from '@capacitor/core';
+import { Smartphone, ShieldCheck, ExternalLink, RefreshCw } from 'lucide-react';
 
 const STORAGE_KEY = 'biro-screen-time';
 
@@ -43,6 +46,36 @@ const ScreenTimePage = () => {
   });
   const [newAppName, setNewAppName] = useState('');
   const [newSeasonName, setNewSeasonName] = useState('');
+
+  // ---- Real device usage (Android native) ----
+  const platform = Capacitor.getPlatform();
+  const nativeAvailable = usageStats.available();
+  const [permGranted, setPermGranted] = useState(false);
+  const [nativeApps, setNativeApps] = useState<AppUsage[]>([]);
+  const [nativeTotalToday, setNativeTotalToday] = useState(0);
+  const [loadingNative, setLoadingNative] = useState(false);
+
+  const refreshNative = async () => {
+    if (!nativeAvailable) return;
+    setLoadingNative(true);
+    try {
+      const granted = await usageStats.hasPermission();
+      setPermGranted(granted);
+      if (granted) {
+        const r = await usageStats.getDailyUsage(7);
+        setNativeApps(r.apps);
+        setNativeTotalToday(r.totalMinutesToday);
+      }
+    } finally { setLoadingNative(false); }
+  };
+
+  useEffect(() => { refreshNative(); }, []);
+  // Re-check permission when the tab regains focus (user came back from settings).
+  useEffect(() => {
+    const onVis = () => { if (!document.hidden) refreshNative(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => document.removeEventListener('visibilitychange', onVis);
+  }, []);
 
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
@@ -104,6 +137,72 @@ const ScreenTimePage = () => {
           <h1 className="font-game text-xl">📱 Digital Discipline</h1>
           <div className="w-12" />
         </div>
+
+        {/* Real device usage — Android native */}
+        {nativeAvailable && (
+          <Card className="glass-panel border-primary/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-game flex items-center gap-2">
+                <Smartphone className="w-4 h-4 text-primary" /> Real Device Usage
+                <Button variant="ghost" size="icon" className="ml-auto h-7 w-7" onClick={refreshNative}>
+                  <RefreshCw className={cn("w-3.5 h-3.5", loadingNative && "animate-spin")} />
+                </Button>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="text-xs">
+                  <p>Permission: <span className={permGranted ? 'text-green-400 font-semibold' : 'text-raid font-semibold'}>{permGranted ? 'Granted' : 'Not granted'}</span></p>
+                  <p className="text-muted-foreground mt-1">Reads real per-app minutes from Android system usage stats.</p>
+                </div>
+                {!permGranted && (
+                  <Button size="sm" className="bg-primary" onClick={async () => {
+                    try { await usageStats.requestPermission(); toast({ title: 'Enable "Biro-log" in Usage access' }); }
+                    catch { toast({ title: 'Could not open settings' }); }
+                  }}>
+                    <ShieldCheck className="w-3.5 h-3.5 mr-1" /> Grant access
+                  </Button>
+                )}
+              </div>
+              {permGranted && (
+                <>
+                  <div className="rounded-lg bg-secondary/40 p-3 text-center">
+                    <p className="text-[10px] text-muted-foreground">Today (all apps)</p>
+                    <p className="text-2xl font-game text-primary">
+                      {Math.floor(nativeTotalToday / 60)}h {nativeTotalToday % 60}m
+                    </p>
+                  </div>
+                  <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                    {[...nativeApps]
+                      .filter(a => a.date === new Date().toISOString().slice(0, 10))
+                      .sort((a, b) => b.minutes - a.minutes)
+                      .slice(0, 15)
+                      .map(a => (
+                        <div key={a.packageName} className="flex items-center justify-between text-xs p-2 rounded-md bg-secondary/30">
+                          <span className="truncate">{a.appName}</span>
+                          <span className="text-muted-foreground shrink-0 ml-2">{Math.floor(a.minutes / 60)}h {a.minutes % 60}m</span>
+                        </div>
+                      ))}
+                    {nativeApps.length === 0 && <p className="text-xs text-muted-foreground text-center py-3">No data yet — usage stats need a few minutes.</p>}
+                  </div>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* iOS fallback: deep-link to Screen Time (Apple blocks reading) */}
+        {platform === 'ios' && (
+          <Card className="glass-panel border-primary/30">
+            <CardHeader className="pb-2"><CardTitle className="text-sm font-game flex items-center gap-2">📱 iOS Screen Time</CardTitle></CardHeader>
+            <CardContent className="space-y-2">
+              <p className="text-xs text-muted-foreground">Apple doesn't let apps read your Screen Time data. Tap below to open Apple's Screen Time settings.</p>
+              <Button size="sm" className="w-full bg-primary" onClick={() => usageStats.openIOSScreenTime()}>
+                <ExternalLink className="w-3.5 h-3.5 mr-1" /> Open Screen Time settings
+              </Button>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Streak Card */}
         <div className="glass-panel rounded-2xl p-4 border border-coins/30 text-center">

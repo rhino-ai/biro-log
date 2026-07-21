@@ -1,64 +1,99 @@
-# Plan: True E2EE + Attachment Preview Panel + Locked Signed URLs
+## Scope (from your answers)
 
-Four related pieces. Ship in this order so each step is verifiable.
+1. **Real per-app screen time** — Android native + iOS shortcut
+2. **Live-call indicator** — Android foreground-service notification + web system notification when tab hides
+3. **Task UX** — faster add, drag-reorder + inline edit, prominent templates, weekly/monthly view, task reminders as push
+4. **Message push** — only when app is closed/backgrounded
 
-## 1. True End-to-End Encryption (libsodium)
+---
 
-**Keys**
-- On first sign-in per device, generate a libsodium `box` keypair (X25519). Private key stays in IndexedDB (never leaves device). Public key uploaded to a new `user_public_keys` table.
-- Each 1:1 DM derives a shared symmetric key via `crypto_box_beforenm(peerPub, myPriv)`.
-- Each group has a symmetric `group_key` (XChaCha20-Poly1305). When a member is added, an existing member wraps the group key with the new member's public key and writes it to `group_key_shares(group_id, user_id, wrapped_key, nonce)`. New joiners pull their wrapped copy and unwrap locally.
+## 1. Screen Time (native + web fallback)
 
-**Messages**
-- Client encrypts message text with the shared/group key → stores `ciphertext` + `nonce` in `direct_messages.content` / `group_messages.content` (base64). Server never sees plaintext.
-- Legacy plaintext rows stay readable; new rows are tagged `encryption_version=2`.
+**Android (Capacitor plugin)**
+- Add a small custom Capacitor plugin `UsageStatsPlugin` (Kotlin) exposing:
+  - `hasPermission()` — checks `AppOpsManager` for `PACKAGE_USAGE_STATS`
+  - `requestPermission()` — deep-links to `Settings.ACTION_USAGE_ACCESS_SETTINGS`
+  - `getDailyUsage({ days })` — returns `[{ packageName, appName, minutes, date }]` via `UsageStatsManager.queryUsageStats`
+- Update `ScreenTimePage.tsx`:
+  - New "Real device usage" section (shown only when `Capacitor.isNativePlatform()` and platform is Android)
+  - Big **"Grant Usage Access"** button → deep-link; live status pill (Granted / Not granted)
+  - Once granted: replace the simulated `weekData` with real per-day totals, and list the top apps with real per-app minutes
+- iOS: add an **"Open iOS Screen Time"** button that calls `App-Prefs:SCREEN_TIME` via `App.openUrl` (iOS blocks reading, so this just deep-links to Settings)
+- Web/PWA: keep the existing in-app tracker but relabel it "In-app time" so it's not misleading
 
-**Attachments (files encrypted before upload)**
-- Client generates a random 32-byte file key + nonce, encrypts the file bytes with XChaCha20-Poly1305, uploads the ciphertext blob to `chat-uploads`.
-- The file key + nonce + original filename/mime are encrypted with the chat's shared/group key and stored in the message row as `attachment_meta` (JSON, ciphertext).
-- On receive, client fetches the ciphertext blob, decrypts in-memory, creates a `blob:` URL for `<img>/<video>/<audio>/<embed>`.
+**Files**
+- `android/app/src/main/java/app/lovable/.../UsageStatsPlugin.kt` (new)
+- Register plugin in `MainActivity.java`
+- `src/lib/usageStats.ts` — TS wrapper with web fallback
+- `src/pages/ScreenTimePage.tsx` — new "Device Usage" section
+- `ANDROID.md` — document the permission
 
-**What server sees**: only opaque ciphertext for messages and files. No admin, no DB dump, no leaked signed URL can decrypt without the recipient's device private key.
+---
 
-**Trade-offs (called out honestly)**
-- Losing the device = losing message history unless the user exported/backed up their private key. Add a "Export encryption key" button in Profile.
-- Push notification bodies stay generic ("New message") — content stays on device.
-- OCR / mentor analysis of chat attachments won't work on E2EE chats (would need to decrypt server-side, defeating E2EE). Mentor uploads (separate flow) keep working as today.
+## 2. Live-call indicator (foreground service + web notification)
 
-## 2. Locked signed URLs
+**Android foreground service**
+- Add `CallForegroundService` (Kotlin) that shows a persistent low-priority notification:
+  - Title: "You are LIVE in <room name>"
+  - Actions: `Return to room` (deep-links back), `Leave call`
+  - Started when `liveCall.active` becomes true; stopped on `clear()`
+- Small Capacitor plugin `LiveCallNotifier`: `start({ roomName, roomCode })`, `stop()`
+- Manifest permissions: `FOREGROUND_SERVICE`, `POST_NOTIFICATIONS` (13+), `WAKE_LOCK`
 
-- Drop 365-day signed URLs. Add edge function `chat-file-url` that:
-  - Verifies caller's JWT.
-  - Checks caller is sender/recipient (DM) or member (group) of the message that references this path.
-  - Returns a 60-second signed URL.
-- Client requests a fresh URL right before render/download. Even a leaked URL dies in a minute.
-- Combined with E2EE, the blob is also unreadable ciphertext even if downloaded.
+**Web / PWA**
+- In `LiveCallIndicator.tsx`, when the tab is hidden and a call is active, show a real **Notification API** notification (not just a toast) with the room name and a "Return" action that focuses the tab. Keep the current in-app red banner for when the tab is visible.
 
-## 3. Attachment preview side panel (WhatsApp/TG-style)
+**Files**
+- `src/components/system/LiveCallIndicator.tsx` — add Notification API branch, wire native start/stop
+- `src/lib/liveCall.ts` — call `LiveCallNotifier.start/stop` in `set/clear`
+- `android/.../CallForegroundService.kt`, `LiveCallNotifierPlugin.kt` (new)
 
-- New `AttachmentPreviewPanel` component: right-side drawer on desktop, bottom sheet on mobile.
-- Opens automatically right after the user picks a file (before send), showing:
-  - Image → full preview + caption field
-  - Video → player + duration + caption
-  - PDF → first-page thumbnail + filename + caption
-  - Audio → waveform-ish bar + duration + caption
-- Buttons: `Send`, `Cancel`, optional `Add another`. Enter-to-send.
-- Also opens on tap of an existing attachment in the transcript for full-screen view + download.
-- Wired into `FriendsPage.tsx` (both DMs and groups). Composer's paperclip triggers the panel instead of sending immediately.
+---
 
-## 4. Migration + rollout
+## 3. Task system upgrade
 
-- New tables: `user_public_keys`, `group_key_shares`. GRANTs + RLS.
-- Non-breaking: old plaintext messages render as before. New sends are E2EE by default once both sides have public keys published.
-- If a peer has no public key yet (never logged in on new client), fall back to plaintext with an in-UI warning "This chat is not end-to-end encrypted until <name> opens the app once."
+- **Faster add**: one-line composer at the top of `TasksPage` (title only + Enter to save). Time / priority / templates collapse behind a "…" affordance.
+- **Templates prominent**: pinned chip row above the composer with the top habit templates (Morning routine, Focus block, Revision, Sleep by 11) — one tap adds a full pre-filled task.
+- **Drag reorder + inline edit**: `@dnd-kit/sortable` on the task list, tap-title-to-edit inline (no modal).
+- **Weekly / Monthly views**: new tab switcher `Today | Week | Month`:
+  - Week: 7-column grid grouped by day-of-week
+  - Month: calendar grid with task dots per day and a bottom sheet on tap
+  - Recurring tasks (`repeat: daily|weekly|monthly`) expand into the correct cells
+- **Task reminders (push)**: add `remind_at TIMESTAMPTZ` column on `user_tasks`; `push-scheduler` picks up any task with `remind_at <= now() AND reminded_at IS NULL` and sends push via existing `send-push` pipeline; sets `reminded_at`.
 
-## Technical notes
+**Files**
+- `src/pages/TasksPage.tsx` — rewrite composer, add view switcher, dnd, inline edit
+- `src/components/game/HabitTemplates.tsx` — expose a compact chip variant
+- Migration: `ALTER TABLE user_tasks ADD COLUMN remind_at TIMESTAMPTZ, reminded_at TIMESTAMPTZ`
+- `supabase/functions/push-scheduler/index.ts` — add task-reminder pass
 
-- Library: `libsodium-wrappers-sumo` (~200KB gz, loads lazily on first chat open).
-- Storage: private key in IndexedDB under `biro-e2ee/priv-<userId>`.
-- Attachments still go to existing `chat-uploads` bucket, just as ciphertext blobs (`.enc` suffix).
-- `attachment_meta` schema: `{ v: 2, path, mime, name, size, keyCipher, keyNonce, fileNonce }`.
-- All crypto happens in a small `src/lib/e2ee.ts` module with unit-tested `encryptText/decryptText/encryptFile/decryptFile` helpers.
-- Backward compat: if `encryption_version` missing/1, render as plaintext (current behavior).
+---
 
-This is ~1 focused build. I'll implement in the order above, verifying each slice before moving on. Approve and I'll start with the crypto module + key publishing, then wire it into DMs, then groups, then the preview panel and locked URLs.
+## 4. Message push only when backgrounded
+
+- Client sets an app-wide "app is focused" flag; `notify-chat` already fires on new messages — we gate delivery by checking that the recipient is not the active viewer of that chat (existing tracking in `chat_preferences.last_seen_at`) and only sends when `document.hidden` was the last state or `last_seen_at > 60s ago`.
+- Simpler and reliable: in `notify-chat`, skip push if the recipient's `push_subscriptions.last_active_at` is within the last 30 seconds AND they are viewing the same chat (write `chat_preferences.viewing_chat_id` from the client while the chat is open, clear on unmount / blur).
+
+**Files**
+- Migration: `chat_preferences.viewing_chat_id UUID`, `push_subscriptions.last_active_at TIMESTAMPTZ`
+- `src/hooks/useChatStorage.ts` — write/clear `viewing_chat_id`; heartbeat `last_active_at` every 20s while focused
+- `supabase/functions/notify-chat/index.ts` — skip when actively viewing
+
+---
+
+## Order of execution
+
+1. DB migration (task columns + chat presence columns) — needs your approval
+2. Backend: `push-scheduler` task pass + `notify-chat` gating
+3. Frontend: Tasks page rewrite (composer, dnd, week/month, reminders)
+4. Live-call web Notification API branch + `ScreenTimePage` rename/relabel
+5. Capacitor native plugins (UsageStats + LiveCallNotifier + foreground service) — you'll need to `git pull` + `npx cap sync` + rebuild the Android app for these to activate
+
+---
+
+## Caveats you should know
+
+- **iOS screen time is unreadable** by any third-party app — Apple policy. Only the deep-link button is possible.
+- **Android usage stats permission** requires the user to enable "Usage access" manually in system settings; it can't be granted from an in-app prompt.
+- **Web PWA "You are LIVE" while tab is closed**: browsers freeze background JS. The Notification API fires at the moment of tab-hide; while fully closed, only the native Android build can keep the persistent alert.
+- Native pieces (plugins, foreground service) will only run after you `git pull` → `npm install` → `npx cap sync android` → rebuild.

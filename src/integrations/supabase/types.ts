@@ -145,6 +145,7 @@ export type Database = {
           tone: string
           updated_at: string
           user_id: string
+          viewing_chat_id: string | null
         }
         Insert: {
           created_at?: string
@@ -156,6 +157,7 @@ export type Database = {
           tone?: string
           updated_at?: string
           user_id: string
+          viewing_chat_id?: string | null
         }
         Update: {
           created_at?: string
@@ -167,6 +169,7 @@ export type Database = {
           tone?: string
           updated_at?: string
           user_id?: string
+          viewing_chat_id?: string | null
         }
         Relationships: []
       }
@@ -662,6 +665,7 @@ export type Database = {
           created_at: string
           endpoint: string
           id: string
+          last_active_at: string | null
           p256dh: string
           updated_at: string
           user_agent: string | null
@@ -672,6 +676,7 @@ export type Database = {
           created_at?: string
           endpoint: string
           id?: string
+          last_active_at?: string | null
           p256dh: string
           updated_at?: string
           user_agent?: string | null
@@ -682,6 +687,7 @@ export type Database = {
           created_at?: string
           endpoint?: string
           id?: string
+          last_active_at?: string | null
           p256dh?: string
           updated_at?: string
           user_agent?: string | null
@@ -1066,6 +1072,11 @@ export type Database = {
           due_time: string | null
           id: string
           jungle_id: string
+          notes: string | null
+          priority: string
+          remind_at: string | null
+          reminded_at: string | null
+          sort_order: number
           title: string
           type: string
           user_id: string
@@ -1081,6 +1092,11 @@ export type Database = {
           due_time?: string | null
           id?: string
           jungle_id: string
+          notes?: string | null
+          priority?: string
+          remind_at?: string | null
+          reminded_at?: string | null
+          sort_order?: number
           title: string
           type: string
           user_id: string
@@ -1096,6 +1112,11 @@ export type Database = {
           due_time?: string | null
           id?: string
           jungle_id?: string
+          notes?: string | null
+          priority?: string
+          remind_at?: string | null
+          reminded_at?: string | null
+          sort_order?: number
           title?: string
           type?: string
           user_id?: string
