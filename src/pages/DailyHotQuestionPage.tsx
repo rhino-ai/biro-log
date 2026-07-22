@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from 'react';
 import { supabase as _supabase } from '@/integrations/supabase/client';
 const supabase = _supabase as any;
 import { useAuth } from '@/hooks/useAuth';
-import { useGame } from '@/hooks/useGame';
 import { Header } from '@/components/layout/Header';
 import { BackButton } from '@/components/layout/BackButton';
 import { Button } from '@/components/ui/button';
@@ -40,7 +39,6 @@ interface Answer {
 
 const DailyHotQuestionPage = () => {
   const { user, isAdmin } = useAuth();
-  const { profile } = useGame();
   
   const [question, setQuestion] = useState<Question | null>(null);
   const [answers, setAnswers] = useState<Answer[]>([]);
@@ -109,9 +107,14 @@ const DailyHotQuestionPage = () => {
     setIsPosting(true);
     try {
       const { error } = await supabase.from('daily_hot_questions').insert({
+        owner_id: user.id,
         admin_id: user.id,
         title: newTitle,
-        content: newContent
+        content: newContent,
+        kind: 'text',
+        schedule_basis: 'daily',
+        starts_at: new Date().toISOString(),
+        is_active: true,
       });
       if (error) throw error;
       
@@ -235,7 +238,7 @@ const DailyHotQuestionPage = () => {
                 {question.kind === 'poll' || question.kind === 'quiz' ? (
                   <select value={selectedOption} onChange={e => setSelectedOption(e.target.value)} className="flex-1 rounded-md bg-secondary/50 border border-white/10 px-3 text-sm">
                     <option value="">Choose option…</option>
-                    {(question.kind === 'quiz' ? question.quiz_options : question.poll_options || []).map((opt) => <option key={opt} value={opt}>{opt}</option>)}
+                    {((question.kind === 'quiz' ? question.quiz_options : question.poll_options) || []).map((opt) => <option key={opt} value={opt}>{opt}</option>)}
                   </select>
                 ) : (
                   <Input 

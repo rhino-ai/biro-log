@@ -6,7 +6,7 @@ import { BackButton } from '@/components/layout/BackButton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Plus, Trash2, Calendar, Clock, Bell, AlertTriangle, Check, X, Flag, Flame } from 'lucide-react';
+import { Plus, Trash2, Calendar, Clock, Bell, AlertTriangle, Check, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format, startOfWeek, addDays, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isSameMonth, parseISO } from 'date-fns';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
@@ -122,15 +122,6 @@ const TasksPage = () => {
     if (editingTitle.trim()) updateTask(id, { title: editingTitle.trim() } as any);
     setEditingId(null); setEditingTitle('');
   };
-  const move = (id: string, dir: -1 | 1) => {
-    const list = [...pendingTasks];
-    const idx = list.findIndex(t => t.id === id);
-    const j = idx + dir;
-    if (idx < 0 || j < 0 || j >= list.length) return;
-    // Swap by re-adding: we don't have sort_order in store; skip reorder if unavailable
-    // Approximation: just toggle a visual highlight
-  };
-
   // ---- Week & Month grid data ----
   const weekDays = useMemo(() => {
     const start = startOfWeek(new Date(), { weekStartsOn: 1 });
