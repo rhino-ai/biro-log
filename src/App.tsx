@@ -30,6 +30,7 @@ import VillainModePage from "./pages/VillainModePage";
 import RevisionSchedulerPage from "./pages/RevisionSchedulerPage";
 import MentorTimelinePage from "./pages/MentorTimelinePage";
 import JoinInvitePage from "./pages/JoinInvitePage";
+import DailyHotQuestionPage from "./pages/DailyHotQuestionPage";
 import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 import { ReadModeGuard } from "@/components/system/ReadModeGuard";
@@ -98,6 +99,7 @@ const AppRoutes = () => {
     <Route path="/villain" element={<ProtectedRoute><VillainModePage /></ProtectedRoute>} />
     <Route path="/revision" element={<ProtectedRoute><RevisionSchedulerPage /></ProtectedRoute>} />
     <Route path="/mentor-timeline" element={<ProtectedRoute><MentorTimelinePage /></ProtectedRoute>} />
+    <Route path="/hot-question" element={<ProtectedRoute><DailyHotQuestionPage /></ProtectedRoute>} />
     <Route path="*" element={<NotFound />} />
   </Routes>
   </ReadModeGuard>
