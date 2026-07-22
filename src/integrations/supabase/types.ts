@@ -200,6 +200,101 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_hot_answers: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          is_correct: boolean
+          question_id: string
+          selected_option: string | null
+          user_id: string
+        }
+        Insert: {
+          content?: string
+          created_at?: string
+          id?: string
+          is_correct?: boolean
+          question_id: string
+          selected_option?: string | null
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          is_correct?: boolean
+          question_id?: string
+          selected_option?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "daily_hot_answers_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "daily_hot_questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      daily_hot_questions: {
+        Row: {
+          admin_id: string | null
+          content: string
+          correct_answer: string | null
+          created_at: string
+          ends_at: string | null
+          id: string
+          image_url: string | null
+          is_active: boolean
+          kind: string
+          owner_id: string
+          poll_options: Json
+          quiz_options: Json
+          schedule_basis: string
+          starts_at: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          admin_id?: string | null
+          content?: string
+          correct_answer?: string | null
+          created_at?: string
+          ends_at?: string | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          kind?: string
+          owner_id: string
+          poll_options?: Json
+          quiz_options?: Json
+          schedule_basis?: string
+          starts_at?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          admin_id?: string | null
+          content?: string
+          correct_answer?: string | null
+          created_at?: string
+          ends_at?: string | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean
+          kind?: string
+          owner_id?: string
+          poll_options?: Json
+          quiz_options?: Json
+          schedule_basis?: string
+          starts_at?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       direct_messages: {
         Row: {
           attachment_meta: Json | null
@@ -916,6 +1011,41 @@ export type Database = {
         }
         Relationships: []
       }
+      tracker_sheet_collaborators: {
+        Row: {
+          collaborator_id: string
+          created_at: string
+          id: string
+          owner_id: string
+          role: string
+          tracker_id: string
+        }
+        Insert: {
+          collaborator_id: string
+          created_at?: string
+          id?: string
+          owner_id: string
+          role?: string
+          tracker_id: string
+        }
+        Update: {
+          collaborator_id?: string
+          created_at?: string
+          id?: string
+          owner_id?: string
+          role?: string
+          tracker_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tracker_sheet_collaborators_tracker_id_fkey"
+            columns: ["tracker_id"]
+            isOneToOne: false
+            referencedRelation: "tracker_sheets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tracker_sheets: {
         Row: {
           color: string | null
@@ -1275,6 +1405,15 @@ export type Database = {
       }
       join_group_by_invite: { Args: { _code: string }; Returns: string }
       join_study_room_by_code: { Args: { _code: string }; Returns: string }
+      log_my_activity: {
+        Args: {
+          _coins_earned?: number
+          _message: string
+          _type: string
+          _xp_earned?: number
+        }
+        Returns: string
+      }
       realtime_room_code_from_topic: {
         Args: { _topic: string }
         Returns: string
