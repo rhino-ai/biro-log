@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useGame } from '@/hooks/useGame';
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { Calendar, List, CheckCircle, Star, Zap } from 'lucide-react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, isToday } from 'date-fns';
@@ -17,9 +19,36 @@ interface ActivityEntry {
 
 export const ActivityLog = () => {
   const { xp, coins, level, streak, tasks, testRecords } = useGame();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'activity' | 'calendar'>('activity');
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [activities, setActivities] = useState<ActivityEntry[]>([]);
+  const [remoteActivities, setRemoteActivities] = useState<ActivityEntry[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    supabase
+      .from('activity_log')
+      .select('id,type,message,xp_earned,coins_earned,created_at')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(50)
+      .then(({ data }) => {
+        if (cancelled) return;
+        setRemoteActivities((data || []).map((row: any) => ({
+          id: `remote-${row.id}`,
+          time: format(new Date(row.created_at), 'HH:mm'),
+          date: format(new Date(row.created_at), 'yyyy-MM-dd'),
+          type: (row.type || 'task') as ActivityEntry['type'],
+          icon: row.type === 'streak' ? '🔥' : row.type === 'level' ? '🏆' : '⚡',
+          message: row.message,
+          xp: row.xp_earned || undefined,
+          coins: row.coins_earned || undefined,
+        })));
+      });
+    return () => { cancelled = true; };
+  }, [user]);
 
   // Generate activities from completed tasks and real data
   useEffect(() => {
@@ -52,11 +81,12 @@ export const ActivityLog = () => {
       });
     });
 
-    // Sort by date, newest first
-    newActivities.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    newActivities.push(...remoteActivities);
+    // Sort by date/time, newest first
+    newActivities.sort((a, b) => new Date(`${b.date}T${b.time}`).getTime() - new Date(`${a.date}T${a.time}`).getTime());
     
     setActivities(newActivities);
-  }, [tasks, testRecords]);
+  }, [tasks, testRecords, remoteActivities]);
 
   // Calendar data
   const monthStart = startOfMonth(currentMonth);

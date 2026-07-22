@@ -11,6 +11,8 @@ interface Task {
   jungleId: string;
   chapterId?: string;
   type: 'daily' | 'weekly' | 'monthly' | 'custom';
+  priority?: 'random' | 'important' | 'most-important';
+  notes?: string;
   createdAt: string;
   alarm?: {
     enabled: boolean;

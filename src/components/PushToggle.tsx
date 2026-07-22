@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Bell, BellOff, BellRing } from "lucide-react";
+import { Bell, BellOff, BellRing, ShieldCheck, TestTube2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "@/components/ui/sonner";
@@ -40,7 +40,9 @@ export function PushToggle() {
     setBusy(true);
     try {
       const r: any = await sendTest();
-      toast.success(`Sent to ${r?.sent ?? 0} device(s)`);
+      const sent = r?.sent ?? 0;
+      if (sent > 0) toast.success(`Test sent to ${sent} device(s)`);
+      else toast.error("No subscribed device found — tap Enable first on this phone/browser.");
     } catch (e: any) {
       toast.error(e?.message || "Test failed");
     } finally {
@@ -57,7 +59,7 @@ export function PushToggle() {
             <div>
               <div className="font-semibold text-sm">Push Notifications</div>
               <div className="text-xs text-muted-foreground">
-                {subscribed ? "Enabled on this device" : "Reminders, mentor check-ins, streak alerts"}
+                {subscribed ? "Enabled on this device" : status === "denied" ? "Blocked in browser settings" : "Tasks, chat, mentor check-ins"}
               </div>
             </div>
           </div>
@@ -65,11 +67,13 @@ export function PushToggle() {
             {subscribed ? "Disable" : "Enable"}
           </Button>
         </div>
-        {subscribed && (
-          <Button size="sm" variant="ghost" className="w-full" onClick={handleTest} disabled={busy}>
-            Send test notification
-          </Button>
-        )}
+        <div className="grid grid-cols-2 gap-2 text-[11px] text-muted-foreground">
+          <div className="rounded-md border border-border/50 px-2 py-1 flex items-center gap-1"><ShieldCheck className="w-3 h-3" /> Permission: {status}</div>
+          <div className="rounded-md border border-border/50 px-2 py-1 flex items-center gap-1"><BellRing className="w-3 h-3" /> Device: {subscribed ? 'saved' : 'not saved'}</div>
+        </div>
+        <Button size="sm" variant={subscribed ? "secondary" : "outline"} className="w-full" onClick={handleTest} disabled={busy || !subscribed}>
+          <TestTube2 className="w-3 h-3 mr-1" /> Send test notification
+        </Button>
       </CardContent>
     </Card>
   );
