@@ -12,7 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from '@/hooks/use-toast';
-import { Loader2, Shield, Users, Trophy, Trash2, Save, MessageSquare } from 'lucide-react';
+import { Loader2, Shield, Users, Trophy, Trash2, Save, MessageSquare, Flame, CalendarDays } from 'lucide-react';
 
 type AdminUser = {
   user_id: string;
@@ -43,8 +43,23 @@ type FeedbackRow = {
   user_id: string;
 };
 
+type HotQuestionRow = {
+  id: string;
+  title: string;
+  content: string;
+  image_url: string | null;
+  kind: 'text' | 'poll' | 'image' | 'quiz';
+  schedule_basis: 'daily' | 'weekly' | 'monthly' | 'yearly';
+  starts_at: string;
+  ends_at: string | null;
+  poll_options: string[];
+  quiz_options: string[];
+  correct_answer: string | null;
+  is_active: boolean;
+};
+
 const AdminPage = () => {
-  const { isAdmin, isLoading } = useAuth();
+  const { user, isAdmin, isLoading } = useAuth();
   const [stepOne, setStepOne] = useState('');
   const [stepTwo, setStepTwo] = useState('');
   const [isUnlocking, setIsUnlocking] = useState(false);
@@ -67,9 +82,22 @@ const AdminPage = () => {
   const [savingRules, setSavingRules] = useState(false);
 
   const [feedback, setFeedback] = useState<FeedbackRow[]>([]);
+  const [hotQuestions, setHotQuestions] = useState<HotQuestionRow[]>([]);
+  const [hotForm, setHotForm] = useState({
+    title: '',
+    content: '',
+    image_url: '',
+    kind: 'text' as HotQuestionRow['kind'],
+    schedule_basis: 'daily' as HotQuestionRow['schedule_basis'],
+    starts_at: new Date().toISOString().slice(0, 16),
+    ends_at: '',
+    options: '',
+    correct_answer: '',
+  });
+  const [savingHot, setSavingHot] = useState(false);
 
   const loadAdminData = async () => {
-    const [usersRes, rulesRes, feedbackRes] = await Promise.all([
+    const [usersRes, rulesRes, feedbackRes, hotRes] = await Promise.all([
       supabase
         .from('profiles')
         .select('user_id,name,level,xp,coins,streak,unique_id')
@@ -85,6 +113,11 @@ const AdminPage = () => {
         .select('id,rating,suggestion,feature_request,created_at,user_id')
         .order('created_at', { ascending: false })
         .limit(50),
+      (supabase as any)
+        .from('daily_hot_questions')
+        .select('id,title,content,image_url,kind,schedule_basis,starts_at,ends_at,poll_options,quiz_options,correct_answer,is_active')
+        .order('starts_at', { ascending: false })
+        .limit(30),
     ]);
 
     if (usersRes.data) {
@@ -102,6 +135,7 @@ const AdminPage = () => {
 
     if (rulesRes.data) setRules(rulesRes.data as RuleRow);
     if (feedbackRes.data) setFeedback(feedbackRes.data as FeedbackRow[]);
+    if ((hotRes as any).data) setHotQuestions((hotRes as any).data as HotQuestionRow[]);
   };
 
   useEffect(() => {
@@ -197,6 +231,42 @@ const AdminPage = () => {
     setSavingRules(false);
   };
 
+  const saveHotQuestion = async () => {
+    if (!user || !hotForm.title.trim()) return;
+    setSavingHot(true);
+    const options = hotForm.options.split('\n').map((s) => s.trim()).filter(Boolean).slice(0, 8);
+    const startsAt = new Date(hotForm.starts_at).toISOString();
+    const endsAt = hotForm.ends_at ? new Date(hotForm.ends_at).toISOString() : null;
+    const { error } = await (supabase as any).from('daily_hot_questions').insert({
+      owner_id: user.id,
+      admin_id: user.id,
+      title: hotForm.title.trim(),
+      content: hotForm.content.trim(),
+      image_url: hotForm.image_url.trim() || null,
+      kind: hotForm.kind,
+      schedule_basis: hotForm.schedule_basis,
+      starts_at: startsAt,
+      ends_at: endsAt,
+      poll_options: hotForm.kind === 'poll' ? options : [],
+      quiz_options: hotForm.kind === 'quiz' ? options : [],
+      correct_answer: hotForm.kind === 'quiz' ? hotForm.correct_answer.trim() || options[0] || null : null,
+      is_active: true,
+    });
+    if (error) toast({ title: 'Hot question save failed', description: error.message, variant: 'destructive' });
+    else {
+      toast({ title: 'Hot question scheduled 🔥' });
+      setHotForm((p) => ({ ...p, title: '', content: '', image_url: '', options: '', correct_answer: '' }));
+      void loadAdminData();
+    }
+    setSavingHot(false);
+  };
+
+  const toggleHotQuestion = async (id: string, isActive: boolean) => {
+    const { error } = await (supabase as any).from('daily_hot_questions').update({ is_active: !isActive }).eq('id', id);
+    if (error) toast({ title: 'Update failed', description: error.message, variant: 'destructive' });
+    else void loadAdminData();
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -248,10 +318,11 @@ const AdminPage = () => {
         </div>
 
         <Tabs defaultValue="users" className="space-y-4">
-          <TabsList className="grid grid-cols-3 w-full">
+          <TabsList className="grid grid-cols-4 w-full">
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="rules">XP Rules</TabsTrigger>
             <TabsTrigger value="feedback">Feedback</TabsTrigger>
+            <TabsTrigger value="hot">Hot Qs</TabsTrigger>
           </TabsList>
 
           <TabsContent value="users" className="space-y-4">
@@ -345,6 +416,52 @@ const AdminPage = () => {
                     <p className="text-sm">⭐ {item.rating}/5</p>
                     {item.suggestion && <p className="text-xs text-muted-foreground mt-1">{item.suggestion}</p>}
                     {item.feature_request && <p className="text-xs mt-1">Feature: {item.feature_request}</p>}
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="hot" className="space-y-4">
+            <Card className="glass-panel border-primary/20">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2"><Flame className="w-4 h-4" /> Daily / Weekly Hot Question Owner Panel</CardTitle>
+                <CardDescription>Schedule text, image, poll, and quiz prompts for students.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="grid sm:grid-cols-2 gap-3">
+                  <div><Label>Title</Label><Input value={hotForm.title} onChange={(e) => setHotForm((p) => ({ ...p, title: e.target.value }))} /></div>
+                  <div><Label>Image URL / attachment URL</Label><Input value={hotForm.image_url} onChange={(e) => setHotForm((p) => ({ ...p, image_url: e.target.value }))} placeholder="Optional" /></div>
+                </div>
+                <div><Label>Question / prompt</Label><Textarea value={hotForm.content} onChange={(e) => setHotForm((p) => ({ ...p, content: e.target.value }))} rows={4} /></div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  <div><Label>Type</Label><Select value={hotForm.kind} onValueChange={(v) => setHotForm((p) => ({ ...p, kind: v as HotQuestionRow['kind'] }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="text">Text</SelectItem><SelectItem value="image">Image</SelectItem><SelectItem value="poll">Poll</SelectItem><SelectItem value="quiz">Quiz</SelectItem></SelectContent></Select></div>
+                  <div><Label>Basis</Label><Select value={hotForm.schedule_basis} onValueChange={(v) => setHotForm((p) => ({ ...p, schedule_basis: v as HotQuestionRow['schedule_basis'] }))}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="daily">Daily</SelectItem><SelectItem value="weekly">Weekly</SelectItem><SelectItem value="monthly">Monthly</SelectItem><SelectItem value="yearly">Yearly</SelectItem></SelectContent></Select></div>
+                  <div><Label>Start</Label><Input type="datetime-local" value={hotForm.starts_at} onChange={(e) => setHotForm((p) => ({ ...p, starts_at: e.target.value }))} /></div>
+                  <div><Label>End</Label><Input type="datetime-local" value={hotForm.ends_at} onChange={(e) => setHotForm((p) => ({ ...p, ends_at: e.target.value }))} /></div>
+                </div>
+                {(hotForm.kind === 'poll' || hotForm.kind === 'quiz') && (
+                  <div className="grid sm:grid-cols-2 gap-3">
+                    <div><Label>Options (one per line)</Label><Textarea value={hotForm.options} onChange={(e) => setHotForm((p) => ({ ...p, options: e.target.value }))} rows={4} /></div>
+                    {hotForm.kind === 'quiz' && <div><Label>Correct answer</Label><Input value={hotForm.correct_answer} onChange={(e) => setHotForm((p) => ({ ...p, correct_answer: e.target.value }))} placeholder="Must match one option" /></div>}
+                  </div>
+                )}
+                <Button onClick={saveHotQuestion} disabled={savingHot || !hotForm.title.trim()}>{savingHot ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4 mr-2" />} Save Hot Question</Button>
+              </CardContent>
+            </Card>
+
+            <Card className="glass-panel border-primary/20">
+              <CardHeader><CardTitle className="flex items-center gap-2"><CalendarDays className="w-4 h-4" /> Scheduled Hot Questions</CardTitle></CardHeader>
+              <CardContent className="space-y-2 max-h-80 overflow-auto">
+                {hotQuestions.length === 0 && <p className="text-sm text-muted-foreground">No hot questions scheduled.</p>}
+                {hotQuestions.map((q) => (
+                  <div key={q.id} className="rounded-lg border border-border p-3 flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold truncate">{q.title}</p>
+                      <p className="text-xs text-muted-foreground">{q.kind} • {q.schedule_basis} • {new Date(q.starts_at).toLocaleString()}</p>
+                      <p className="text-xs mt-1 line-clamp-2">{q.content}</p>
+                    </div>
+                    <Button size="sm" variant={q.is_active ? 'destructive' : 'outline'} onClick={() => toggleHotQuestion(q.id, q.is_active)}>{q.is_active ? 'Pause' : 'Activate'}</Button>
                   </div>
                 ))}
               </CardContent>

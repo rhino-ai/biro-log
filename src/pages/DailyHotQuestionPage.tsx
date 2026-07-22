@@ -245,7 +245,7 @@ const DailyHotQuestionPage = () => {
                     onKeyDown={e => { if (e.key === 'Enter') handleSubmitAnswer(); }}
                   />
                 )}
-                <Button size="icon" onClick={handleSubmitAnswer} disabled={isSubmitting || !myAnswer.trim()}>
+                <Button size="icon" onClick={handleSubmitAnswer} disabled={isSubmitting || ((question.kind === 'poll' || question.kind === 'quiz') ? !selectedOption : !myAnswer.trim())}>
                   {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 </Button>
               </div>
