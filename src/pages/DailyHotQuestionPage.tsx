@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from 'react';
 import { supabase as _supabase } from '@/integrations/supabase/client';
 const supabase = _supabase as any;
 import { useAuth } from '@/hooks/useAuth';
-import { Header } from '@/components/layout/Header';
 import { BackButton } from '@/components/layout/BackButton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -170,7 +169,6 @@ const DailyHotQuestionPage = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20 flex flex-col">
-      <Header />
       <main className="flex-1 px-4 py-6 max-w-lg mx-auto w-full flex flex-col gap-4">
         <div className="flex items-center gap-3">
           <BackButton to="/" />

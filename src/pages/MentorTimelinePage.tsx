@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
-import { Header } from '@/components/layout/Header';
-import { BottomNav } from '@/components/layout/BottomNav';
 import { BackButton } from '@/components/layout/BackButton';
 import { Calendar, Clock, MessageCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -45,7 +43,6 @@ const MentorTimelinePage = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <Header />
       <main className="px-4 py-6 max-w-lg mx-auto space-y-4">
         <BackButton />
         <div className="flex items-center gap-2">
@@ -79,7 +76,6 @@ const MentorTimelinePage = () => {
           ))}
         </div>
       </main>
-      <BottomNav />
     </div>
   );
 };

@@ -1,7 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
-import { Header } from '@/components/layout/Header';
-import { BottomNav } from '@/components/layout/BottomNav';
 import { BackButton } from '@/components/layout/BackButton';
 import { Button } from '@/components/ui/button';
 import { Skull, Flame, Lock, Unlock } from 'lucide-react';
@@ -86,7 +84,6 @@ const VillainModePage = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <Header />
       <main className="px-4 py-6 max-w-lg mx-auto space-y-6">
         <BackButton to="/" />
         {locked && (
@@ -128,7 +125,6 @@ const VillainModePage = () => {
           <p>🔥 Survive the full session for bonus XP and a Villain badge.</p>
         </div>
       </main>
-      <BottomNav />
     </div>
   );
 };

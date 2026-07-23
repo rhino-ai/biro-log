@@ -35,6 +35,7 @@ import NotFound from "./pages/NotFound";
 import { Loader2 } from "lucide-react";
 import { ReadModeGuard } from "@/components/system/ReadModeGuard";
 import { LiveCallIndicator } from "@/components/system/LiveCallIndicator";
+import { MainAppLayout } from "@/components/layouts/MainAppLayout";
 import { useInAppPushSound } from "@/hooks/useInAppPushSound";
 import { useNavigate } from "react-router-dom";
 import { initNative } from "@/lib/native";
@@ -43,7 +44,7 @@ const queryClient = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 5 * 60 * 1000 } },
 });
 
-const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
+const ProtectedRoute = ({ children, hideHeader, hideNav }: { children: React.ReactNode; hideHeader?: boolean; hideNav?: boolean }) => {
   const { user, isGuest, isLoading } = useAuth();
   if (isLoading) return (
     <div className="min-h-screen bg-background flex items-center justify-center">
@@ -51,7 +52,7 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     </div>
   );
   if (!user && !isGuest) return <Navigate to="/auth" replace />;
-  return <>{children}</>;
+  return <MainAppLayout hideHeader={hideHeader} hideNav={hideNav}>{children}</MainAppLayout>;
 };
 
 const PublicRoute = ({ children }: { children: React.ReactNode }) => {

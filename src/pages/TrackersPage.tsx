@@ -1,6 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Header } from '@/components/layout/Header';
-import { BottomNav } from '@/components/layout/BottomNav';
 import { BackButton } from '@/components/layout/BackButton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -184,7 +182,6 @@ const TrackersPage = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <Header />
       <main className="px-3 py-4 max-w-6xl mx-auto space-y-3">
         <div className="flex items-center justify-between">
           <BackButton to="/" />
@@ -268,7 +265,6 @@ const TrackersPage = () => {
           </>
         )}
       </main>
-      <BottomNav />
     </div>
   );
 };

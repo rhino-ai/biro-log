@@ -1,5 +1,3 @@
-import { Header } from '@/components/layout/Header';
-import { BottomNav } from '@/components/layout/BottomNav';
 import { BackButton } from '@/components/layout/BackButton';
 import { GuideSection } from '@/components/game/GuideSection';
 import { FocusTimer } from '@/components/game/FocusTimer';
@@ -32,7 +30,6 @@ const SECTIONS: { path: string; icon: string; label: string; hint: string }[] = 
 const GuidePage = () => {
   return (
     <div className="min-h-screen bg-background pb-20">
-      <Header />
       
       <main className="px-4 py-6 max-w-lg mx-auto space-y-6">
         {/* Back + Page Title */}
@@ -82,7 +79,6 @@ const GuidePage = () => {
         </div>
       </main>
 
-      <BottomNav />
     </div>
   );
 };

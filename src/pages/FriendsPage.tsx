@@ -1,6 +1,4 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Header } from '@/components/layout/Header';
-import { BottomNav } from '@/components/layout/BottomNav';
 import { BackButton } from '@/components/layout/BackButton';
 import { FriendInvite } from '@/components/game/FriendInvite';
 import { Button } from '@/components/ui/button';
@@ -643,7 +641,6 @@ const FriendsPage = () => {
   if (isGuest) {
     return (
       <div className="min-h-screen bg-background pb-20">
-        <Header />
         <main className="px-4 py-6 max-w-lg mx-auto space-y-6">
           <BackButton to="/" />
           <div className="glass-panel rounded-xl p-5 border border-primary/30 space-y-3 text-center">
@@ -653,7 +650,6 @@ const FriendsPage = () => {
             <Button className="w-full" onClick={() => window.location.assign('/auth')}>Sign in to chat</Button>
           </div>
         </main>
-        <BottomNav />
       </div>
     );
   }
@@ -798,7 +794,6 @@ const FriendsPage = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <Header />
       <main className="px-4 py-6 max-w-lg mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <BackButton to="/" />
@@ -919,7 +914,6 @@ const FriendsPage = () => {
           <TabsContent value="invite"><FriendInvite /></TabsContent>
         </Tabs>
       </main>
-      <BottomNav />
     </div>
   );
 };
