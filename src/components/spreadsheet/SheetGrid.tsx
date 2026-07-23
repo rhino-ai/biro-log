@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
-import { colToLetter, computeWorkbook, displayValue, letterToCol, rcToAddr, addrToRC, type CellStyle, type SheetData, type Workbook } from '@/lib/spreadsheet/engine';
+import { colToLetter, computeWorkbook, displayValue, letterToCol, rcToAddr, addrToRC, type Cell, type CellStyle, type SheetData, type Workbook } from '@/lib/spreadsheet/engine';
 import { Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, Rows3, Columns3, Trash, Snowflake, Search, PaintBucket, Type } from 'lucide-react';
 
 type Sel = { r: number; c: number };
