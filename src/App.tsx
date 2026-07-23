@@ -85,15 +85,15 @@ const AppRoutes = () => {
     <Route path="/raid" element={<ProtectedRoute><RaidPage /></ProtectedRoute>} />
     <Route path="/admin" element={<ProtectedRoute><AdminPage /></ProtectedRoute>} />
     <Route path="/guide" element={<ProtectedRoute><GuidePage /></ProtectedRoute>} />
-    <Route path="/biro-yaar" element={<ProtectedRoute><BiroYaarPage /></ProtectedRoute>} />
-    <Route path="/mentor" element={<ProtectedRoute><MentorPage /></ProtectedRoute>} />
-    <Route path="/friends" element={<ProtectedRoute><FriendsPage /></ProtectedRoute>} />
+    <Route path="/biro-yaar" element={<ProtectedRoute hideHeader hideNav><BiroYaarPage /></ProtectedRoute>} />
+    <Route path="/mentor" element={<ProtectedRoute hideHeader hideNav><MentorPage /></ProtectedRoute>} />
+    <Route path="/friends" element={<ProtectedRoute hideHeader hideNav><FriendsPage /></ProtectedRoute>} />
     <Route path="/leaderboard" element={<ProtectedRoute><LeaderboardPage /></ProtectedRoute>} />
     <Route path="/mind-games" element={<ProtectedRoute><MindGamesPage /></ProtectedRoute>} />
     <Route path="/wellness" element={<ProtectedRoute><WellnessPage /></ProtectedRoute>} />
     <Route path="/screen-time" element={<ProtectedRoute><ScreenTimePage /></ProtectedRoute>} />
     <Route path="/analytics" element={<ProtectedRoute><AnalyticsPage /></ProtectedRoute>} />
-    <Route path="/virtual-library" element={<VirtualLibraryPage />} />
+    <Route path="/virtual-library" element={<MainAppLayout hideHeader hideNav><VirtualLibraryPage /></MainAppLayout>} />
     <Route path="/feedback" element={<ProtectedRoute><FeedbackPage /></ProtectedRoute>} />
     <Route path="/journal" element={<ProtectedRoute><JournalPage /></ProtectedRoute>} />
     <Route path="/trackers" element={<ProtectedRoute><TrackersPage /></ProtectedRoute>} />
