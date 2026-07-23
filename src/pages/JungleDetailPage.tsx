@@ -1,8 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useGame } from '@/hooks/useGame';
-import { Header } from '@/components/layout/Header';
-import { BottomNav } from '@/components/layout/BottomNav';
 import { ChapterList } from '@/components/game/ChapterList';
 import { JungleGardenMap } from '@/components/game/JungleGardenMap';
 import { ChaptersGrid } from '@/components/game/ChaptersGrid';
@@ -56,7 +54,6 @@ const JungleDetailPage = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <Header />
       
       <main className="px-4 py-6 max-w-lg mx-auto space-y-6">
         <div className="flex items-center justify-between">
@@ -156,7 +153,6 @@ const JungleDetailPage = () => {
           </TabsContent>
         </Tabs>
       </main>
-      <BottomNav />
     </div>
   );
 };

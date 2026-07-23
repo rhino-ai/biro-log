@@ -1,6 +1,4 @@
 import { useEffect, useState } from 'react';
-import { Header } from '@/components/layout/Header';
-import { BottomNav } from '@/components/layout/BottomNav';
 import { BackButton } from '@/components/layout/BackButton';
 import { useGame } from '@/hooks/useGame';
 import { RotateCw, Flame, AlertTriangle, CheckCircle2 } from 'lucide-react';
@@ -77,7 +75,6 @@ const RevisionSchedulerPage = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <Header />
       <main className="px-4 py-6 max-w-lg mx-auto space-y-5">
         <BackButton to="/" />
         <div className="text-center">
@@ -130,7 +127,6 @@ const RevisionSchedulerPage = () => {
           </div>
         )}
       </main>
-      <BottomNav />
     </div>
   );
 };

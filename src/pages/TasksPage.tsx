@@ -1,7 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useGame } from '@/hooks/useGame';
-import { Header } from '@/components/layout/Header';
-import { BottomNav } from '@/components/layout/BottomNav';
 import { BackButton } from '@/components/layout/BackButton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -143,7 +141,6 @@ const TasksPage = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <Header />
       <main className="px-4 py-6 max-w-lg mx-auto space-y-6">
         <div className="flex items-center justify-between animate-fade-in">
           <BackButton to="/" />
@@ -436,7 +433,6 @@ const TasksPage = () => {
           <div className="flex items-start gap-3"><span className="text-2xl">⚠️</span><div><h3 className="font-game text-sm mb-1 text-destructive">Deadline Warning!</h3><p className="text-xs text-muted-foreground">Miss a deadline → Task goes to BACKLOG → RAID MODE activates! Complete tasks on time to keep your jungle healthy! 🌴</p></div></div>
         </div>
       </main>
-      <BottomNav />
     </div>
   );
 };

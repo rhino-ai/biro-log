@@ -1,8 +1,6 @@
 import { useGame } from '@/hooks/useGame';
 import { useGameStore } from '@/store/gameStore';
 import { TrackSelection } from '@/components/game/TrackSelection';
-import { Header } from '@/components/layout/Header';
-import { BottomNav } from '@/components/layout/BottomNav';
 import { StatCard } from '@/components/game/StatCard';
 import { XPBar } from '@/components/game/XPBar';
 import { JungleCard } from '@/components/game/JungleCard';
@@ -46,7 +44,6 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <Header />
       
       <main className="px-4 py-6 max-w-lg mx-auto space-y-6">
         {/* Welcome Section - Rebranded */}
@@ -253,7 +250,6 @@ const Index = () => {
         </div>
       </main>
 
-      <BottomNav />
     </div>
   );
 };

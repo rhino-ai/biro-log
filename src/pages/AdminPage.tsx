@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { Header } from '@/components/layout/Header';
-import { BottomNav } from '@/components/layout/BottomNav';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -280,7 +278,6 @@ const AdminPage = () => {
   if (!isUnlocked) {
     return (
       <div className="min-h-screen bg-background pb-20">
-        <Header />
         <main className="px-4 py-6 max-w-lg mx-auto">
           <Card className="glass-panel border-primary/30">
             <CardHeader>
@@ -303,14 +300,12 @@ const AdminPage = () => {
             </CardContent>
           </Card>
         </main>
-        <BottomNav />
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <Header />
       <main className="px-4 py-6 max-w-4xl mx-auto space-y-6">
         <div className="text-center">
           <h1 className="font-game text-2xl text-primary">Admin Control Center</h1>
@@ -469,7 +464,6 @@ const AdminPage = () => {
           </TabsContent>
         </Tabs>
       </main>
-      <BottomNav />
     </div>
   );
 };

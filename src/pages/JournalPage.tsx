@@ -1,6 +1,4 @@
 import { useState, useEffect } from 'react';
-import { Header } from '@/components/layout/Header';
-import { BottomNav } from '@/components/layout/BottomNav';
 import { BackButton } from '@/components/layout/BackButton';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -88,7 +86,6 @@ const JournalPage = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <Header />
       <main className="px-4 py-6 max-w-lg mx-auto space-y-6">
         <div className="flex items-center justify-between">
           <BackButton to="/wellness" />
@@ -158,7 +155,6 @@ const JournalPage = () => {
           ))}
         </div>
       </main>
-      <BottomNav />
     </div>
   );
 };

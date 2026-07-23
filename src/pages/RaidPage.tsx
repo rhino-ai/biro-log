@@ -1,6 +1,4 @@
 import { useState } from 'react';
-import { Header } from '@/components/layout/Header';
-import { BottomNav } from '@/components/layout/BottomNav';
 import { BackButton } from '@/components/layout/BackButton';
 import { RaidBattle } from '@/components/game/RaidBattle';
 import { PunishmentModal } from '@/components/game/PunishmentModal';
@@ -22,7 +20,6 @@ const RaidPage = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <Header />
       <main className="px-4 py-6 max-w-lg mx-auto space-y-6">
         <div className="flex items-center justify-between animate-fade-in">
           <BackButton to="/" />
@@ -106,7 +103,6 @@ const RaidPage = () => {
         </div>
         <Card className="glass-panel border-primary/20"><CardContent className="p-4"><div className="flex items-start gap-3"><span className="text-2xl">💡</span><div><h4 className="font-medium text-sm mb-1">How Raid Works</h4><ul className="text-xs text-muted-foreground space-y-1"><li>• Overdue tasks become Backlog Boss HP</li><li>• Complete each task = Deal 100 damage</li><li>• Clear all backlogs = Victory + Rewards!</li><li>• Skip tasks = Face BEIJJATI punishment! 😈</li><li>• Stay consistent to avoid raids!</li></ul></div></div></CardContent></Card>
       </main>
-      <BottomNav />
       <RaidBattle isOpen={showBattle} onClose={() => setShowBattle(false)} />
       <PunishmentModal isOpen={showPunishment} onClose={() => setShowPunishment(false)} backlogCount={backlogCount} />
     </div>

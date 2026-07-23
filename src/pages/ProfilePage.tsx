@@ -1,8 +1,6 @@
 import { useState, useRef } from 'react';
 import { useGame } from '@/hooks/useGame';
 import { useAuth } from '@/hooks/useAuth';
-import { Header } from '@/components/layout/Header';
-import { BottomNav } from '@/components/layout/BottomNav';
 import { PushToggle } from '@/components/PushToggle';
 import { UserApiKeysDialog } from '@/components/settings/UserApiKeysDialog';
 import { KeyRound } from 'lucide-react';
@@ -89,7 +87,6 @@ const ProfilePage = () => {
 
   return (
     <div className="min-h-screen bg-background pb-20">
-      <Header />
       <main className="px-4 py-6 max-w-lg mx-auto space-y-6">
         <div className="animate-fade-in"><BackButton to="/" /></div>
         <div className="glass-panel rounded-2xl p-6 text-center animate-fade-in border border-primary/20">
@@ -182,7 +179,6 @@ const ProfilePage = () => {
         <ApiKeysSection />
         <div className="animate-fade-in" style={{ animationDelay: '0.4s' }}><AppRatingSection /></div>
       </main>
-      <BottomNav />
     </div>
   );
 };
