@@ -265,7 +265,7 @@ serve(async (req) => {
         supabase.from("user_tasks").select("title,type,completed,due_date,due_time").eq("user_id", userId).order("created_at", { ascending: false }).limit(15),
         supabase.from("user_chapter_progress").select("jungle_id,chapter_id,theory_done,practice_done,revision_done,updated_at").eq("user_id", userId).order("updated_at", { ascending: false }).limit(15),
         supabase.from("journal_entries").select("entry_date,mood,content,tags").eq("user_id", userId).order("entry_date", { ascending: false }).limit(7),
-        supabase.from("mentor_conversations").select("role,content,created_at").eq("user_id", userId).order("created_at", { ascending: false }).limit(20),
+        supabase.from("mentor_conversations").select("role,content,created_at").eq("user_id", userId).neq("study_track", "biro_yaar").order("created_at", { ascending: false }).limit(20),
       ]);
       const p: any = profileRes.data;
       const summaries = (summariesRes.data || []).map((s: any) => `  • ${s.summary_date}: ${s.summary}`).join("\n");
@@ -279,6 +279,7 @@ serve(async (req) => {
         .select("created_at,attachment_meta")
         .eq("user_id", userId)
         .not("attachment_meta", "is", null)
+        .neq("study_track", "biro_yaar")
         .order("created_at", { ascending: false })
         .limit(15);
       const attachLog = (attachHistory || []).map((a: any) => {
@@ -400,8 +401,9 @@ ${chapters || "  (no chapter progress)"}`;
     const lastUserMsg = [...messages].reverse().find((m: any) => m.role === "user");
     if (lastUserMsg?.content) {
       const savedAttachments = (attachments && attachments.length) ? attachments : null;
+      const mentorTrack = (studyTrack && studyTrack !== "biro_yaar") ? studyTrack : "mentor";
       const { data: savedRow } = await supabase.from("mentor_conversations").insert({
-        user_id: userId, role: "user", content: String(lastUserMsg.content).slice(0, 8000), study_track: studyTrack || null,
+        user_id: userId, role: "user", content: String(lastUserMsg.content).slice(0, 8000), study_track: mentorTrack,
         attachment_meta: savedAttachments,
       }).select("id").maybeSingle();
 
@@ -490,8 +492,9 @@ ${chapters || "  (no chapter progress)"}`;
           }
         }
         if (full.trim()) {
+          const mentorTrack = (studyTrack && studyTrack !== "biro_yaar") ? studyTrack : "mentor";
           await supabase.from("mentor_conversations").insert({
-            user_id: userId, role: "assistant", content: full.slice(0, 12000), study_track: studyTrack || null,
+            user_id: userId, role: "assistant", content: full.slice(0, 12000), study_track: mentorTrack,
           });
         }
       } catch (e) { console.error("capture error:", e); }

@@ -51,7 +51,7 @@ export function Workbook({ workbook, onChange }: { workbook: WB; onChange: (wb: 
       </div>
 
       {/* Grid */}
-      <SheetGrid workbook={workbook} activeIndex={active} onChange={onChange} zoom={zoom} />
+      <SheetGrid workbook={workbook} activeIndex={active} onChange={onChange} zoom={zoom} onZoom={setZoom} />
 
       {/* Sheet tabs */}
       <div className="flex items-center gap-1 p-1 border-t border-white/10 bg-secondary/40 overflow-x-auto">

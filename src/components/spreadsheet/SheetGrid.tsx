@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
-import { colToLetter, computeWorkbook, displayValue, letterToCol, rcToAddr, addrToRC, type SheetData, type Workbook } from '@/lib/spreadsheet/engine';
+import { colToLetter, computeWorkbook, displayValue, letterToCol, rcToAddr, addrToRC, type Cell, type CellStyle, type SheetData, type Workbook } from '@/lib/spreadsheet/engine';
+import { Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, Rows3, Columns3, Trash, Snowflake, Search, PaintBucket, Type } from 'lucide-react';
 
 type Sel = { r: number; c: number };
 type Range = { r1: number; c1: number; r2: number; c2: number };
@@ -10,11 +11,13 @@ export function SheetGrid({
   activeIndex,
   onChange,
   zoom = 1,
+  onZoom,
 }: {
   workbook: Workbook;
   activeIndex: number;
   onChange: (wb: Workbook) => void;
   zoom?: number;
+  onZoom?: (z: number) => void;
 }) {
   const sheet = workbook.sheets[activeIndex];
   const [sel, setSel] = useState<Sel>({ r: 0, c: 0 });
@@ -22,6 +25,9 @@ export function SheetGrid({
   const [editing, setEditing] = useState<null | { r: number; c: number; text: string }>(null);
   const [history, setHistory] = useState<Workbook[]>([]);
   const [future, setFuture] = useState<Workbook[]>([]);
+  const [findOpen, setFindOpen] = useState(false);
+  const [findText, setFindText] = useState('');
+  const [replaceText, setReplaceText] = useState('');
   const gridRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -73,9 +79,128 @@ export function SheetGrid({
     r2: Math.max(rg.r1, rg.r2), c2: Math.max(rg.c1, rg.c2),
   });
 
+  const currentRange = (): Range => range || { r1: sel.r, c1: sel.c, r2: sel.r, c2: sel.c };
+
+  const applyStyleToSelection = (patch: Partial<CellStyle>) => {
+    applyChange(wb => {
+      const sh = wb.sheets[activeIndex];
+      const rg = currentRange();
+      for (let r = rg.r1; r <= rg.r2; r++)
+        for (let c = rg.c1; c <= rg.c2; c++) {
+          const addr = rcToAddr(r, c);
+          const cell = sh.cells[addr] || { raw: '' };
+          cell.style = { ...(cell.style || {}), ...patch };
+          // Clean empty
+          if (cell.style) {
+            (Object.keys(cell.style) as (keyof CellStyle)[]).forEach(k => {
+              const v = (cell.style as any)[k];
+              if (v === undefined || v === '' || v === false) delete (cell.style as any)[k];
+            });
+            if (Object.keys(cell.style).length === 0) delete cell.style;
+          }
+          sh.cells[addr] = cell;
+        }
+      return wb;
+    });
+  };
+
+  const toggleStyleBool = (key: 'bold' | 'italic' | 'underline') => {
+    const addr = rcToAddr(sel.r, sel.c);
+    const cur = !!sheet.cells[addr]?.style?.[key];
+    applyStyleToSelection({ [key]: !cur } as any);
+  };
+
+  const insertRow = (offset: 0 | 1) => {
+    applyChange(wb => {
+      const sh = wb.sheets[activeIndex];
+      const at = sel.r + offset;
+      const next: Record<string, Cell> = {};
+      Object.entries(sh.cells).forEach(([addr, cell]) => {
+        const rc = addrToRC(addr); if (!rc) return;
+        const nr = rc.r >= at ? rc.r + 1 : rc.r;
+        next[rcToAddr(nr, rc.c)] = cell as any;
+      });
+      sh.cells = next; sh.rows = Math.max(sh.rows + 1, at + 5);
+      return wb;
+    });
+  };
+  const insertCol = (offset: 0 | 1) => {
+    applyChange(wb => {
+      const sh = wb.sheets[activeIndex];
+      const at = sel.c + offset;
+      const next: Record<string, Cell> = {};
+      Object.entries(sh.cells).forEach(([addr, cell]) => {
+        const rc = addrToRC(addr); if (!rc) return;
+        const nc = rc.c >= at ? rc.c + 1 : rc.c;
+        next[rcToAddr(rc.r, nc)] = cell as any;
+      });
+      sh.cells = next; sh.cols = Math.max(sh.cols + 1, at + 3);
+      return wb;
+    });
+  };
+  const deleteRow = () => {
+    applyChange(wb => {
+      const sh = wb.sheets[activeIndex];
+      const at = sel.r;
+      const next: Record<string, Cell> = {};
+      Object.entries(sh.cells).forEach(([addr, cell]) => {
+        const rc = addrToRC(addr); if (!rc) return;
+        if (rc.r === at) return;
+        const nr = rc.r > at ? rc.r - 1 : rc.r;
+        next[rcToAddr(nr, rc.c)] = cell as any;
+      });
+      sh.cells = next; sh.rows = Math.max(1, sh.rows - 1);
+      return wb;
+    });
+  };
+  const deleteCol = () => {
+    applyChange(wb => {
+      const sh = wb.sheets[activeIndex];
+      const at = sel.c;
+      const next: Record<string, Cell> = {};
+      Object.entries(sh.cells).forEach(([addr, cell]) => {
+        const rc = addrToRC(addr); if (!rc) return;
+        if (rc.c === at) return;
+        const nc = rc.c > at ? rc.c - 1 : rc.c;
+        next[rcToAddr(rc.r, nc)] = cell as any;
+      });
+      sh.cells = next; sh.cols = Math.max(1, sh.cols - 1);
+      return wb;
+    });
+  };
+  const toggleFreeze = () => {
+    applyChange(wb => {
+      const sh = wb.sheets[activeIndex];
+      if (sh.freezeRow || sh.freezeCol) { delete sh.freezeRow; delete sh.freezeCol; }
+      else { sh.freezeRow = 1; sh.freezeCol = 1; }
+      return wb;
+    });
+  };
+  const runFindReplace = () => {
+    if (!findText) return;
+    applyChange(wb => {
+      const sh = wb.sheets[activeIndex];
+      Object.entries(sh.cells).forEach(([addr, cell]) => {
+        if (cell.raw && cell.raw.includes(findText)) {
+          sh.cells[addr] = { ...cell, raw: cell.raw.split(findText).join(replaceText) };
+        }
+      });
+      return wb;
+    });
+  };
+
   const onKey = (e: React.KeyboardEvent) => {
     if (editing) return; // input handles keys
     const meta = e.ctrlKey || e.metaKey;
+    // Zoom
+    if (meta && (e.key === '=' || e.key === '+')) { e.preventDefault(); onZoom?.(Math.min(2, (zoom || 1) + 0.1)); return; }
+    if (meta && e.key === '-') { e.preventDefault(); onZoom?.(Math.max(0.6, (zoom || 1) - 0.1)); return; }
+    if (meta && e.key === '0') { e.preventDefault(); onZoom?.(1); return; }
+    // Formatting shortcuts
+    if (meta && e.key.toLowerCase() === 'b') { e.preventDefault(); toggleStyleBool('bold'); return; }
+    if (meta && e.key.toLowerCase() === 'i') { e.preventDefault(); toggleStyleBool('italic'); return; }
+    if (meta && e.key.toLowerCase() === 'u') { e.preventDefault(); toggleStyleBool('underline'); return; }
+    if (meta && e.key.toLowerCase() === 'f') { e.preventDefault(); setFindOpen(v => !v); return; }
     // Undo / redo
     if (meta && e.key.toLowerCase() === 'z' && !e.shiftKey) {
       e.preventDefault();
@@ -179,9 +304,56 @@ export function SheetGrid({
 
   const activeAddr = rcToAddr(sel.r, sel.c);
   const activeRaw = sheet.cells[activeAddr]?.raw ?? '';
+  const activeStyle = sheet.cells[activeAddr]?.style;
+
+  const onWheelZoom = (e: React.WheelEvent) => {
+    if (!(e.ctrlKey || e.metaKey) || !onZoom) return;
+    e.preventDefault();
+    const dir = e.deltaY > 0 ? -1 : 1;
+    onZoom(Math.min(2, Math.max(0.6, (zoom || 1) + dir * 0.1)));
+  };
 
   return (
     <div className="flex flex-col h-full">
+      {/* Formatting toolbar */}
+      <div className="flex flex-wrap items-center gap-0.5 p-1 border-b border-white/10 bg-secondary/40 text-xs">
+        <button title="Bold (Ctrl+B)" onClick={() => toggleStyleBool('bold')} className={cn('h-7 w-7 rounded hover:bg-secondary flex items-center justify-center', activeStyle?.bold && 'bg-primary/30')}><Bold className="w-3.5 h-3.5" /></button>
+        <button title="Italic (Ctrl+I)" onClick={() => toggleStyleBool('italic')} className={cn('h-7 w-7 rounded hover:bg-secondary flex items-center justify-center', activeStyle?.italic && 'bg-primary/30')}><Italic className="w-3.5 h-3.5" /></button>
+        <button title="Underline (Ctrl+U)" onClick={() => toggleStyleBool('underline')} className={cn('h-7 w-7 rounded hover:bg-secondary flex items-center justify-center', activeStyle?.underline && 'bg-primary/30')}><Underline className="w-3.5 h-3.5" /></button>
+        <div className="w-px h-5 bg-white/10 mx-1" />
+        <button title="Align left" onClick={() => applyStyleToSelection({ align: 'left' })} className={cn('h-7 w-7 rounded hover:bg-secondary flex items-center justify-center', activeStyle?.align === 'left' && 'bg-primary/30')}><AlignLeft className="w-3.5 h-3.5" /></button>
+        <button title="Align center" onClick={() => applyStyleToSelection({ align: 'center' })} className={cn('h-7 w-7 rounded hover:bg-secondary flex items-center justify-center', activeStyle?.align === 'center' && 'bg-primary/30')}><AlignCenter className="w-3.5 h-3.5" /></button>
+        <button title="Align right" onClick={() => applyStyleToSelection({ align: 'right' })} className={cn('h-7 w-7 rounded hover:bg-secondary flex items-center justify-center', activeStyle?.align === 'right' && 'bg-primary/30')}><AlignRight className="w-3.5 h-3.5" /></button>
+        <div className="w-px h-5 bg-white/10 mx-1" />
+        <label title="Fill color" className="h-7 px-1 rounded hover:bg-secondary flex items-center gap-1 cursor-pointer">
+          <PaintBucket className="w-3.5 h-3.5" />
+          <input type="color" className="w-4 h-4 border-0 bg-transparent p-0 cursor-pointer" onChange={(e) => applyStyleToSelection({ bg: e.target.value })} />
+        </label>
+        <label title="Text color" className="h-7 px-1 rounded hover:bg-secondary flex items-center gap-1 cursor-pointer">
+          <Type className="w-3.5 h-3.5" />
+          <input type="color" className="w-4 h-4 border-0 bg-transparent p-0 cursor-pointer" onChange={(e) => applyStyleToSelection({ color: e.target.value })} />
+        </label>
+        <button title="Clear formatting" onClick={() => applyStyleToSelection({ bold: false, italic: false, underline: false, align: undefined, bg: '', color: '' } as any)} className="h-7 px-2 rounded hover:bg-secondary text-[10px]">Clear</button>
+        <div className="w-px h-5 bg-white/10 mx-1" />
+        <button title="Insert row above" onClick={() => insertRow(0)} className="h-7 px-1.5 rounded hover:bg-secondary flex items-center gap-1"><Rows3 className="w-3.5 h-3.5" />+</button>
+        <button title="Insert row below" onClick={() => insertRow(1)} className="h-7 px-1.5 rounded hover:bg-secondary text-[10px]">Row↓</button>
+        <button title="Insert column left" onClick={() => insertCol(0)} className="h-7 px-1.5 rounded hover:bg-secondary flex items-center gap-1"><Columns3 className="w-3.5 h-3.5" />+</button>
+        <button title="Insert column right" onClick={() => insertCol(1)} className="h-7 px-1.5 rounded hover:bg-secondary text-[10px]">Col→</button>
+        <button title="Delete row" onClick={deleteRow} className="h-7 px-1.5 rounded hover:bg-destructive/30 flex items-center gap-1"><Trash className="w-3.5 h-3.5" />R</button>
+        <button title="Delete column" onClick={deleteCol} className="h-7 px-1.5 rounded hover:bg-destructive/30 flex items-center gap-1"><Trash className="w-3.5 h-3.5" />C</button>
+        <div className="w-px h-5 bg-white/10 mx-1" />
+        <button title="Freeze first row & column" onClick={toggleFreeze} className={cn('h-7 px-1.5 rounded hover:bg-secondary flex items-center gap-1', (sheet.freezeRow || sheet.freezeCol) && 'bg-primary/30')}><Snowflake className="w-3.5 h-3.5" /></button>
+        <button title="Find & replace (Ctrl+F)" onClick={() => setFindOpen(v => !v)} className={cn('h-7 px-1.5 rounded hover:bg-secondary flex items-center gap-1', findOpen && 'bg-primary/30')}><Search className="w-3.5 h-3.5" /></button>
+      </div>
+      {findOpen && (
+        <div className="flex items-center gap-1 p-1 border-b border-white/10 bg-secondary/60 text-xs">
+          <input value={findText} onChange={(e) => setFindText(e.target.value)} placeholder="Find" className="flex-1 min-w-0 bg-background/70 px-2 py-1 rounded border border-white/10" />
+          <input value={replaceText} onChange={(e) => setReplaceText(e.target.value)} placeholder="Replace" className="flex-1 min-w-0 bg-background/70 px-2 py-1 rounded border border-white/10" />
+          <button onClick={runFindReplace} className="px-2 py-1 rounded bg-primary text-primary-foreground">Replace all</button>
+          <button onClick={() => setFindOpen(false)} className="px-2 py-1 rounded bg-secondary">Close</button>
+        </div>
+      )}
+
       {/* Formula bar */}
       <div className="flex items-center gap-2 p-1.5 border-b border-white/10 bg-secondary/30">
         <span className="text-xs font-mono text-muted-foreground px-2 py-1 bg-secondary/60 rounded min-w-[3.5rem] text-center">{activeAddr}</span>
@@ -204,6 +376,7 @@ export function SheetGrid({
         tabIndex={0}
         onKeyDown={onKey}
         onPaste={onPaste}
+        onWheel={onWheelZoom}
         className="flex-1 overflow-auto outline-none focus:ring-1 focus:ring-primary/40"
         style={{ fontSize: `${11 * zoom}px` }}
       >
@@ -230,6 +403,7 @@ export function SheetGrid({
                   const isEditing = editing && editing.r === r && editing.c === c;
                   const selected = inSel(r, c);
                   const isActive = r === sel.r && c === sel.c;
+                  const st = cell?.style;
                   return (
                     <td key={c}
                         data-cell={`${r}-${c}`}
@@ -238,7 +412,12 @@ export function SheetGrid({
                           selected && 'bg-primary/20',
                           isActive && 'ring-2 ring-primary ring-inset',
                         )}
-                        style={{ minWidth: `${(sheet.colWidths?.[c] ?? 80) * zoom}px`, width: `${(sheet.colWidths?.[c] ?? 80) * zoom}px` }}
+                        style={{
+                          minWidth: `${(sheet.colWidths?.[c] ?? 80) * zoom}px`,
+                          width: `${(sheet.colWidths?.[c] ?? 80) * zoom}px`,
+                          backgroundColor: st?.bg || undefined,
+                          color: st?.color || undefined,
+                        }}
                         onMouseDown={(e) => {
                           if (e.shiftKey) setRange(normRange({ r1: sel.r, c1: sel.c, r2: r, c2: c }));
                           else { setSel({ r, c }); setRange(null); }
@@ -263,7 +442,10 @@ export function SheetGrid({
                       ) : (
                         <span className={cn(
                           'block truncate',
-                          typeof val === 'number' ? 'text-right' : 'text-left',
+                          st?.align ? `text-${st.align}` : (typeof val === 'number' ? 'text-right' : 'text-left'),
+                          st?.bold && 'font-bold',
+                          st?.italic && 'italic',
+                          st?.underline && 'underline',
                           typeof val === 'string' && val.startsWith('#') && 'text-destructive',
                         )}>
                           {displayValue(val ?? null)}

@@ -41,6 +41,7 @@ export const useMentorChat = () => {
         .from('mentor_conversations')
         .select('id,role,content,created_at')
         .eq('user_id', user.id)
+        .neq('study_track', 'biro_yaar')
         .order('created_at', { ascending: true })
         .limit(500);
       if (!error && data) {
