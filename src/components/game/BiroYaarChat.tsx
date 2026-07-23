@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useGame } from '@/hooks/useGame';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { AutoGrowTextarea } from '@/components/common/AutoGrowTextarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Send, Clock, ArrowLeft, AlertTriangle, Trash2, Smile, MoreVertical, Volume2, Loader2, Paperclip, X, Settings2 } from 'lucide-react';
 import { ChatFileUpload, ChatFilePreview } from '@/components/game/ChatFileUpload';
@@ -112,7 +113,7 @@ export const BiroYaarChat = () => {
   const [messageToDelete, setMessageToDelete] = useState<string | null>(null);
   const [showReactionPicker, setShowReactionPicker] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const [currentAssistantId, setCurrentAssistantId] = useState<string | null>(null);
   const [playingAudio, setPlayingAudio] = useState<string | null>(null);
 
@@ -520,9 +521,11 @@ export const BiroYaarChat = () => {
           <ChatFileUpload onFileUploaded={(url, type, name) => {
             setPendingAttachments(prev => [...prev, { url, type, name }]);
           }} />
-          <Input ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)} onKeyPress={handleKeyPress}
+          <AutoGrowTextarea ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
             placeholder={isLimitReached ? "Kal milte hain..." : "Type kar yaar..."}
-            disabled={isLoading || isLimitReached} className="flex-1 bg-secondary/50 border-white/10" />
+            disabled={isLoading || isLimitReached} minRows={1} maxRows={6}
+            className="flex-1 bg-secondary/50 border-white/10" />
           <Button onClick={sendMessage} disabled={(!input.trim() && pendingAttachments.length === 0) || isLoading || isLimitReached}
             size="icon" className="bg-accent hover:bg-accent/90 shrink-0">
             <Send className="w-4 h-4" />
