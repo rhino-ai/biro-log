@@ -4,9 +4,9 @@ import { useGame } from '@/hooks/useGame';
 
 const navItems = [
   { path: '/', icon: '🏠', label: 'Home' },
-  { path: '/mind-games', icon: '🧠', label: 'Games' },
-  { path: '/wellness', icon: '🧘', label: 'Wellness' },
+  { path: '/jungles', icon: '🌴', label: 'Jungles' },
   { path: '/tasks', icon: '✅', label: 'Tasks' },
+  { path: '/mind-games', icon: '🧠', label: 'Games' },
   { path: '/friends', icon: '💬', label: 'Social' },
 ];
 
