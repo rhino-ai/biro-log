@@ -2,7 +2,15 @@
 // auto-recalc via topological pass with cycle detection.
 
 export type CellValue = string | number | boolean | null;
-export type Cell = { raw: string }; // raw stores formula (starting "=") or literal
+export type CellStyle = {
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  align?: 'left' | 'center' | 'right';
+  bg?: string;
+  color?: string;
+};
+export type Cell = { raw: string; style?: CellStyle }; // raw stores formula (starting "=") or literal
 export type SheetData = { name: string; cells: Record<string, Cell>; cols: number; rows: number; freezeRow?: number; freezeCol?: number; colWidths?: Record<number, number> };
 export type Workbook = { sheets: SheetData[]; activeSheetId?: number };
 
