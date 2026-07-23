@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { AutoGrowTextarea } from '@/components/common/AutoGrowTextarea';
 import { Video, Users, Monitor, Copy, ExternalLink, Mic, MicOff, VideoOff, Send, DoorOpen, Loader2, PhoneCall, PhoneOff, Search, Share2, XCircle, Link as LinkIcon, Ban, UserX, ShieldOff, MoreVertical, Pin, PinOff, MessageSquare, Wifi, WifiOff, ScrollText, Download, Gauge, Activity, Stethoscope, CheckCircle2, AlertTriangle, ArrowLeft, RefreshCw, LifeBuoy, Settings } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { useGame } from '@/hooks/useGame';
@@ -1571,7 +1572,7 @@ const VirtualLibraryPage = () => {
               </div>
             </ScrollArea>
             <div className="p-3 border-t border-border flex gap-2">
-              <Textarea value={messageInput} onChange={(e) => setMessageInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void sendMessage(); } }} placeholder={isGuestRoom ? 'Sign in to chat…' : 'Shared notes / chat...'} disabled={isGuestRoom} className="min-h-[44px] max-h-24 bg-secondary/50" />
+              <AutoGrowTextarea value={messageInput} onChange={(e) => setMessageInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void sendMessage(); } }} placeholder={isGuestRoom ? 'Sign in to chat…' : 'Shared notes / chat...'} disabled={isGuestRoom} minRows={1} maxRows={6} className="flex-1 bg-secondary/50" />
               <Button size="icon" onClick={sendMessage} disabled={!messageInput.trim() || isGuestRoom} className="shrink-0"><Send className="w-4 h-4" /></Button>
             </div>
           </aside>

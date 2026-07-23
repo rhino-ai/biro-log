@@ -3,6 +3,7 @@ import { BackButton } from '@/components/layout/BackButton';
 import { FriendInvite } from '@/components/game/FriendInvite';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { AutoGrowTextarea } from '@/components/common/AutoGrowTextarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -770,7 +771,7 @@ const FriendsPage = () => {
             >
               <Paperclip className="w-4 h-4" />
             </Button>
-            <Input value={messageInput} onChange={(e) => setMessageInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) void sendMessage(); }} placeholder="Type a message..." className="flex-1 bg-secondary/50" />
+            <AutoGrowTextarea value={messageInput} onChange={(e) => setMessageInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void sendMessage(); } }} placeholder="Type a message..." minRows={1} maxRows={6} className="flex-1 bg-secondary/50" />
             <Button onClick={() => void sendMessage()} disabled={!messageInput.trim() || sendingMsg} size="icon" className="bg-accent shrink-0">{sendingMsg ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}</Button>
           </div>
         </div>
