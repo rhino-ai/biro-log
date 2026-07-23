@@ -1,0 +1,14 @@
+export { default as ProfilePage } from "@/pages/ProfilePage";
+export { default as AnalyticsPage } from "@/pages/AnalyticsPage";
+export { default as FeedbackPage } from "@/pages/FeedbackPage";
+export { default as GuidePage } from "@/pages/GuidePage";
+export { default as AdminPage } from "@/pages/AdminPage";
+export { default as TrackersPage } from "@/pages/TrackersPage";
+export { default as MentorPage } from "@/pages/MentorPage";
+export { default as MentorTimelinePage } from "@/pages/MentorTimelinePage";
+export { default as BiroYaarPage } from "@/pages/BiroYaarPage";
+export { default as JunglesPage } from "@/pages/JunglesPage";
+export { default as JungleDetailPage } from "@/pages/JungleDetailPage";
+export { default as VillainModePage } from "@/pages/VillainModePage";
+export { default as AuthPage } from "@/pages/AuthPage";
+export { default as NotFound } from "@/pages/NotFound";
