@@ -6,19 +6,18 @@ interface Props {
   children: ReactNode;
   hideHeader?: boolean;
   hideNav?: boolean;
-  className?: string;
 }
 
 /**
- * Standard app shell: sticky top bar + scrollable main + bottom nav.
- * Pages can still render their own Header/BottomNav directly — this is opt-in.
+ * Standard app shell: renders Header + children + BottomNav.
+ * Pages keep their own outer container/padding so per-page layouts stay intact.
  */
-export const MainAppLayout = ({ children, hideHeader, hideNav, className }: Props) => (
-  <div className="min-h-screen bg-background pb-20">
+export const MainAppLayout = ({ children, hideHeader, hideNav }: Props) => (
+  <>
     {!hideHeader && <Header />}
-    <main className={className ?? "px-4 py-6 max-w-lg mx-auto"}>{children}</main>
+    {children}
     {!hideNav && <BottomNav />}
-  </div>
+  </>
 );
 
 export default MainAppLayout;
