@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useGame } from '@/hooks/useGame';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { AutoGrowTextarea } from '@/components/common/AutoGrowTextarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Send, ArrowLeft, Trash2, MoreVertical, GraduationCap, Volume2, Loader2, Paperclip, Settings2, Reply, X as XIcon } from 'lucide-react';
 import { ChatFileUpload, ChatFilePreview } from '@/components/game/ChatFileUpload';
@@ -72,7 +73,7 @@ export const MentorChat = () => {
   const [showPrefs, setShowPrefs] = useState(false);
   const [playingAudio, setPlayingAudio] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
 
   const mentor = trackMentorNames[studyTrack] || trackMentorNames.jee;
 
@@ -321,9 +322,10 @@ export const MentorChat = () => {
           <ChatFileUpload onFileUploaded={(url, type, name) => {
             setPendingAttachments(prev => [...prev, { url, type, name }]);
           }} />
-          <Input ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)}
+          <AutoGrowTextarea ref={inputRef} value={input} onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-            placeholder="Ask your mentor..." disabled={isLoading} className="flex-1 bg-secondary/50 border-amber-500/20" />
+            placeholder="Ask your mentor..." disabled={isLoading} minRows={1} maxRows={6}
+            className="flex-1 bg-secondary/50 border-amber-500/20" />
           <Button onClick={sendMessage} disabled={(!input.trim() && pendingAttachments.length === 0) || isLoading} size="icon" className="bg-amber-500 hover:bg-amber-600 shrink-0">
             <Send className="w-4 h-4" />
           </Button>
