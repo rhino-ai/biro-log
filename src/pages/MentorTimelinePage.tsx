@@ -22,7 +22,7 @@ const MentorTimelinePage = () => {
     if (!user) return;
     (async () => {
       const [{ data: chats }, { data: sums }] = await Promise.all([
-        supabase.from('mentor_conversations').select('role,content,created_at').eq('user_id', user.id).order('created_at', { ascending: false }).limit(500),
+        supabase.from('mentor_conversations').select('role,content,created_at').eq('user_id', user.id).neq('study_track', 'biro_yaar').order('created_at', { ascending: false }).limit(500),
         supabase.from('mentor_daily_summaries').select('summary_date,summary').eq('user_id', user.id).order('summary_date', { ascending: false }).limit(30),
       ]);
       const map = new Map<string, DayBucket>();
