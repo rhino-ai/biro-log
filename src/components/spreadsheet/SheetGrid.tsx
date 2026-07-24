@@ -313,6 +313,30 @@ export function SheetGrid({
     onZoom(Math.min(2, Math.max(0.6, (zoom || 1) + dir * 0.1)));
   };
 
+  // Pinch-to-zoom (two-finger) for touch devices — Google Sheets style.
+  const pinchStartDist = useRef<number | null>(null);
+  const pinchStartZoom = useRef<number>(1);
+  const dist = (a: React.Touch, b: React.Touch) =>
+    Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+  const onTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      pinchStartDist.current = dist(e.touches[0], e.touches[1]);
+      pinchStartZoom.current = zoom || 1;
+    }
+  };
+  const onTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2 && pinchStartDist.current && onZoom) {
+      e.preventDefault();
+      const d = dist(e.touches[0], e.touches[1]);
+      const ratio = d / pinchStartDist.current;
+      const next = Math.min(2, Math.max(0.6, pinchStartZoom.current * ratio));
+      onZoom(Math.round(next * 20) / 20);
+    }
+  };
+  const onTouchEnd = (e: React.TouchEvent) => {
+    if (e.touches.length < 2) pinchStartDist.current = null;
+  };
+
   return (
     <div className="flex flex-col h-full">
       {/* Formatting toolbar */}
@@ -377,8 +401,11 @@ export function SheetGrid({
         onKeyDown={onKey}
         onPaste={onPaste}
         onWheel={onWheelZoom}
+        onTouchStart={onTouchStart}
+        onTouchMove={onTouchMove}
+        onTouchEnd={onTouchEnd}
         className="flex-1 overflow-auto outline-none focus:ring-1 focus:ring-primary/40"
-        style={{ fontSize: `${11 * zoom}px` }}
+        style={{ fontSize: `${11 * zoom}px`, touchAction: 'pan-x pan-y' }}
       >
         <table className="border-collapse" style={{ tableLayout: 'fixed' }}>
           <thead className="sticky top-0 z-20">

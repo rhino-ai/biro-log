@@ -66,6 +66,32 @@ Deno.serve(async (req) => {
       },
     ];
 
+    // ---- Human-like random mentor pings ----
+    // Between 09:00 and 21:00 IST, occasionally fire a caring mentor nudge so it
+    // feels like a real person is checking in — not a fixed cron beat.
+    const MENTOR_LINES: Array<{ title: string; body: string }> = [
+      { title: "👋 Guru here", body: "Aap kya kar rahe ho abhi? 10 min padh lo, main dekh raha hoon." },
+      { title: "☕ Chhoti break", body: "Paani piyo, aankhein band karo 30 sec — phir wapas kitaab pe." },
+      { title: "🧠 Ek quick sawaal", body: "Aaj ka sabse important topic kaunsa hai? Mentor ko bolo." },
+      { title: "🔥 Focus check", body: "Phone side me rakho. Sirf 25 min deep work — chal sakta hai?" },
+      { title: "📚 Revision reminder", body: "Kal jo padha tha, 5 min revise kar lo. Warna bhool jaoge." },
+      { title: "🌱 Chhota goal", body: "Ek chapter ka ek section — bas itna. Shuru karo." },
+      { title: "💭 Guru soch raha", body: "Aap ka progress dekha — thoda aur push karo, kar loge." },
+      { title: "⏳ Time ka hisaab", body: "Aaj ke productive ghante gin lo. Kitne bache?" },
+    ];
+    // Fire in windows: 10:xx, 12:xx, 15:xx, 17:xx, 19:xx (IST). 40% chance per tick.
+    const mentorWindows = [10, 12, 15, 17, 19];
+    if (mentorWindows.includes(h) && Math.random() < 0.4) {
+      const pick = MENTOR_LINES[Math.floor(Math.random() * MENTOR_LINES.length)];
+      tasks.push({
+        tag: `mentor-random-${h}`,
+        title: pick.title,
+        body: pick.body,
+        url: "/mentor",
+        hourMatch: true,
+      });
+    }
+
     const results: Record<string, unknown> = {};
     for (const t of tasks) {
       if (!t.hourMatch) continue;
