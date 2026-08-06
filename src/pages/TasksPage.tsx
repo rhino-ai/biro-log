@@ -35,8 +35,8 @@ const PRIORITY_META: Record<Priority, { label: string; chip: string; row: string
 
 const TasksPage = () => {
   const { tasks, addTask, toggleTask, deleteTask, updateTask, jungles, checkDeadlinesAndUpdateBacklog } = useGame();
-  const [activeTab, setActiveTab] = useState<'all' | 'daily' | 'weekly' | 'monthly'>('all');
-  const [view, setView] = useState<'list' | 'week' | 'month'>('list');
+  const [activeTab, setActiveTab] = useState<'all' | 'daily' | 'weekly' | 'monthly' | 'holiday'>('all');
+  const [view, setView] = useState<'list' | 'week' | 'month' | 'year' | 'life'>('list');
   const [quickTitle, setQuickTitle] = useState('');
   const [quickType, setQuickType] = useState<'daily' | 'weekly' | 'monthly' | 'custom'>('daily');
   const [quickPriority, setQuickPriority] = useState<Priority>('important');
@@ -45,6 +45,7 @@ const TasksPage = () => {
   const [editingTitle, setEditingTitle] = useState('');
   const [monthCursor, setMonthCursor] = useState(new Date());
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
+  const [filterTags, setFilterTags] = useState<string[]>([]);
 
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [newTask, setNewTask] = useState({
@@ -150,12 +151,27 @@ const TasksPage = () => {
 
         {/* View switcher */}
         <div className="flex items-center gap-2">
-          {(['list', 'week', 'month'] as const).map((v) => (
-            <button key={v} onClick={() => setView(v)} className={cn(
-              'flex-1 px-3 py-1.5 rounded-full text-xs font-medium transition',
+          {(['list', 'week', 'month', 'year', 'life'] as const).map((v) => (
+            <button key={v} onClick={() => setView(v as any)} className={cn(
+              'flex-1 px-3 py-1.5 rounded-full text-[10px] font-medium transition',
               view === v ? 'bg-primary text-primary-foreground' : 'bg-secondary/50 text-muted-foreground'
             )}>
-              {v === 'list' ? '📋 Today' : v === 'week' ? '📆 Week' : '🗓️ Month'}
+              {v === 'list' ? 'Today' : v === 'week' ? 'Week' : v === 'month' ? 'Month' : v === 'year' ? 'Year' : 'Life'}
+            </button>
+          ))}
+        </div>
+
+        {/* Filters */}
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+          {['Important', 'Personal', 'Study', 'Health', 'Backlog'].map(tag => (
+            <button key={tag} 
+              onClick={() => setFilterTags(prev => prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag])}
+              className={cn(
+                "px-3 py-1 rounded-full text-[10px] border transition-all whitespace-nowrap",
+                filterTags.includes(tag) ? "bg-primary/20 border-primary text-primary" : "bg-secondary/30 border-white/5 text-muted-foreground"
+              )}
+            >
+              {tag}
             </button>
           ))}
         </div>
@@ -253,15 +269,30 @@ const TasksPage = () => {
         {view === 'list' && (
           <>
         <div className="flex items-center gap-2 overflow-x-auto pb-2">
-          {(['all', 'daily', 'weekly', 'monthly'] as const).map((tab) => (
-            <button key={tab} onClick={() => setActiveTab(tab)} className={cn("px-4 py-2 rounded-full text-sm font-medium transition-all whitespace-nowrap", activeTab === tab ? "bg-primary text-primary-foreground" : "bg-secondary/50 text-muted-foreground hover:bg-secondary")}>
-              {tab === 'all' && '📋'} {tab === 'daily' && '📅'} {tab === 'weekly' && '📆'} {tab === 'monthly' && '🗓️'} {tab.charAt(0).toUpperCase() + tab.slice(1)}
+          {(['all', 'daily', 'weekly', 'monthly', 'holiday'] as const).map((tab) => (
+            <button key={tab} onClick={() => setActiveTab(tab as any)} className={cn("px-4 py-2 rounded-full text-sm font-medium transition-all whitespace-nowrap", activeTab === tab ? "bg-primary text-primary-foreground" : "bg-secondary/50 text-muted-foreground hover:bg-secondary")}>
+              {tab === 'all' && '📋'} {tab === 'daily' && '📅'} {tab === 'weekly' && '📆'} {tab === 'monthly' && '🗓️'} {tab === 'holiday' && '🏝️'} {tab.charAt(0).toUpperCase() + tab.slice(1)}
             </button>
           ))}
         </div>
         <div className="space-y-3">
           <h2 className="font-game text-lg flex items-center gap-2"><span>📋</span> Pending ({pendingTasks.length})</h2>
-          {pendingTasks.length === 0 ? (
+          {activeTab === 'holiday' ? (
+            <div className="space-y-3">
+              {[
+                { name: 'Republic Day', date: 'Jan 26' },
+                { name: 'Independence Day', date: 'Aug 15' },
+                { name: 'Gandhi Jayanti', date: 'Oct 2' },
+                { name: 'Diwali', date: 'Nov 1' },
+                { name: 'Christmas', date: 'Dec 25' },
+              ].map(h => (
+                <div key={h.name} className="glass-panel p-3 rounded-xl border border-white/5 flex justify-between items-center">
+                  <span className="text-sm font-medium">{h.name}</span>
+                  <span className="text-xs text-muted-foreground">{h.date}</span>
+                </div>
+              ))}
+            </div>
+          ) : pendingTasks.length === 0 ? (
             <div className="glass-panel rounded-xl p-6 text-center"><span className="text-4xl mb-2 block">🎉</span><p className="text-muted-foreground text-sm">All tasks completed!</p></div>
           ) : (
             <div className="space-y-2">
@@ -426,6 +457,38 @@ const TasksPage = () => {
                 )}
               </div>
             )}
+          </div>
+        )}
+
+        {view === 'year' && (
+          <div className="space-y-4">
+            <h2 className="font-game text-sm text-center">{new Date().getFullYear()} Yearly Overview</h2>
+            <div className="grid grid-cols-4 gap-2">
+              {Array.from({ length: 12 }).map((_, i) => (
+                <div key={i} className="glass-panel p-2 rounded-lg text-center border border-white/5">
+                  <p className="text-[10px] font-bold">{format(new Date(2026, i, 1), 'MMM')}</p>
+                  <p className="text-[10px] text-muted-foreground">{tasks.filter(t => t.dueDate && parseISO(t.dueDate).getMonth() === i).length} tasks</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {view === 'life' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-game text-sm">Life Calendar (90 Years)</h2>
+              <span className="text-[10px] text-muted-foreground">Each dot = 1 week</span>
+            </div>
+            <div className="grid grid-cols-52 gap-0.5 max-h-[300px] overflow-y-auto pr-2 pb-2">
+              {Array.from({ length: 90 * 52 }).map((_, i) => (
+                <div key={i} className={cn("w-1.5 h-1.5 rounded-full", i < (18 * 52) ? "bg-primary/40" : "bg-white/5")} />
+              ))}
+            </div>
+            <div className="flex gap-4 text-[9px] text-muted-foreground justify-center">
+              <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-primary/40" /> Past</div>
+              <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-white/5" /> Future</div>
+            </div>
           </div>
         )}
 
