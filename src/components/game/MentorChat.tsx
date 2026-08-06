@@ -246,14 +246,46 @@ export const MentorChat = () => {
           <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8"><MoreVertical className="w-4 h-4" /></Button></DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="glass-panel">
             <DropdownMenuItem onClick={() => setShowPrefs(true)}><Settings2 className="w-4 h-4 mr-2" />Chat Preferences</DropdownMenuItem>
+            <DropdownMenuItem onClick={() => {
+              const input = document.createElement('input');
+              input.type = 'file';
+              input.accept = 'image/*';
+              input.onchange = (e) => {
+                const file = (e.target as HTMLInputElement).files?.[0];
+                if (file) {
+                  const reader = new FileReader();
+                  reader.onload = (re) => {
+                    const url = re.target?.result as string;
+                    localStorage.setItem('biro_chat_bg_mentor', url);
+                    toast({ title: 'Background updated' });
+                    window.location.reload();
+                  };
+                  reader.readAsDataURL(file);
+                }
+              };
+              input.click();
+            }}><Camera className="w-4 h-4 mr-2" />Change Background</DropdownMenuItem>
             <DropdownMenuItem onClick={() => setShowClearDialog(true)} className="text-raid"><Trash2 className="w-4 h-4 mr-2" />Clear All</DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
       <ChatPreferencesDialog open={showPrefs} onClose={() => setShowPrefs(false)} />
 
+      {/* Chat Background */}
+      <div className="absolute inset-0 top-14 bottom-16 pointer-events-none overflow-hidden">
+        <div 
+          className="w-full h-full bg-repeat transition-opacity duration-500" 
+          style={{
+            backgroundImage: `url("${localStorage.getItem('biro_chat_bg_mentor') || 'data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'0.4\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E'}")`,
+            backgroundSize: localStorage.getItem('biro_chat_bg_mentor') ? 'cover' : '60px',
+            backgroundPosition: 'center',
+            opacity: 0.08,
+          }} 
+        />
+      </div>
+
       {/* Messages */}
-      <ScrollArea className="flex-1 p-4" ref={scrollRef}>
+      <ScrollArea className="flex-1 p-4 relative" ref={scrollRef}>
         <div className="space-y-3 pb-4">
           {messages.map((msg) => (
             <div key={msg.id} className={cn('flex animate-fade-in', msg.role === 'user' ? 'justify-end' : 'justify-start')}>
