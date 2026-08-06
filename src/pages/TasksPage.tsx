@@ -460,6 +460,38 @@ const TasksPage = () => {
           </div>
         )}
 
+        {view === 'year' && (
+          <div className="space-y-4">
+            <h2 className="font-game text-sm text-center">{new Date().getFullYear()} Yearly Overview</h2>
+            <div className="grid grid-cols-4 gap-2">
+              {Array.from({ length: 12 }).map((_, i) => (
+                <div key={i} className="glass-panel p-2 rounded-lg text-center border border-white/5">
+                  <p className="text-[10px] font-bold">{format(new Date(2026, i, 1), 'MMM')}</p>
+                  <p className="text-[10px] text-muted-foreground">{tasks.filter(t => t.dueDate && parseISO(t.dueDate).getMonth() === i).length} tasks</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {view === 'life' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="font-game text-sm">Life Calendar (90 Years)</h2>
+              <span className="text-[10px] text-muted-foreground">Each dot = 1 week</span>
+            </div>
+            <div className="grid grid-cols-52 gap-0.5 max-h-[300px] overflow-y-auto pr-2 pb-2">
+              {Array.from({ length: 90 * 52 }).map((_, i) => (
+                <div key={i} className={cn("w-1.5 h-1.5 rounded-full", i < (18 * 52) ? "bg-primary/40" : "bg-white/5")} />
+              ))}
+            </div>
+            <div className="flex gap-4 text-[9px] text-muted-foreground justify-center">
+              <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-primary/40" /> Past</div>
+              <div className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-white/5" /> Future</div>
+            </div>
+          </div>
+        )}
+
         <div className="glass-panel rounded-2xl p-4 border border-accent/20">
           <div className="flex items-start gap-3"><span className="text-2xl">⚠️</span><div><h3 className="font-game text-sm mb-1 text-destructive">Deadline Warning!</h3><p className="text-xs text-muted-foreground">Miss a deadline → Task goes to BACKLOG → RAID MODE activates! Complete tasks on time to keep your jungle healthy! 🌴</p></div></div>
         </div>

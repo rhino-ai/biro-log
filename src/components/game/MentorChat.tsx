@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AutoGrowTextarea } from '@/components/common/AutoGrowTextarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Send, ArrowLeft, Trash2, MoreVertical, GraduationCap, Volume2, Loader2, Paperclip, Settings2, Reply, X as XIcon } from 'lucide-react';
+import { Send, ArrowLeft, Trash2, MoreVertical, GraduationCap, Volume2, Loader2, Paperclip, Settings2, Reply, X as XIcon, Camera } from 'lucide-react';
 import { ChatFileUpload, ChatFilePreview } from '@/components/game/ChatFileUpload';
 import { ChatPreferencesDialog } from '@/components/game/ChatPreferencesDialog';
 import { X } from 'lucide-react';
