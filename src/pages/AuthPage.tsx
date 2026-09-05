@@ -33,16 +33,24 @@ const AuthPage = () => {
   const handleGoogleLogin = async () => {
     setIsLoading(true);
     try {
-      const result = await lovable.auth.signInWithOAuth("google");
+      const result = await lovable.auth.signInWithOAuth("google", {
+        redirect_uri: window.location.origin,
+      });
       if (result.error) {
-        toast({ title: 'Google Login Failed', description: String(result.error), variant: 'destructive' });
+        toast({ title: 'Google Login Failed', description: String((result.error as any)?.message || result.error), variant: 'destructive' });
+        setIsLoading(false);
+        return;
       }
+      if (result.redirected) return; // browser is navigating to Google
+      // Session set — continue
+      navigate(nextPath, { replace: true });
     } catch (err: any) {
       toast({ title: 'Error', description: err.message || 'Google login failed', variant: 'destructive' });
     } finally {
       setIsLoading(false);
     }
   };
+
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
