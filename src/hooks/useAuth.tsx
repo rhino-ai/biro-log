@@ -8,7 +8,7 @@ interface AuthContextType {
   isAdmin: boolean;
   isGuest: boolean;
   isLoading: boolean;
-  signUp: (email: string, password: string, name?: string) => Promise<{ error: any }>;
+  signUp: (email: string, password: string, name?: string) => Promise<{ error: any; session: Session | null }>;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   enterGuestMode: () => void;
@@ -25,6 +25,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   });
   const [isLoading, setIsLoading] = useState(true);
   const loadingResolved = useRef(false);
+
+  const leaveGuestMode = useCallback(() => {
+    try { localStorage.removeItem('biro_guest_mode'); } catch {}
+    setIsGuest(false);
+  }, []);
 
   const resolveLoading = useCallback(() => {
     if (!loadingResolved.current) {
@@ -107,6 +112,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.log('[Auth] Session loaded:', session ? 'active' : 'none');
         setSession(session);
         setUser(session?.user ?? null);
+        if (session?.user) leaveGuestMode();
         
         // Admin check is non-blocking
         if (session?.user) {
@@ -137,6 +143,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
       setSession(session);
       setUser(session?.user ?? null);
+      if (session?.user) leaveGuestMode();
       
       if (session?.user) {
         // Fire-and-forget admin check
@@ -163,11 +170,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       clearTimeout(safetyTimeout);
       subscription.unsubscribe();
     };
-  }, [checkAdminRole]);
+  }, [checkAdminRole, leaveGuestMode]);
 
   const signUp = async (email: string, password: string, name?: string) => {
     try {
-      const { error } = await supabase.auth.signUp({
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -175,9 +182,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           emailRedirectTo: window.location.origin,
         },
       });
-      return { error };
+      return { error, session: data.session };
     } catch (err: any) {
-      return { error: err };
+      return { error: err, session: null };
     }
   };
 
@@ -187,6 +194,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         email,
         password,
       });
+      if (!error) leaveGuestMode();
       return { error };
     } catch (err: any) {
       return { error: err };

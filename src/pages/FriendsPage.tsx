@@ -639,7 +639,7 @@ const FriendsPage = () => {
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }); }, [chatMessages]);
 
-  if (isGuest) {
+  if (isGuest && !user) {
     return (
       <div className="min-h-screen bg-background pb-20">
         <main className="px-4 py-6 max-w-lg mx-auto space-y-6">
@@ -648,7 +648,7 @@ const FriendsPage = () => {
             <Users className="w-12 h-12 mx-auto text-primary" />
             <h1 className="font-game text-lg">Real chat needs sign-in</h1>
             <p className="text-sm text-muted-foreground">Guest users can explore the app, but real DMs, groups, and invites need a verified account.</p>
-            <Button className="w-full" onClick={() => window.location.assign('/auth')}>Sign in to chat</Button>
+            <Button className="w-full" onClick={() => window.location.assign('/auth?next=%2Ffriends')}>Sign in to chat</Button>
           </div>
         </main>
       </div>

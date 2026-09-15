@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/hooks/useAuth";
 import Index from "./pages/Index";
 import JunglesPage from "./pages/JunglesPage";
@@ -56,22 +56,33 @@ const ProtectedRoute = ({ children, hideHeader, hideNav }: { children: React.Rea
 };
 
 const PublicRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, isGuest, isLoading } = useAuth();
+  const { user, isLoading } = useAuth();
   if (isLoading) return (
     <div className="min-h-screen bg-background flex items-center justify-center">
       <div className="flex flex-col items-center gap-4"><Loader2 className="w-8 h-8 animate-spin text-primary" /><p className="text-muted-foreground text-sm">Loading...</p></div>
     </div>
   );
-  if (user || isGuest) return <Navigate to="/" replace />;
+  if (user) return <Navigate to="/" replace />;
   return <>{children}</>;
 };
 
 const AppRoutes = () => {
   useInAppPushSound();
+  const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   useEffect(() => {
     initNative((path) => navigate(path));
   }, [navigate]);
+  useEffect(() => {
+    if (!user) return;
+    const pendingPath = sessionStorage.getItem('biro_auth_next');
+    if (!pendingPath) return;
+    sessionStorage.removeItem('biro_auth_next');
+    if (pendingPath.startsWith('/') && !pendingPath.startsWith('//') && pendingPath !== location.pathname) {
+      navigate(pendingPath, { replace: true });
+    }
+  }, [user, navigate, location.pathname]);
   return (
   <ReadModeGuard>
   <Routes>

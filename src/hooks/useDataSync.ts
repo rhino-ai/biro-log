@@ -26,14 +26,14 @@ export const useDataSync = () => {
 
     const fallbackName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Student';
     const { error } = await withTimeout(
-      supabase.from('profiles').insert([{
+      supabase.from('profiles').upsert([{
         user_id: userId,
         name: fallbackName,
-      }] as any),
+      }] as any, { onConflict: 'user_id', ignoreDuplicates: true }),
       4000,
       { error: { message: 'profile-create-timeout' } } as any,
     );
-    if (error) console.warn('[DataSync] Profile create issue:', error.message);
+    if (error && !error.message.includes('duplicate key')) console.warn('[DataSync] Profile create issue:', error.message);
   }, [user]);
 
   const loadFromDB = useCallback(async (userId: string) => {
