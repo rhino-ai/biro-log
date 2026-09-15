@@ -1558,8 +1558,17 @@ const VirtualLibraryPage = () => {
             <ScrollArea className="flex-1 p-3">
               <div className="space-y-3">
                 {isGuestRoom && (
-                  <div className="text-center text-xs text-muted-foreground p-3 bg-secondary/30 rounded-lg">
-                    Sign in to chat & save study history.
+                  <div className="text-center text-xs text-muted-foreground p-3 bg-secondary/30 rounded-lg space-y-2">
+                    <p>Sign in to chat and save study history.</p>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        const next = `/virtual-library?join=${encodeURIComponent(activeRoom.code)}`;
+                        window.location.assign(`/auth?next=${encodeURIComponent(next)}`);
+                      }}
+                    >
+                      Sign in to room chat
+                    </Button>
                   </div>
                 )}
                 {messages.map((msg) => (

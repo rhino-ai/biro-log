@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { useGameStore } from '@/store/gameStore';
+import { useGame } from '@/hooks/useGame';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -15,9 +15,10 @@ import { lovable } from '@/integrations/lovable/index';
 const AuthPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const nextPath = searchParams.get('next') || '/';
+  const requestedPath = searchParams.get('next');
+  const nextPath = requestedPath?.startsWith('/') && !requestedPath.startsWith('//') ? requestedPath : '/';
   const { signIn, signUp, user, enterGuestMode } = useAuth();
-  const { hasSelectedTrack } = useGameStore();
+  const { hasSelectedTrack } = useGame();
   const [isLoading, setIsLoading] = useState(false);
   const [showTrackSelection, setShowTrackSelection] = useState(false);
   
@@ -33,10 +34,12 @@ const AuthPage = () => {
   const handleGoogleLogin = async () => {
     setIsLoading(true);
     try {
+      sessionStorage.setItem('biro_auth_next', nextPath);
       const result = await lovable.auth.signInWithOAuth("google", {
         redirect_uri: window.location.origin,
       });
       if (result.error) {
+        sessionStorage.removeItem('biro_auth_next');
         toast({ title: 'Google Login Failed', description: String((result.error as any)?.message || result.error), variant: 'destructive' });
         setIsLoading(false);
         return;
@@ -68,12 +71,14 @@ const AuthPage = () => {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-    const { error } = await signUp(signupForm.email, signupForm.password, signupForm.name);
+    const { error, session } = await signUp(signupForm.email, signupForm.password, signupForm.name);
     if (error) {
       toast({ title: 'Signup Failed', description: error.message, variant: 'destructive' });
-    } else {
+    } else if (session) {
       toast({ title: 'Account Created! 🌱', description: 'Welcome to Biro-log!' });
       setShowTrackSelection(true);
+    } else {
+      toast({ title: 'Confirm your email', description: 'Open the confirmation link we sent, then sign in.' });
     }
     setIsLoading(false);
   };
